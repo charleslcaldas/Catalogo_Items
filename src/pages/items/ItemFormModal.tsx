@@ -20,6 +20,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import { useData } from '@/contexts/data-context'
 import { Item } from '@/types'
+import { Plus } from 'lucide-react'
+import { LineModal, FinishModal, NcmModal } from '@/components/MetadataModals'
+import { getContrastColor } from '@/lib/utils'
+import { toast } from 'sonner'
 
 export function ItemFormModal({
   open,
@@ -30,8 +34,15 @@ export function ItemFormModal({
   onOpenChange: (open: boolean) => void
   item?: Item
 }) {
-  const { linhas, acabamentos, ncms, saveItem } = useData()
+  const { linhas, acabamentos, ncms, atributosLinha, saveItem } = useData()
   const [formData, setFormData] = useState<Partial<Item>>({})
+  const [lineModalOpen, setLineModalOpen] = useState(false)
+  const [finishModalOpen, setFinishModalOpen] = useState(false)
+  const [ncmModalOpen, setNcmModalOpen] = useState(false)
+
+  const customTamanhoLabel =
+    atributosLinha.find((a) => a.linha_id === formData.linha_id && a.tipo_atributo === 'tamanho')
+      ?.nome_campo_customizado || 'Tamanho'
 
   useEffect(() => {
     if (item) setFormData(item)
@@ -45,6 +56,8 @@ export function ItemFormModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!formData.sku || !formData.linha_id || !formData.descr_pt)
+      return toast.error('Preencha todos os campos obrigatórios')
     saveItem(formData as Item)
     onOpenChange(false)
   }
@@ -66,7 +79,9 @@ export function ItemFormModal({
             <TabsContent value="geral" className="space-y-4 pt-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>SKU</Label>
+                  <Label>
+                    SKU <span className="text-destructive">*</span>
+                  </Label>
                   <Input
                     required
                     value={formData.sku || ''}
@@ -82,7 +97,9 @@ export function ItemFormModal({
                   />
                 </div>
                 <div className="space-y-2 col-span-2">
-                  <Label>Descrição (PT)</Label>
+                  <Label>
+                    Descrição (PT) <span className="text-destructive">*</span>
+                  </Label>
                   <Input
                     required
                     value={formData.descr_pt || ''}
@@ -109,61 +126,113 @@ export function ItemFormModal({
             <TabsContent value="atributos" className="space-y-4 pt-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Linha</Label>
-                  <Select
-                    value={formData.linha_id}
-                    onValueChange={(v) => setFormData({ ...formData, linha_id: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {linhas.map((l) => (
-                        <SelectItem key={l.id} value={l.id}>
-                          {l.nome_pt}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>
+                    Linha <span className="text-destructive">*</span>
+                  </Label>
+                  <div className="flex gap-2">
+                    <Select
+                      required
+                      value={formData.linha_id}
+                      onValueChange={(v) => setFormData({ ...formData, linha_id: v })}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {linhas.map((l) => (
+                          <SelectItem key={l.id} value={l.id}>
+                            {l.nome_pt} / {l.nome_en || l.nome_pt}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="text-green-600 shrink-0"
+                      onClick={() => setLineModalOpen(true)}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Acabamento</Label>
-                  <Select
-                    value={formData.acabamento_id}
-                    onValueChange={(v) => setFormData({ ...formData, acabamento_id: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {acabamentos.map((a) => (
-                        <SelectItem key={a.id} value={a.id}>
-                          {a.nome_pt} ({a.codigo})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex gap-2">
+                    <Select
+                      value={formData.acabamento_id}
+                      onValueChange={(v) => setFormData({ ...formData, acabamento_id: v })}
+                    >
+                      <SelectTrigger
+                        className="w-full"
+                        style={(() => {
+                          const sel = acabamentos.find((a) => a.id === formData.acabamento_id)
+                          return sel?.cor_hex
+                            ? { backgroundColor: sel.cor_hex, color: getContrastColor(sel.cor_hex) }
+                            : {}
+                        })()}
+                      >
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {acabamentos.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>
+                            <div className="flex items-center gap-2">
+                              {a.cor_hex && (
+                                <div
+                                  className="w-3 h-3 rounded-full border border-black/10"
+                                  style={{ backgroundColor: a.cor_hex }}
+                                />
+                              )}
+                              {a.nome_pt} / {a.nome_en || a.nome_pt} ({a.codigo})
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="text-green-600 shrink-0"
+                      onClick={() => setFinishModalOpen(true)}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>NCM</Label>
-                  <Select
-                    value={formData.ncm_id}
-                    onValueChange={(v) => setFormData({ ...formData, ncm_id: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ncms.map((n) => (
-                        <SelectItem key={n.id} value={n.id}>
-                          {n.codigo}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex gap-2">
+                    <Select
+                      value={formData.ncm_id}
+                      onValueChange={(v) => setFormData({ ...formData, ncm_id: v })}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ncms.map((n) => (
+                          <SelectItem key={n.id} value={n.id}>
+                            {n.codigo}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="text-green-600 shrink-0"
+                      onClick={() => setNcmModalOpen(true)}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Tamanho</Label>
+                  <Label>{customTamanhoLabel}</Label>
                   <Input
                     value={formData.tamanho || ''}
                     onChange={(e) => setFormData({ ...formData, tamanho: e.target.value })}
@@ -219,6 +288,21 @@ export function ItemFormModal({
           </DialogFooter>
         </form>
       </DialogContent>
+      <LineModal
+        open={lineModalOpen}
+        onOpenChange={setLineModalOpen}
+        onSaved={(l) => setFormData({ ...formData, linha_id: l.id })}
+      />
+      <FinishModal
+        open={finishModalOpen}
+        onOpenChange={setFinishModalOpen}
+        onSaved={(a) => setFormData({ ...formData, acabamento_id: a.id })}
+      />
+      <NcmModal
+        open={ncmModalOpen}
+        onOpenChange={setNcmModalOpen}
+        onSaved={(n) => setFormData({ ...formData, ncm_id: n.id })}
+      />
     </Dialog>
   )
 }

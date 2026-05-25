@@ -1,0 +1,492 @@
+import { useState } from 'react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { useData } from '@/contexts/data-context'
+import { toast } from 'sonner'
+import pb from '@/lib/pocketbase/client'
+import { Plus } from 'lucide-react'
+
+export function CategoryModal({
+  open,
+  onOpenChange,
+  onSaved,
+}: {
+  open: boolean
+  onOpenChange: (o: boolean) => void
+  onSaved?: (cat: any) => void
+}) {
+  const [data, setData] = useState({ nome_pt: '', nome_en: '' })
+  const [saving, setSaving] = useState(false)
+  const { reloadMetadata } = useData()
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!data.nome_pt || !data.nome_en) return toast.error('Preencha todos os campos obrigatórios')
+    setSaving(true)
+    try {
+      const created = await pb.collection('categorias').create(data)
+      await reloadMetadata()
+      toast.success('Novo registro criado com sucesso')
+      onSaved?.(created)
+      onOpenChange(false)
+      setData({ nome_pt: '', nome_en: '' })
+    } catch (e) {
+      toast.error('Erro ao salvar categoria')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Criar Nova Categoria</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-4 pt-4">
+          <div className="space-y-2">
+            <Label>
+              Nome (PT) <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              required
+              value={data.nome_pt}
+              onChange={(e) => setData({ ...data, nome_pt: e.target.value })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>
+              Nome (EN) <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              required
+              value={data.nome_en}
+              onChange={(e) => setData({ ...data, nome_en: e.target.value })}
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={saving}>
+              Criar
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+export function LineModal({
+  open,
+  onOpenChange,
+  onSaved,
+}: {
+  open: boolean
+  onOpenChange: (o: boolean) => void
+  onSaved?: (lin: any) => void
+}) {
+  const [data, setData] = useState({
+    categoria_id: '',
+    nome_pt: '',
+    nome_en: '',
+    superlinha_pt: '',
+    superlinha_en: '',
+    ncm_id: '',
+  })
+  const [saving, setSaving] = useState(false)
+  const { categorias, ncms, reloadMetadata } = useData()
+  const [catModalOpen, setCatModalOpen] = useState(false)
+  const [ncmModalOpen, setNcmModalOpen] = useState(false)
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (
+      !data.categoria_id ||
+      !data.nome_pt ||
+      !data.nome_en ||
+      !data.superlinha_pt ||
+      !data.superlinha_en ||
+      !data.ncm_id
+    )
+      return toast.error('Preencha todos os campos obrigatórios')
+    setSaving(true)
+    try {
+      const created = await pb.collection('linhas').create(data)
+      await reloadMetadata()
+      toast.success('Novo registro criado com sucesso')
+      onSaved?.(created)
+      onOpenChange(false)
+      setData({
+        categoria_id: '',
+        nome_pt: '',
+        nome_en: '',
+        superlinha_pt: '',
+        superlinha_en: '',
+        ncm_id: '',
+      })
+    } catch (e) {
+      toast.error('Erro ao salvar linha')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Criar Nova Linha</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={submit} className="space-y-4 pt-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2 col-span-2">
+                <Label>
+                  Categoria <span className="text-destructive">*</span>
+                </Label>
+                <div className="flex gap-2">
+                  <Select
+                    required
+                    value={data.categoria_id}
+                    onValueChange={(v) => setData({ ...data, categoria_id: v })}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Selecione a Categoria..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categorias.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.nome_pt} / {c.nome_en}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="text-green-600 shrink-0"
+                    onClick={() => setCatModalOpen(true)}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2 col-span-2">
+                <Label>
+                  NCM <span className="text-destructive">*</span>
+                </Label>
+                <div className="flex gap-2">
+                  <Select
+                    required
+                    value={data.ncm_id}
+                    onValueChange={(v) => setData({ ...data, ncm_id: v })}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Selecione o NCM..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ncms.map((n) => (
+                        <SelectItem key={n.id} value={n.id}>
+                          {n.codigo}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="text-green-600 shrink-0"
+                    onClick={() => setNcmModalOpen(true)}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>
+                  Nome (PT) <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  required
+                  value={data.nome_pt}
+                  onChange={(e) => setData({ ...data, nome_pt: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>
+                  Nome (EN) <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  required
+                  value={data.nome_en}
+                  onChange={(e) => setData({ ...data, nome_en: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>
+                  Superlinha (PT) <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  required
+                  value={data.superlinha_pt}
+                  onChange={(e) => setData({ ...data, superlinha_pt: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>
+                  Superlinha (EN) <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  required
+                  value={data.superlinha_en}
+                  onChange={(e) => setData({ ...data, superlinha_en: e.target.value })}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={saving}>
+                Criar
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <CategoryModal
+        open={catModalOpen}
+        onOpenChange={setCatModalOpen}
+        onSaved={(c) => setData({ ...data, categoria_id: c.id })}
+      />
+      <NcmModal
+        open={ncmModalOpen}
+        onOpenChange={setNcmModalOpen}
+        onSaved={(n) => setData({ ...data, ncm_id: n.id })}
+      />
+    </>
+  )
+}
+
+export function FinishModal({
+  open,
+  onOpenChange,
+  onSaved,
+}: {
+  open: boolean
+  onOpenChange: (o: boolean) => void
+  onSaved?: (acab: any) => void
+}) {
+  const [data, setData] = useState({ codigo: '', nome_pt: '', nome_en: '', cor_hex: '#000000' })
+  const [saving, setSaving] = useState(false)
+  const { reloadMetadata } = useData()
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!data.codigo || !data.nome_pt || !data.nome_en || !data.cor_hex)
+      return toast.error('Preencha todos os campos obrigatórios')
+    setSaving(true)
+    try {
+      const created = await pb.collection('acabamentos').create(data)
+      await reloadMetadata()
+      toast.success('Novo registro criado com sucesso')
+      onSaved?.(created)
+      onOpenChange(false)
+      setData({ codigo: '', nome_pt: '', nome_en: '', cor_hex: '#000000' })
+    } catch (e) {
+      toast.error('Erro ao salvar acabamento')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Criar Novo Acabamento</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-4 pt-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>
+                Código <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                required
+                value={data.codigo}
+                onChange={(e) => setData({ ...data, codigo: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>
+                Cor (Hex) <span className="text-destructive">*</span>
+              </Label>
+              <div className="flex gap-2 items-center">
+                <Input
+                  type="color"
+                  required
+                  value={data.cor_hex}
+                  onChange={(e) => setData({ ...data, cor_hex: e.target.value })}
+                  className="h-10 w-16 p-1 cursor-pointer"
+                />
+                <Input
+                  value={data.cor_hex}
+                  onChange={(e) => setData({ ...data, cor_hex: e.target.value })}
+                  className="uppercase"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>
+                Nome (PT) <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                required
+                value={data.nome_pt}
+                onChange={(e) => setData({ ...data, nome_pt: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>
+                Nome (EN) <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                required
+                value={data.nome_en}
+                onChange={(e) => setData({ ...data, nome_en: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={saving}>
+              Criar
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+export function NcmModal({
+  open,
+  onOpenChange,
+  onSaved,
+}: {
+  open: boolean
+  onOpenChange: (o: boolean) => void
+  onSaved?: (n: any) => void
+}) {
+  const [data, setData] = useState({ codigo: '', ii: 0, ipi: 0, pis: 0, cofins: 0 })
+  const [saving, setSaving] = useState(false)
+  const { reloadMetadata } = useData()
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!data.codigo) return toast.error('Preencha todos os campos obrigatórios')
+    setSaving(true)
+    try {
+      const created = await pb.collection('ncm').create(data)
+      await reloadMetadata()
+      toast.success('Novo registro criado com sucesso')
+      onSaved?.(created)
+      onOpenChange(false)
+      setData({ codigo: '', ii: 0, ipi: 0, pis: 0, cofins: 0 })
+    } catch (e) {
+      toast.error('Erro ao salvar NCM')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Criar Novo NCM</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-4 pt-4">
+          <div className="space-y-2">
+            <Label>
+              Código <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              required
+              value={data.codigo}
+              onChange={(e) => setData({ ...data, codigo: e.target.value })}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>II (%)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={data.ii}
+                onChange={(e) => setData({ ...data, ii: Number(e.target.value) })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>IPI (%)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={data.ipi}
+                onChange={(e) => setData({ ...data, ipi: Number(e.target.value) })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>PIS (%)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={data.pis}
+                onChange={(e) => setData({ ...data, pis: Number(e.target.value) })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>COFINS (%)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={data.cofins}
+                onChange={(e) => setData({ ...data, cofins: Number(e.target.value) })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={saving}>
+              Criar
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}

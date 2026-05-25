@@ -9,6 +9,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useData } from '@/contexts/data-context'
 import { Badge } from '@/components/ui/badge'
+import { getContrastColor } from '@/lib/utils'
 
 export default function Finishes() {
   const { acabamentos } = useData()
@@ -43,8 +44,19 @@ export default function Finishes() {
                   <TableCell>
                     <Badge variant="secondary">{aca.codigo}</Badge>
                   </TableCell>
-                  <TableCell className="font-medium">{aca.nome_pt}</TableCell>
-                  <TableCell>{aca.nome_en}</TableCell>
+                  <TableCell>
+                    <span
+                      className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium"
+                      style={
+                        aca.cor_hex
+                          ? { backgroundColor: aca.cor_hex, color: getContrastColor(aca.cor_hex) }
+                          : {}
+                      }
+                    >
+                      {aca.nome_pt} / {aca.nome_en || aca.nome_pt}
+                    </span>
+                  </TableCell>
+                  <TableCell>{aca.nome_en || '-'}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

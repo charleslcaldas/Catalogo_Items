@@ -20,6 +20,9 @@ import { useData } from '@/contexts/data-context'
 import type { Item } from '@/types'
 import pb from '@/lib/pocketbase/client'
 import { toast } from 'sonner'
+import { Plus } from 'lucide-react'
+import { LineModal, FinishModal } from '@/components/MetadataModals'
+import { getContrastColor } from '@/lib/utils'
 
 interface QuickItemModalProps {
   open: boolean
@@ -29,9 +32,11 @@ interface QuickItemModalProps {
 }
 
 export function QuickItemModal({ open, onOpenChange, initialData, onSaved }: QuickItemModalProps) {
-  const { linhas, acabamentos } = useData()
+  const { linhas, acabamentos, atributosLinha } = useData()
   const [formData, setFormData] = useState<Partial<Item>>({})
   const [isSaving, setIsSaving] = useState(false)
+  const [lineModalOpen, setLineModalOpen] = useState(false)
+  const [finishModalOpen, setFinishModalOpen] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -48,8 +53,14 @@ export function QuickItemModal({ open, onOpenChange, initialData, onSaved }: Qui
     }
   }, [open, initialData])
 
+  const customTamanhoLabel =
+    atributosLinha.find((a) => a.linha_id === formData.linha_id && a.tipo_atributo === 'tamanho')
+      ?.nome_campo_customizado || 'Tamanho'
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!formData.sku || !formData.linha_id || !formData.descr_pt)
+      return toast.error('Preencha todos os campos obrigatórios')
     setIsSaving(true)
     try {
       const record = await pb.collection('itens').create(formData)
@@ -91,22 +102,33 @@ export function QuickItemModal({ open, onOpenChange, initialData, onSaved }: Qui
               <Label>
                 Linha <span className="text-destructive">*</span>
               </Label>
-              <Select
-                required
-                value={formData.linha_id || ''}
-                onValueChange={(v) => setFormData({ ...formData, linha_id: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {linhas.map((l) => (
-                    <SelectItem key={l.id} value={l.id}>
-                      {l.nome_pt}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex gap-2">
+                <Select
+                  required
+                  value={formData.linha_id || ''}
+                  onValueChange={(v) => setFormData({ ...formData, linha_id: v })}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {linhas.map((l) => (
+                      <SelectItem key={l.id} value={l.id}>
+                        {l.nome_pt} / {l.nome_en || l.nome_pt}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="text-green-600 shrink-0"
+                  onClick={() => setLineModalOpen(true)}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
             <div className="space-y-2 col-span-2">
               <Label>
@@ -119,7 +141,7 @@ export function QuickItemModal({ open, onOpenChange, initialData, onSaved }: Qui
               />
             </div>
             <div className="space-y-2">
-              <Label>Tamanho</Label>
+              <Label>{customTamanhoLabel}</Label>
               <Input
                 value={formData.tamanho || ''}
                 onChange={(e) => setFormData({ ...formData, tamanho: e.target.value })}
@@ -127,21 +149,48 @@ export function QuickItemModal({ open, onOpenChange, initialData, onSaved }: Qui
             </div>
             <div className="space-y-2">
               <Label>Acabamento</Label>
-              <Select
-                value={formData.acabamento_id || ''}
-                onValueChange={(v) => setFormData({ ...formData, acabamento_id: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {acabamentos.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
-                      {a.nome_pt}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex gap-2">
+                <Select
+                  value={formData.acabamento_id || ''}
+                  onValueChange={(v) => setFormData({ ...formData, acabamento_id: v })}
+                >
+                  <SelectTrigger
+                    className="w-full"
+                    style={(() => {
+                      const sel = acabamentos.find((a) => a.id === formData.acabamento_id)
+                      return sel?.cor_hex
+                        ? { backgroundColor: sel.cor_hex, color: getContrastColor(sel.cor_hex) }
+                        : {}
+                    })()}
+                  >
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {acabamentos.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        <div className="flex items-center gap-2">
+                          {a.cor_hex && (
+                            <div
+                              className="w-3 h-3 rounded-full border border-black/10"
+                              style={{ backgroundColor: a.cor_hex }}
+                            />
+                          )}
+                          {a.nome_pt} / {a.nome_en || a.nome_pt}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="text-green-600 shrink-0"
+                  onClick={() => setFinishModalOpen(true)}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Classe</Label>
@@ -198,6 +247,16 @@ export function QuickItemModal({ open, onOpenChange, initialData, onSaved }: Qui
           </DialogFooter>
         </form>
       </DialogContent>
+      <LineModal
+        open={lineModalOpen}
+        onOpenChange={setLineModalOpen}
+        onSaved={(l) => setFormData({ ...formData, linha_id: l.id })}
+      />
+      <FinishModal
+        open={finishModalOpen}
+        onOpenChange={setFinishModalOpen}
+        onSaved={(a) => setFormData({ ...formData, acabamento_id: a.id })}
+      />
     </Dialog>
   )
 }

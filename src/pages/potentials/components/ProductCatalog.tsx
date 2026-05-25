@@ -174,7 +174,9 @@ export function ProductCatalog({
                   </TableCell>
                   <TableCell className="whitespace-nowrap">{item.tamanho || '-'}</TableCell>
                   <TableCell className="whitespace-nowrap">
-                    {item.expand?.acabamento_id?.nome_pt || '-'}
+                    {item.expand?.acabamento_id
+                      ? `${item.expand.acabamento_id.nome_pt} / ${item.expand.acabamento_id.nome_en || item.expand.acabamento_id.nome_pt}`
+                      : '-'}
                   </TableCell>
                   <TableCell className="text-right whitespace-nowrap">
                     {item.preco_venda ? `$ ${item.preco_venda.toFixed(2)}` : '-'}

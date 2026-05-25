@@ -37,8 +37,12 @@ export default function Categories() {
             <TableBody>
               {categorias.map((cat) => (
                 <TableRow key={cat.id}>
-                  <TableCell className="font-medium">{cat.nome_pt}</TableCell>
-                  <TableCell>{cat.nome_en}</TableCell>
+                  <TableCell className="font-medium">
+                    <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-[#E5E7EB] text-[#1F2937] w-fit">
+                      {cat.nome_pt} / {cat.nome_en || cat.nome_pt}
+                    </span>
+                  </TableCell>
+                  <TableCell>{cat.nome_en || '-'}</TableCell>
                   <TableCell>{new Date(cat.created).toLocaleDateString('pt-BR')}</TableCell>
                 </TableRow>
               ))}

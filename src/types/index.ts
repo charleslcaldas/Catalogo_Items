@@ -14,12 +14,17 @@ export type Categoria = {
 export type Linha = {
   id: string
   categoria_id: string
+  ncm_id?: string
   nome_pt: string
   nome_en: string
   superlinha_pt: string
   superlinha_en: string
   created: string
   updated: string
+  expand?: {
+    categoria_id?: Categoria
+    ncm_id?: NCM
+  }
 }
 
 export type Acabamento = {
@@ -27,6 +32,16 @@ export type Acabamento = {
   codigo: string
   nome_pt: string
   nome_en: string
+  cor_hex?: string
+  created: string
+  updated: string
+}
+
+export type AtributoLinha = {
+  id: string
+  linha_id: string
+  tipo_atributo: string
+  nome_campo_customizado: string
   created: string
   updated: string
 }
