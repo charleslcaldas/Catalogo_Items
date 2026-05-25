@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-25T01:44:48.003Z",
+  "generatedAt": "2026-05-25T01:53:22.327Z",
   "collections": [
     {
       "name": "users",
@@ -372,6 +372,70 @@
         "CREATE INDEX idx_itens_acabamento_id ON itens (acabamento_id)",
         "CREATE INDEX idx_itens_ncm_id ON itens (ncm_id)"
       ]
+    },
+    {
+      "name": "logs_importacao",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "arquivo_nome",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "total_processado",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "sucessos",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "duplicados",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "erros",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "detalhes_erros",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
     }
   ]
 }

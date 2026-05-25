@@ -1,5 +1,13 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Package, Folders, AlignJustify, Paintbrush, Receipt } from 'lucide-react'
+import {
+  LayoutDashboard,
+  Package,
+  Folders,
+  AlignJustify,
+  Paintbrush,
+  Receipt,
+  UploadCloud,
+} from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -19,6 +27,7 @@ const items = [
   { title: 'Linhas', url: '/linhas', icon: AlignJustify },
   { title: 'Acabamentos', url: '/acabamentos', icon: Paintbrush },
   { title: 'Configurações NCM', url: '/ncm', icon: Receipt },
+  { title: 'Importar do Airtable', url: '/importar', icon: UploadCloud },
 ]
 
 export function AppSidebar() {

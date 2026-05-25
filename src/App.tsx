@@ -10,6 +10,7 @@ import Categories from './pages/Categories'
 import Lines from './pages/Lines'
 import Finishes from './pages/Finishes'
 import NCMPage from './pages/NCM'
+import ImportPage from './pages/Import'
 import Login from './pages/Login'
 import { DataProvider } from './contexts/data-context'
 import { AuthProvider } from './hooks/use-auth'
@@ -32,6 +33,7 @@ const App = () => (
                 <Route path="/linhas" element={<Lines />} />
                 <Route path="/acabamentos" element={<Finishes />} />
                 <Route path="/ncm" element={<NCMPage />} />
+                <Route path="/importar" element={<ImportPage />} />
               </Route>
             </Route>
             <Route path="*" element={<NotFound />} />
