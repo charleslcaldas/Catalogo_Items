@@ -39,7 +39,7 @@ export default function Categories() {
                 <TableRow key={cat.id}>
                   <TableCell className="font-medium">{cat.nome_pt}</TableCell>
                   <TableCell>{cat.nome_en}</TableCell>
-                  <TableCell>{new Date(cat.criado_em).toLocaleDateString('pt-BR')}</TableCell>
+                  <TableCell>{new Date(cat.created).toLocaleDateString('pt-BR')}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

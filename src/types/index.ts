@@ -2,8 +2,8 @@ export type Categoria = {
   id: string
   nome_pt: string
   nome_en: string
-  criado_em: string
-  atualizado_em: string
+  created: string
+  updated: string
 }
 
 export type Linha = {
@@ -13,8 +13,8 @@ export type Linha = {
   nome_en: string
   superlinha_pt: string
   superlinha_en: string
-  criado_em: string
-  atualizado_em: string
+  created: string
+  updated: string
 }
 
 export type Acabamento = {
@@ -22,8 +22,8 @@ export type Acabamento = {
   codigo: string
   nome_pt: string
   nome_en: string
-  criado_em: string
-  atualizado_em: string
+  created: string
+  updated: string
 }
 
 export type NCM = {
@@ -33,8 +33,8 @@ export type NCM = {
   ipi: number
   pis: number
   cofins: number
-  criado_em: string
-  atualizado_em: string
+  created: string
+  updated: string
 }
 
 export type Item = {
@@ -54,6 +54,6 @@ export type Item = {
   ativo: boolean
   sincronizado_com_zoho: boolean
   data_sincronizacao: string | null
-  criado_em: string
-  atualizado_em: string
+  created: string
+  updated: string
 }

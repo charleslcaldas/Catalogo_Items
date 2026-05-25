@@ -1,7 +1,9 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react'
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { Categoria, Linha, Acabamento, NCM, Item } from '@/types'
-import { mockCategorias, mockLinhas, mockAcabamentos, mockNCM, mockItens } from '@/data/mock'
 import { toast } from '@/hooks/use-toast'
+import pb from '@/lib/pocketbase/client'
+import { useRealtime } from '@/hooks/use-realtime'
+import { useAuth } from '@/hooks/use-auth'
 
 interface DataContextType {
   categorias: Categoria[]
@@ -18,64 +20,101 @@ interface DataContextType {
 const DataContext = createContext<DataContextType | undefined>(undefined)
 
 export function DataProvider({ children }: { children: ReactNode }) {
-  const [categorias, setCategorias] = useState<Categoria[]>(mockCategorias)
-  const [linhas, setLinhas] = useState<Linha[]>(mockLinhas)
-  const [acabamentos, setAcabamentos] = useState<Acabamento[]>(mockAcabamentos)
-  const [ncms, setNcms] = useState<NCM[]>(mockNCM)
-  const [itens, setItens] = useState<Item[]>(mockItens)
+  const [categorias, setCategorias] = useState<Categoria[]>([])
+  const [linhas, setLinhas] = useState<Linha[]>([])
+  const [acabamentos, setAcabamentos] = useState<Acabamento[]>([])
+  const [ncms, setNcms] = useState<NCM[]>([])
+  const [itens, setItens] = useState<Item[]>([])
+  const { isAuthenticated } = useAuth()
 
-  const saveItem = (item: Partial<Item>) => {
-    if (item.id) {
-      setItens((prev) =>
-        prev.map((i) =>
-          i.id === item.id
-            ? ({ ...i, ...item, atualizado_em: new Date().toISOString() } as Item)
-            : i,
-        ),
-      )
-      toast({ title: 'Item atualizado', description: 'O item foi salvo com sucesso.' })
-    } else {
-      const newItem = {
-        ...item,
-        id: `itm-${Date.now()}`,
-        criado_em: new Date().toISOString(),
-        atualizado_em: new Date().toISOString(),
-      } as Item
-      setItens((prev) => [newItem, ...prev])
-      toast({ title: 'Item criado', description: 'Novo item adicionado ao catálogo.' })
+  const loadData = async () => {
+    try {
+      const [cats, lins, acabs, ncmData, itemsData] = await Promise.all([
+        pb.collection('categorias').getFullList<Categoria>(),
+        pb.collection('linhas').getFullList<Linha>(),
+        pb.collection('acabamentos').getFullList<Acabamento>(),
+        pb.collection('ncm').getFullList<NCM>(),
+        pb.collection('itens').getFullList<Item>({ sort: '-created' }),
+      ])
+      setCategorias(cats)
+      setLinhas(lins)
+      setAcabamentos(acabs)
+      setNcms(ncmData)
+      setItens(itemsData)
+    } catch (e) {
+      console.error('Error loading data', e)
     }
   }
 
-  const deleteItem = (id: string) => {
-    setItens((prev) => prev.filter((i) => i.id !== id))
-    toast({ title: 'Item excluído', variant: 'destructive' })
-  }
-
-  const saveCategoria = (cat: Partial<Categoria>) => {
-    if (cat.id) {
-      setCategorias((prev) =>
-        prev.map((c) =>
-          c.id === cat.id
-            ? ({ ...c, ...cat, atualizado_em: new Date().toISOString() } as Categoria)
-            : c,
-        ),
-      )
-      toast({ title: 'Categoria atualizada' })
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadData()
     } else {
-      const newCat = {
-        ...cat,
-        id: `cat-${Date.now()}`,
-        criado_em: new Date().toISOString(),
-        atualizado_em: new Date().toISOString(),
-      } as Categoria
-      setCategorias((prev) => [newCat, ...prev])
-      toast({ title: 'Categoria criada' })
+      setCategorias([])
+      setLinhas([])
+      setAcabamentos([])
+      setNcms([])
+      setItens([])
+    }
+  }, [isAuthenticated])
+
+  useRealtime(
+    'itens',
+    () => {
+      if (isAuthenticated) {
+        pb.collection('itens').getFullList<Item>({ sort: '-created' }).then(setItens)
+      }
+    },
+    isAuthenticated,
+  )
+
+  const saveItem = async (item: Partial<Item>) => {
+    try {
+      if (item.id) {
+        await pb.collection('itens').update(item.id, item)
+        toast({ title: 'Item atualizado', description: 'O item foi salvo com sucesso.' })
+      } else {
+        await pb.collection('itens').create(item)
+        toast({ title: 'Item criado', description: 'Novo item adicionado ao catálogo.' })
+      }
+    } catch (e: any) {
+      toast({ title: 'Erro ao salvar item', description: e.message, variant: 'destructive' })
     }
   }
 
-  const deleteCategoria = (id: string) => {
-    setCategorias((prev) => prev.filter((c) => c.id !== id))
-    toast({ title: 'Categoria excluída', variant: 'destructive' })
+  const deleteItem = async (id: string) => {
+    try {
+      await pb.collection('itens').delete(id)
+      toast({ title: 'Item excluído', variant: 'destructive' })
+    } catch (e: any) {
+      toast({ title: 'Erro ao excluir item', description: e.message, variant: 'destructive' })
+    }
+  }
+
+  const saveCategoria = async (cat: Partial<Categoria>) => {
+    try {
+      if (cat.id) {
+        const updated = await pb.collection('categorias').update<Categoria>(cat.id, cat)
+        setCategorias((prev) => prev.map((c) => (c.id === updated.id ? updated : c)))
+        toast({ title: 'Categoria atualizada' })
+      } else {
+        const created = await pb.collection('categorias').create<Categoria>(cat)
+        setCategorias((prev) => [created, ...prev])
+        toast({ title: 'Categoria criada' })
+      }
+    } catch (e: any) {
+      toast({ title: 'Erro ao salvar categoria', description: e.message, variant: 'destructive' })
+    }
+  }
+
+  const deleteCategoria = async (id: string) => {
+    try {
+      await pb.collection('categorias').delete(id)
+      setCategorias((prev) => prev.filter((c) => c.id !== id))
+      toast({ title: 'Categoria excluída', variant: 'destructive' })
+    } catch (e: any) {
+      toast({ title: 'Erro ao excluir categoria', description: e.message, variant: 'destructive' })
+    }
   }
 
   return (
