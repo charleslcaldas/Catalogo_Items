@@ -9,8 +9,16 @@ export const getItensPaginated = (
 ) => {
   let filter = ''
   if (searchTerm) {
-    const term = searchTerm.replace(/"/g, '')
-    filter = `sku ~ "${term}" || descr_pt ~ "${term}" || descr_en ~ "${term}"`
+    const terms = searchTerm
+      .split(' ')
+      .map((t) => t.trim().replace(/"/g, ''))
+      .filter(Boolean)
+    filter = terms
+      .map(
+        (term) =>
+          `(sku ~ "${term}" || descr_pt ~ "${term}" || descr_en ~ "${term}" || tamanho ~ "${term}")`,
+      )
+      .join(' && ')
   }
   return pb.collection<Item>('itens').getList(page, perPage, {
     filter,

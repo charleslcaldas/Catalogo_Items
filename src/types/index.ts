@@ -47,6 +47,7 @@ export type Potencial = {
   numero_potencial: string
   cliente: string
   status: string
+  observacoes?: string
   created: string
   updated: string
 }
@@ -56,10 +57,14 @@ export type PotencialItem = {
   potencial_id: string
   item_id: string
   quantidade: number
+  unidade_medida?: string
   preco_unitario: number
   observacoes: string
   created: string
   updated: string
+  expand?: {
+    item_id?: Item
+  }
 }
 
 export type Item = {
@@ -79,6 +84,13 @@ export type Item = {
   ativo: boolean
   sincronizado_com_zoho: boolean
   data_sincronizacao: string | null
+  classe?: string
+  norma?: string
   created: string
   updated: string
+  expand?: {
+    acabamento_id?: Acabamento
+    linha_id?: Linha
+    ncm_id?: NCM
+  }
 }

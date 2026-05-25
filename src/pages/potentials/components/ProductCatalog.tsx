@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Search } from 'lucide-react'
+import { Search, Loader2, Plus, Copy, PackageOpen } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -18,9 +18,16 @@ import { SelectedItemData } from '../AddItemsToPotential'
 interface ProductCatalogProps {
   selectedItems: Map<string, SelectedItemData>
   onToggle: (item: Item) => void
+  onAddNew: () => void
+  onDuplicate: (item: Item) => void
 }
 
-export function ProductCatalog({ selectedItems, onToggle }: ProductCatalogProps) {
+export function ProductCatalog({
+  selectedItems,
+  onToggle,
+  onAddNew,
+  onDuplicate,
+}: ProductCatalogProps) {
   const [items, setItems] = useState<Item[]>([])
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -38,6 +45,7 @@ export function ProductCatalog({ selectedItems, onToggle }: ProductCatalogProps)
           setItems(res.items)
           setTotalPages(res.totalPages)
         })
+        .catch(console.error)
         .finally(() => setLoading(false))
     }, 300)
     return () => clearTimeout(delay)
@@ -60,26 +68,39 @@ export function ProductCatalog({ selectedItems, onToggle }: ProductCatalogProps)
 
   return (
     <div className="flex flex-col h-full bg-white rounded-lg border shadow-sm overflow-hidden">
-      <div className="p-4 border-b shrink-0">
-        <div className="relative">
+      <div className="p-4 border-b shrink-0 flex gap-2">
+        <div className="relative flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Buscar por SKU ou descrição (PT/EN)..."
-            className="pl-8 w-full md:max-w-md"
+            placeholder="Buscar (ex: PAR SEX M8)..."
+            className="pl-8 w-full"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value)
               setPage(1)
             }}
           />
+          {loading && (
+            <Loader2 className="absolute right-2.5 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+          )}
         </div>
       </div>
       <div className="flex-1 overflow-auto relative min-h-0">
         <Table>
           <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
             <TableRow>
-              <TableHead className="w-12"></TableHead>
+              <TableHead className="w-12">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-primary"
+                  onClick={onAddNew}
+                  title="Novo Item"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </TableHead>
               <TableHead
                 className="cursor-pointer select-none whitespace-nowrap"
                 onClick={() => handleSort('sku')}
@@ -103,21 +124,28 @@ export function ProductCatalog({ selectedItems, onToggle }: ProductCatalogProps)
                 className="cursor-pointer select-none whitespace-nowrap text-right"
                 onClick={() => handleSort('preco_venda')}
               >
-                Preço{renderSortIndicator('preco_venda')}
+                Preço USD{renderSortIndicator('preco_venda')}
               </TableHead>
+              <TableHead className="w-12"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading ? (
+            {loading && items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center h-24">
-                  Carregando...
+                <TableCell colSpan={7} className="text-center h-40">
+                  <div className="flex flex-col items-center justify-center text-muted-foreground">
+                    <Loader2 className="h-8 w-8 animate-spin mb-2" />
+                    <p>Carregando itens...</p>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center h-24">
-                  Nenhum item encontrado.
+                <TableCell colSpan={7} className="text-center h-40">
+                  <div className="flex flex-col items-center justify-center text-muted-foreground opacity-70">
+                    <PackageOpen className="h-10 w-10 mb-2" />
+                    <p>Nenhum item encontrado.</p>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
@@ -149,7 +177,18 @@ export function ProductCatalog({ selectedItems, onToggle }: ProductCatalogProps)
                     {item.expand?.acabamento_id?.nome_pt || '-'}
                   </TableCell>
                   <TableCell className="text-right whitespace-nowrap">
-                    {item.preco_venda ? `R$ ${item.preco_venda.toFixed(2)}` : '-'}
+                    {item.preco_venda ? `$ ${item.preco_venda.toFixed(2)}` : '-'}
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 hover:text-primary"
+                      onClick={() => onDuplicate(item)}
+                      title="Duplicar"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-25T06:09:31.447Z",
+  "generatedAt": "2026-05-25T06:31:24.634Z",
   "collections": [
     {
       "name": "users",
@@ -364,6 +364,18 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "classe",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "norma",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -479,6 +491,12 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "observacoes",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": ["CREATE UNIQUE INDEX idx_potenciais_numero ON potenciais (numero_potencial)"]
@@ -539,6 +557,12 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "unidade_medida",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": []

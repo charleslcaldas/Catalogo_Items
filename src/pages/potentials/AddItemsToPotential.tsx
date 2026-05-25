@@ -1,24 +1,33 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { PotentialHeader } from './components/PotentialHeader'
+import { Search } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { ProductCatalog } from './components/ProductCatalog'
 import { SelectionPanel } from './components/SelectionPanel'
-import { addPotencialItens } from '@/services/potenciais'
+import { QuickItemModal } from './components/QuickItemModal'
+import { SearchQuoteModal } from './components/SearchQuoteModal'
+import { savePotencialFull, getPotencialItens } from '@/services/potenciais'
 import type { Potencial, Item } from '@/types'
 
 export type SelectedItemData = {
   item: Item
   quantidade: number | ''
+  unidade_medida: string
   preco_unitario: number | ''
   observacoes: string
 }
 
 export default function AddItemsToPotential() {
   const navigate = useNavigate()
-  const [selectedPotential, setSelectedPotential] = useState<Potencial | null>(null)
+  const [currentPotential, setCurrentPotential] = useState<Potencial | null>(null)
   const [selectedItems, setSelectedItems] = useState<Map<string, SelectedItemData>>(new Map())
   const [isSaving, setIsSaving] = useState(false)
+
+  // Modals state
+  const [isSearchQuoteOpen, setIsSearchQuoteOpen] = useState(false)
+  const [isItemModalOpen, setIsItemModalOpen] = useState(false)
+  const [itemToEdit, setItemToEdit] = useState<Partial<Item> | undefined>(undefined)
 
   const handleToggleItem = (item: Item) => {
     setSelectedItems((prev) => {
@@ -29,7 +38,8 @@ export default function AddItemsToPotential() {
         next.set(item.id, {
           item,
           quantidade: 1,
-          preco_unitario: item.preco_venda || '',
+          unidade_medida: 'Pcs',
+          preco_unitario: item.preco_venda !== undefined ? item.preco_venda : '',
           observacoes: '',
         })
       }
@@ -38,6 +48,11 @@ export default function AddItemsToPotential() {
   }
 
   const handleUpdateItem = (id: string, field: keyof SelectedItemData, value: string) => {
+    if (id === 'VALIDATION_ERROR') {
+      toast.error('Preencha a quantidade, unidade e preço para todos os itens selecionados.')
+      return
+    }
+
     setSelectedItems((prev) => {
       const next = new Map(prev)
       const data = next.get(id)
@@ -60,80 +75,151 @@ export default function AddItemsToPotential() {
     })
   }
 
-  const handleSave = async () => {
-    if (!selectedPotential) {
-      toast.error('Selecione um Potencial primeiro.')
-      return
-    }
-
-    const items = Array.from(selectedItems.values())
-    const missingQuantities = items.some((i) => i.quantidade === '' || Number(i.quantidade) <= 0)
-
-    if (missingQuantities) {
-      toast.error('Preencha a quantidade para todos os itens', {
-        action: { label: 'Tentar novamente', onClick: () => {} },
-      })
-      return
-    }
-
+  const handleSavePotencial = async (data: {
+    numero: string
+    cliente: string
+    observacoes: string
+    status: 'rascunho' | 'ativo'
+  }) => {
     setIsSaving(true)
     try {
-      const payload = items.map((i) => ({
-        potencial_id: selectedPotential.id,
-        item_id: i.item.id,
-        quantidade: Number(i.quantidade),
-        preco_unitario: Number(i.preco_unitario) || 0,
-        observacoes: i.observacoes,
+      const itemsData = Array.from(selectedItems.values()).map((si) => ({
+        item_id: si.item.id,
+        quantidade: Number(si.quantidade),
+        unidade_medida: si.unidade_medida,
+        preco_unitario: Number(si.preco_unitario) || 0,
+        observacoes: si.observacoes,
       }))
 
-      await addPotencialItens(payload)
-
-      toast.success(
-        `${items.length} itens adicionados ao potencial ${selectedPotential.numero_potencial}`,
+      const saved = await savePotencialFull(
+        currentPotential?.id || null,
         {
-          duration: 3000,
-          className: 'bg-green-500 text-white border-none',
+          numero_potencial: data.numero,
+          cliente: data.cliente,
+          observacoes: data.observacoes,
+          status: data.status,
         },
+        itemsData,
       )
+
+      toast.success(`Cotação ${saved.numero_potencial} salva com sucesso!`, {
+        className: 'bg-green-500 text-white border-none',
+      })
+
+      setCurrentPotential(null)
       setSelectedItems(new Map())
     } catch (error) {
-      toast.error('Erro ao salvar itens. Tente novamente.', {
-        action: { label: 'Tentar novamente', onClick: handleSave },
-      })
+      toast.error('Erro ao salvar a cotação.')
+      console.error(error)
     } finally {
       setIsSaving(false)
     }
   }
 
+  const handleQuoteSelected = async (quote: Potencial) => {
+    setCurrentPotential(quote)
+    setIsSearchQuoteOpen(false)
+    try {
+      const items = await getPotencialItens(quote.id)
+      const newMap = new Map<string, SelectedItemData>()
+      items.forEach((pi) => {
+        newMap.set(pi.item_id, {
+          item: pi.expand?.item_id || ({ id: pi.item_id } as any),
+          quantidade: pi.quantidade,
+          unidade_medida: pi.unidade_medida || 'Pcs',
+          preco_unitario: pi.preco_unitario !== undefined ? pi.preco_unitario : '',
+          observacoes: pi.observacoes || '',
+        })
+      })
+      setSelectedItems(newMap)
+      toast.success('Cotação carregada com sucesso!')
+    } catch (error) {
+      toast.error('Erro ao carregar itens da cotação.')
+    }
+  }
+
+  const handleItemSaved = (newItem: Item) => {
+    setSelectedItems((prev) => {
+      const next = new Map(prev)
+      next.set(newItem.id, {
+        item: newItem,
+        quantidade: 1,
+        unidade_medida: 'Pcs',
+        preco_unitario: newItem.preco_venda !== undefined ? newItem.preco_venda : '',
+        observacoes: '',
+      })
+      return next
+    })
+  }
+
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col p-4 md:p-6 max-w-[1600px] mx-auto w-full">
-      <div className="flex items-center justify-between mb-4 shrink-0">
-        <h1 className="text-2xl font-bold tracking-tight">Adicionar Itens ao Potencial</h1>
-        <button
-          onClick={() => navigate(-1)}
-          className="text-sm font-medium text-muted-foreground hover:text-foreground hover:underline transition-colors"
-        >
-          Voltar
-        </button>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4 shrink-0">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {currentPotential
+              ? `Editando Cotação: ${currentPotential.numero_potencial}`
+              : 'Nova Cotação'}
+          </h1>
+          {currentPotential && (
+            <p className="text-sm text-muted-foreground">
+              Cliente: {currentPotential.cliente || '-'}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" onClick={() => setIsSearchQuoteOpen(true)}>
+            <Search className="h-4 w-4 mr-2" /> Buscar Cotação
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => navigate(-1)}
+            className="text-sm font-medium text-muted-foreground"
+          >
+            Voltar
+          </Button>
+        </div>
       </div>
-
-      <PotentialHeader selected={selectedPotential} onSelect={setSelectedPotential} />
 
       <div className="flex-1 flex flex-col md:flex-row gap-4 md:gap-6 min-h-0 pb-4">
         <div className="w-full md:w-[70%] flex flex-col min-h-[400px] md:min-h-0">
-          <ProductCatalog selectedItems={selectedItems} onToggle={handleToggleItem} />
+          <ProductCatalog
+            selectedItems={selectedItems}
+            onToggle={handleToggleItem}
+            onAddNew={() => {
+              setItemToEdit(undefined)
+              setIsItemModalOpen(true)
+            }}
+            onDuplicate={(item) => {
+              setItemToEdit(item)
+              setIsItemModalOpen(true)
+            }}
+          />
         </div>
         <div className="w-full md:w-[30%] flex flex-col min-h-[500px] md:min-h-0">
           <SelectionPanel
             items={Array.from(selectedItems.values())}
-            potentialNumber={selectedPotential?.numero_potencial}
+            currentPotential={currentPotential}
             onUpdate={handleUpdateItem}
             onRemove={handleRemoveItem}
-            onSave={handleSave}
+            onSave={handleSavePotencial}
             isSaving={isSaving}
           />
         </div>
       </div>
+
+      <QuickItemModal
+        open={isItemModalOpen}
+        onOpenChange={setIsItemModalOpen}
+        initialData={itemToEdit}
+        onSaved={handleItemSaved}
+      />
+
+      <SearchQuoteModal
+        open={isSearchQuoteOpen}
+        onOpenChange={setIsSearchQuoteOpen}
+        onSelect={handleQuoteSelected}
+      />
     </div>
   )
 }
