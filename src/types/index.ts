@@ -4,6 +4,11 @@ export type Categoria = {
   nome_en: string
   created: string
   updated: string
+  expand?: {
+    acabamento_id?: Acabamento
+    linha_id?: Linha
+    ncm_id?: NCM
+  }
 }
 
 export type Linha = {
@@ -33,6 +38,26 @@ export type NCM = {
   ipi: number
   pis: number
   cofins: number
+  created: string
+  updated: string
+}
+
+export type Potencial = {
+  id: string
+  numero_potencial: string
+  cliente: string
+  status: string
+  created: string
+  updated: string
+}
+
+export type PotencialItem = {
+  id: string
+  potencial_id: string
+  item_id: string
+  quantidade: number
+  preco_unitario: number
+  observacoes: string
   created: string
   updated: string
 }

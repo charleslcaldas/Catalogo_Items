@@ -11,6 +11,7 @@ import Lines from './pages/Lines'
 import Finishes from './pages/Finishes'
 import NCMPage from './pages/NCM'
 import ImportPage from './pages/Import'
+import AddItemsToPotential from './pages/potentials/AddItemsToPotential'
 import Login from './pages/Login'
 import { DataProvider } from './contexts/data-context'
 import { AuthProvider } from './hooks/use-auth'
@@ -34,6 +35,7 @@ const App = () => (
                 <Route path="/acabamentos" element={<Finishes />} />
                 <Route path="/ncm" element={<NCMPage />} />
                 <Route path="/importar" element={<ImportPage />} />
+                <Route path="/potenciais/adicionar" element={<AddItemsToPotential />} />
               </Route>
             </Route>
             <Route path="*" element={<NotFound />} />
