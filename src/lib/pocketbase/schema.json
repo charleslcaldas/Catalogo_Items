@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-25T07:22:57.176Z",
+  "generatedAt": "2026-05-26T06:15:54.477Z",
   "collections": [
     {
       "name": "users",
@@ -80,6 +80,12 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "color",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": []
@@ -146,6 +152,12 @@
           "required": false,
           "system": false,
           "collectionRef": "ncm"
+        },
+        {
+          "name": "color",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": ["CREATE INDEX idx_linhas_categoria_id ON linhas (categoria_id)"]
@@ -256,6 +268,12 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "observacoes",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": ["CREATE UNIQUE INDEX idx_ncm_codigo ON ncm (codigo)"]
@@ -387,6 +405,102 @@
         {
           "name": "norma",
           "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "descricao_base_pt",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "descricao_base_en",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "classe_material",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tipo_rosca",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "comprimento_rosca",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "informacao_extra",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "descricao_extra",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tipo",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "subtipo",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "voltagem",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "potencia",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "marca",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "espessura",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dimensao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tipo_vidro",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "foto_arquivo",
+          "type": "file",
           "required": false,
           "system": false
         }

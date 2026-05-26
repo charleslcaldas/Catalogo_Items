@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Package, Folders, RefreshCw, AlertCircle, Plus } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -6,9 +6,11 @@ import { Badge } from '@/components/ui/badge'
 import { useData } from '@/contexts/data-context'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
+import pb from '@/lib/pocketbase/client'
 
 export default function Dashboard() {
   const { itens, categorias } = useData()
+  const navigate = useNavigate()
 
   const ativos = itens.filter((i) => i.ativo).length
   const pendentes = itens.filter((i) => !i.sincronizado_com_zoho).length
@@ -19,8 +21,8 @@ export default function Dashboard() {
     { name: 'Pendentes', value: pendentes, color: 'var(--color-pendentes)' },
   ]
   const chartConfig = {
-    sincronizados: { label: 'Sincronizados', color: 'hsl(var(--chart-2))' }, // Emerald
-    pendentes: { label: 'Pendentes', color: 'hsl(var(--chart-3))' }, // Amber
+    sincronizados: { label: 'Sincronizados', color: 'hsl(var(--chart-2))' },
+    pendentes: { label: 'Pendentes', color: 'hsl(var(--chart-3))' },
   }
 
   return (
@@ -43,7 +45,10 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card
+          className="cursor-pointer hover:bg-muted/50 transition-colors"
+          onClick={() => navigate('/itens')}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total de Itens</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
@@ -52,7 +57,10 @@ export default function Dashboard() {
             <div className="text-2xl font-bold">{itens.length}</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card
+          className="cursor-pointer hover:bg-muted/50 transition-colors"
+          onClick={() => navigate('/itens?filter=ativo')}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Itens Ativos</CardTitle>
             <RefreshCw className="h-4 w-4 text-muted-foreground" />
@@ -61,7 +69,10 @@ export default function Dashboard() {
             <div className="text-2xl font-bold">{ativos}</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card
+          className="cursor-pointer hover:bg-muted/50 transition-colors"
+          onClick={() => navigate('/itens?filter=pendente')}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Pendentes Sync</CardTitle>
             <AlertCircle
@@ -72,7 +83,10 @@ export default function Dashboard() {
             <div className="text-2xl font-bold">{pendentes}</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card
+          className="cursor-pointer hover:bg-muted/50 transition-colors"
+          onClick={() => navigate('/categorias')}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Categorias</CardTitle>
             <Folders className="h-4 w-4 text-muted-foreground" />
@@ -93,13 +107,18 @@ export default function Dashboard() {
               {itens.slice(0, 5).map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between p-2 hover:bg-muted/50 rounded-lg transition-colors"
+                  className="flex items-center justify-between p-2 hover:bg-muted/50 rounded-xl transition-colors cursor-pointer"
+                  onClick={() => navigate('/itens')}
                 >
                   <div className="flex items-center gap-4">
                     <img
-                      src={item.foto_url}
+                      src={
+                        item.foto_arquivo
+                          ? pb.files.getURL(item, item.foto_arquivo, { thumb: '100x100' })
+                          : item.foto_url || 'https://img.usecurling.com/p/100/100?q=tools'
+                      }
                       alt={item.sku}
-                      className="h-10 w-10 rounded object-cover"
+                      className="h-10 w-10 rounded-lg object-cover"
                     />
                     <div>
                       <p className="text-sm font-medium leading-none">{item.sku}</p>
