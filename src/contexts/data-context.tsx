@@ -135,14 +135,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
   )
 
   const saveItem = async (item: Partial<Item>) => {
-    try {
-      if (item.id) {
-        await pb.collection('itens').update(item.id, item)
-      } else {
-        await pb.collection('itens').create(item)
-      }
-    } catch (e: any) {
-      throw e
+    if (item.id) {
+      await pb.collection('itens').update(item.id, item)
+    } else {
+      await pb.collection('itens').create(item)
     }
   }
 
