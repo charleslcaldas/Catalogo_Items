@@ -1,9 +1,35 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { Categoria, Linha, Acabamento, NCM, Item, AtributoLinha } from '@/types'
+import { Categoria, Linha, Acabamento, NCM, Item as BaseItem, AtributoLinha } from '@/types'
 import { toast } from '@/hooks/use-toast'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 import { useAuth } from '@/hooks/use-auth'
+
+export type Item = BaseItem & {
+  descricao_base_id?: string
+  unidade_id?: string
+  ii?: number
+  ipi?: number
+  pis?: number
+  cofins?: number
+  comprimento_rosca_en?: string
+}
+
+export interface UnidadeMedida {
+  id: string
+  nome: string
+}
+
+export interface DescricaoBase {
+  id: string
+  codigo: string
+  nome_pt: string
+  nome_en: string
+  categoria_id: string
+  linha_id: string
+  ncm_id: string
+  ativo: boolean
+}
 
 interface DataContextType {
   categorias: Categoria[]
@@ -12,10 +38,12 @@ interface DataContextType {
   ncms: NCM[]
   itens: Item[]
   atributosLinha: AtributoLinha[]
-  saveItem: (item: Partial<Item>) => void
-  deleteItem: (id: string) => void
-  saveCategoria: (cat: Partial<Categoria>) => void
-  deleteCategoria: (id: string) => void
+  unidadesMedida: UnidadeMedida[]
+  descricoesBase: DescricaoBase[]
+  saveItem: (item: Partial<Item>) => Promise<void>
+  deleteItem: (id: string) => Promise<void>
+  saveCategoria: (cat: Partial<Categoria>) => Promise<void>
+  deleteCategoria: (id: string) => Promise<void>
   reloadMetadata: () => Promise<void>
 }
 
@@ -28,24 +56,31 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [ncms, setNcms] = useState<NCM[]>([])
   const [itens, setItens] = useState<Item[]>([])
   const [atributosLinha, setAtributosLinha] = useState<AtributoLinha[]>([])
+  const [unidadesMedida, setUnidadesMedida] = useState<UnidadeMedida[]>([])
+  const [descricoesBase, setDescricoesBase] = useState<DescricaoBase[]>([])
   const { isAuthenticated } = useAuth()
 
   const loadData = async () => {
     try {
-      const [cats, lins, acabs, ncmData, itemsData, atributosData] = await Promise.all([
-        pb.collection('categorias').getFullList<Categoria>(),
-        pb.collection('linhas').getFullList<Linha>({ expand: 'categoria_id,ncm_id' }),
-        pb.collection('acabamentos').getFullList<Acabamento>(),
-        pb.collection('ncm').getFullList<NCM>(),
-        pb.collection('itens').getFullList<Item>({ sort: '-created' }),
-        pb.collection('atributos_linha').getFullList<AtributoLinha>(),
-      ])
+      const [cats, lins, acabs, ncmData, itemsData, atributosData, unids, descs] =
+        await Promise.all([
+          pb.collection('categorias').getFullList<Categoria>(),
+          pb.collection('linhas').getFullList<Linha>({ expand: 'categoria_id,ncm_id' }),
+          pb.collection('acabamentos').getFullList<Acabamento>(),
+          pb.collection('ncm').getFullList<NCM>(),
+          pb.collection('itens').getFullList<Item>({ sort: '-created' }),
+          pb.collection('atributos_linha').getFullList<AtributoLinha>(),
+          pb.collection('unidades_medida').getFullList<UnidadeMedida>(),
+          pb.collection('descricoes_base').getFullList<DescricaoBase>(),
+        ])
       setCategorias(cats)
       setLinhas(lins)
       setAcabamentos(acabs)
       setNcms(ncmData)
       setItens(itemsData)
       setAtributosLinha(atributosData)
+      setUnidadesMedida(unids)
+      setDescricoesBase(descs)
     } catch (e) {
       console.error('Error loading data', e)
     }
@@ -53,18 +88,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const reloadMetadata = async () => {
     try {
-      const [cats, lins, acabs, ncmData, atributosData] = await Promise.all([
+      const [cats, lins, acabs, ncmData, atributosData, unids, descs] = await Promise.all([
         pb.collection('categorias').getFullList<Categoria>(),
         pb.collection('linhas').getFullList<Linha>({ expand: 'categoria_id,ncm_id' }),
         pb.collection('acabamentos').getFullList<Acabamento>(),
         pb.collection('ncm').getFullList<NCM>(),
         pb.collection('atributos_linha').getFullList<AtributoLinha>(),
+        pb.collection('unidades_medida').getFullList<UnidadeMedida>(),
+        pb.collection('descricoes_base').getFullList<DescricaoBase>(),
       ])
       setCategorias(cats)
       setLinhas(lins)
       setAcabamentos(acabs)
       setNcms(ncmData)
       setAtributosLinha(atributosData)
+      setUnidadesMedida(unids)
+      setDescricoesBase(descs)
     } catch (e) {
       console.error('Error reloading metadata', e)
     }
@@ -80,6 +119,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setNcms([])
       setItens([])
       setAtributosLinha([])
+      setUnidadesMedida([])
+      setDescricoesBase([])
     }
   }, [isAuthenticated])
 
@@ -97,13 +138,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     try {
       if (item.id) {
         await pb.collection('itens').update(item.id, item)
-        toast({ title: 'Item atualizado', description: 'O item foi salvo com sucesso.' })
       } else {
         await pb.collection('itens').create(item)
-        toast({ title: 'Item criado', description: 'Novo item adicionado ao catálogo.' })
       }
     } catch (e: any) {
-      toast({ title: 'Erro ao salvar item', description: e.message, variant: 'destructive' })
+      throw e
     }
   }
 
@@ -151,6 +190,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         ncms,
         itens,
         atributosLinha,
+        unidadesMedida,
+        descricoesBase,
         saveItem,
         deleteItem,
         saveCategoria,

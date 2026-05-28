@@ -10,6 +10,7 @@ import Categories from './pages/Categories'
 import Lines from './pages/Lines'
 import Finishes from './pages/Finishes'
 import NCMPage from './pages/NCM'
+import DescricoesBasePage from './pages/DescricoesBase'
 import ImportPage from './pages/Import'
 import AddItemsToPotential from './pages/potentials/AddItemsToPotential'
 import Login from './pages/Login'
@@ -34,6 +35,7 @@ const App = () => (
                 <Route path="/linhas" element={<Lines />} />
                 <Route path="/acabamentos" element={<Finishes />} />
                 <Route path="/ncm" element={<NCMPage />} />
+                <Route path="/descricoes-base" element={<DescricoesBasePage />} />
                 <Route path="/importar" element={<ImportPage />} />
                 <Route path="/potenciais/adicionar" element={<AddItemsToPotential />} />
               </Route>

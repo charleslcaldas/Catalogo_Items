@@ -38,7 +38,7 @@ function AcabamentoBadge({ acabamentoId }: { acabamentoId?: string }) {
 }
 
 export default function ItemsPage() {
-  const { itens, linhas, categorias, ncms } = useData()
+  const { itens, linhas, categorias, ncms, descricoesBase } = useData()
   const [searchParams] = useSearchParams()
 
   const filterStatus = searchParams.get('status')
@@ -56,6 +56,18 @@ export default function ItemsPage() {
     return categorias.find((c) => c.id === linha.categoria_id)?.nome_pt || ''
   }
   const getNcmCode = (id?: string) => ncms.find((n) => n.id === id)?.codigo || ''
+  const getDescricaoBasePt = (id?: string) => descricoesBase.find((d) => d.id === id)?.nome_pt || ''
+
+  const getDescricaoCurta = (item: any) => {
+    const descPt = item.descricao_base_id
+      ? getDescricaoBasePt(item.descricao_base_id)
+      : item.descricao_base_pt
+    return (
+      [descPt, item.norma, item.classe_material, item.tipo_rosca, item.tamanho]
+        .filter(Boolean)
+        .join(' ') || '-'
+    )
+  }
 
   const filteredItems = useMemo(() => {
     return itens.filter((item) => {
@@ -74,17 +86,13 @@ export default function ItemsPage() {
         item.sku,
         item.descr_pt,
         item.descr_en,
+        getDescricaoBasePt(item.descricao_base_id),
         item.descricao_base_pt,
-        item.descricao_base_en,
         item.classe_material,
         item.tipo_rosca,
         item.norma,
         item.informacao_extra,
-        item.descricao_extra,
         item.tamanho,
-        item.material,
-        item.tipo,
-        item.subtipo,
         getLinhaName(item.linha_id),
         getCategoriaName(item.linha_id),
         getNcmCode(item.ncm_id),
@@ -97,7 +105,7 @@ export default function ItemsPage() {
 
       return tokens.every((token) => searchableText.includes(token))
     })
-  }, [itens, searchTerm, filterStatus, filterSyncStatus, linhas, categorias, ncms])
+  }, [itens, searchTerm, filterStatus, filterSyncStatus, linhas, categorias, ncms, descricoesBase])
 
   const selectedItem = itens.find((i) => i.id === selectedItemId)
 
@@ -166,19 +174,13 @@ export default function ItemsPage() {
                     onCheckedChange={toggleSelectAll}
                   />
                 </TableHead>
-                <TableHead className="w-14 text-center">Foto</TableHead>
+                <TableHead className="w-[72px] text-center">Foto</TableHead>
                 <TableHead>SKU</TableHead>
-                {selectedItemId ? (
+                <TableHead>Descrição Curta</TableHead>
+                <TableHead>Tamanho</TableHead>
+                <TableHead>Acab.</TableHead>
+                {!selectedItemId && (
                   <>
-                    <TableHead>Descrição (Base + Info)</TableHead>
-                    <TableHead>Tamanho</TableHead>
-                    <TableHead>Acab.</TableHead>
-                  </>
-                ) : (
-                  <>
-                    <TableHead>Descrição Completa</TableHead>
-                    <TableHead>Tamanho</TableHead>
-                    <TableHead>Acabamento</TableHead>
                     <TableHead>Preço Venda</TableHead>
                     <TableHead>Status</TableHead>
                   </>
@@ -215,7 +217,7 @@ export default function ItemsPage() {
                           onCheckedChange={() => toggleSelect(item.id)}
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="p-2">
                         <img
                           src={
                             item.foto_arquivo
@@ -223,40 +225,26 @@ export default function ItemsPage() {
                               : item.foto_url || 'https://img.usecurling.com/p/100/100?q=tools'
                           }
                           alt={item.sku}
-                          className="w-8 h-8 rounded object-cover border bg-muted"
+                          className="w-14 h-14 rounded object-cover border bg-muted mx-auto"
                         />
                       </TableCell>
                       <TableCell className="font-medium whitespace-nowrap">{item.sku}</TableCell>
 
-                      {selectedItemId ? (
+                      <TableCell className="max-w-[200px] truncate" title={getDescricaoCurta(item)}>
+                        {getDescricaoCurta(item)}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">{item.tamanho || '-'}</TableCell>
+                      <TableCell>
+                        <AcabamentoBadge acabamentoId={item.acabamento_id} />
+                      </TableCell>
+
+                      {!selectedItemId && (
                         <>
-                          <TableCell
-                            className="max-w-[150px] truncate"
-                            title={`${item.descricao_base_pt || ''} ${item.informacao_extra || ''}`}
-                          >
-                            {[item.descricao_base_pt, item.informacao_extra]
-                              .filter(Boolean)
-                              .join(' ') || '-'}
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap">{item.tamanho || '-'}</TableCell>
-                          <TableCell>
-                            <AcabamentoBadge acabamentoId={item.acabamento_id} />
-                          </TableCell>
-                        </>
-                      ) : (
-                        <>
-                          <TableCell className="max-w-[300px] truncate" title={item.descr_pt}>
-                            {item.descr_pt || '-'}
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap">{item.tamanho || '-'}</TableCell>
-                          <TableCell>
-                            <AcabamentoBadge acabamentoId={item.acabamento_id} />
-                          </TableCell>
                           <TableCell className="whitespace-nowrap">
                             {item.preco_venda
                               ? new Intl.NumberFormat('pt-BR', {
                                   style: 'currency',
-                                  currency: 'BRL',
+                                  currency: 'USD',
                                 }).format(item.preco_venda)
                               : '-'}
                           </TableCell>

@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
@@ -400,7 +401,14 @@ export function NcmModal({
   onOpenChange: (o: boolean) => void
   onSaved?: (n: any) => void
 }) {
-  const [data, setData] = useState({ codigo: '', ii: 0, ipi: 0, pis: 0, cofins: 0 })
+  const [data, setData] = useState({
+    codigo: '',
+    ii: 0,
+    ipi: 0,
+    pis: 0,
+    cofins: 0,
+    observacoes: '',
+  })
   const [saving, setSaving] = useState(false)
   const { reloadMetadata } = useData()
 
@@ -414,7 +422,7 @@ export function NcmModal({
       toast.success('Novo registro criado com sucesso')
       onSaved?.(created)
       onOpenChange(false)
-      setData({ codigo: '', ii: 0, ipi: 0, pis: 0, cofins: 0 })
+      setData({ codigo: '', ii: 0, ipi: 0, pis: 0, cofins: 0, observacoes: '' })
     } catch (e) {
       toast.error('Erro ao salvar NCM')
     } finally {
@@ -476,6 +484,76 @@ export function NcmModal({
                 onChange={(e) => setData({ ...data, cofins: Number(e.target.value) })}
               />
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Observações</Label>
+            <Textarea
+              value={data.observacoes}
+              onChange={(e) => setData({ ...data, observacoes: e.target.value })}
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={saving}>
+              Criar
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+export function UnidadeMedidaModal({
+  open,
+  onOpenChange,
+  onSaved,
+}: {
+  open: boolean
+  onOpenChange: (o: boolean) => void
+  onSaved?: (u: any) => void
+}) {
+  const [nome, setNome] = useState('')
+  const [saving, setSaving] = useState(false)
+  const { reloadMetadata } = useData()
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!nome) return toast.error('O nome é obrigatório')
+    setSaving(true)
+    try {
+      const created = await pb.collection('unidades_medida').create({ nome })
+      await reloadMetadata()
+      toast.success('Unidade de medida criada com sucesso')
+      onSaved?.(created)
+      onOpenChange(false)
+      setNome('')
+    } catch (e) {
+      toast.error('Erro ao salvar unidade de medida')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[400px]">
+        <DialogHeader>
+          <DialogTitle>Criar Unidade de Medida</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-4 pt-4">
+          <div className="space-y-2">
+            <Label>
+              Nome / Símbolo <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              required
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              placeholder="ex: cm, L, kg"
+            />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

@@ -34,6 +34,7 @@ export default function NCMPage() {
                 <TableHead className="text-right">IPI (%)</TableHead>
                 <TableHead className="text-right">PIS (%)</TableHead>
                 <TableHead className="text-right">COFINS (%)</TableHead>
+                <TableHead>Observações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -44,6 +45,9 @@ export default function NCMPage() {
                   <TableCell className="text-right">{ncm.ipi}%</TableCell>
                   <TableCell className="text-right">{ncm.pis}%</TableCell>
                   <TableCell className="text-right">{ncm.cofins}%</TableCell>
+                  <TableCell className="max-w-[200px] truncate" title={ncm.observacoes}>
+                    {ncm.observacoes || '-'}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
