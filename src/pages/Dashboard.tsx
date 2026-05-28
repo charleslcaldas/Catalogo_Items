@@ -59,7 +59,7 @@ export default function Dashboard() {
         </Card>
         <Card
           className="cursor-pointer hover:bg-muted/50 transition-colors"
-          onClick={() => navigate('/itens?filter=ativo')}
+          onClick={() => navigate('/itens?status=Ativo')}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Itens Ativos</CardTitle>
@@ -71,7 +71,7 @@ export default function Dashboard() {
         </Card>
         <Card
           className="cursor-pointer hover:bg-muted/50 transition-colors"
-          onClick={() => navigate('/itens?filter=pendente')}
+          onClick={() => navigate('/itens?sync_status=Pendente')}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Pendentes Sync</CardTitle>

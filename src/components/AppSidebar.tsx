@@ -36,7 +36,7 @@ export function AppSidebar() {
   const location = useLocation()
 
   return (
-    <Sidebar>
+    <Sidebar collapsible="icon">
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2 px-2">
           <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">

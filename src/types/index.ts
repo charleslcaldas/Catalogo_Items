@@ -11,6 +11,20 @@ export type Categoria = {
   }
 }
 
+export type FotoCatalogo = {
+  id: string
+  tipo: string
+  subtipo?: string
+  tamanho: string
+  acabamento_id: string
+  url_foto: string
+  created: string
+  updated: string
+  expand?: {
+    acabamento_id?: Acabamento
+  }
+}
+
 export type Linha = {
   id: string
   categoria_id: string
@@ -117,6 +131,8 @@ export type Item = {
   dimensao?: string
   tipo_vidro?: string
   foto_arquivo?: string
+  fornecedor_ultima_atualizacao?: string
+  unidade?: string
   created: string
   updated: string
   expand?: {
