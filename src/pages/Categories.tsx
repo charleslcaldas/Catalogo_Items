@@ -10,14 +10,16 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useData } from '@/contexts/data-context'
 import { Button } from '@/components/ui/button'
-import { Plus, Pencil } from 'lucide-react'
+import { Plus, Pencil, ArrowRight } from 'lucide-react'
 import { CategoryModal } from '@/components/MetadataModals'
 import { getContrastColor } from '@/lib/utils'
+import { useNavigate } from 'react-router-dom'
 
 export default function Categories() {
   const { categorias } = useData()
   const [modalOpen, setModalOpen] = useState(false)
   const [editData, setEditData] = useState<any>(null)
+  const navigate = useNavigate()
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -83,16 +85,26 @@ export default function Categories() {
                   </TableCell>
                   <TableCell>{new Date(cat.created).toLocaleDateString('pt-BR')}</TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        setEditData(cat)
-                        setModalOpen(true)
-                      }}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setEditData(cat)
+                          setModalOpen(true)
+                        }}
+                        title="Editar Categoria"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/linhas?categoria_id=${cat.id}`)}
+                      >
+                        Linhas <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

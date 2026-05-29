@@ -15,8 +15,9 @@ import {
 import { useData } from '@/contexts/data-context'
 import { ItemDetailPanel } from './ItemDetailPanel'
 import { BulkEditDialog } from './BulkEditDialog'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { cn, getContrastColor } from '@/lib/utils'
+import { FilterX } from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
 
 function AcabamentoBadge({ acabamentoId }: { acabamentoId?: string }) {
@@ -39,10 +40,12 @@ function AcabamentoBadge({ acabamentoId }: { acabamentoId?: string }) {
 
 export default function ItemsPage() {
   const { itens, linhas, categorias, ncms, descricoesBase } = useData()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
 
   const filterStatus = searchParams.get('status')
   const filterSyncStatus = searchParams.get('sync_status')
+  const filterLinhaId = searchParams.get('linha_id')
 
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
@@ -73,6 +76,7 @@ export default function ItemsPage() {
     return itens.filter((item) => {
       if (filterStatus === 'Ativo' && !item.ativo) return false
       if (filterSyncStatus === 'Pendente' && item.sincronizado_com_zoho) return false
+      if (filterLinhaId && item.linha_id !== filterLinhaId) return false
 
       if (!searchTerm.trim()) return true
       const normalizedTerm = searchTerm
@@ -105,7 +109,17 @@ export default function ItemsPage() {
 
       return tokens.every((token) => searchableText.includes(token))
     })
-  }, [itens, searchTerm, filterStatus, filterSyncStatus, linhas, categorias, ncms, descricoesBase])
+  }, [
+    itens,
+    searchTerm,
+    filterStatus,
+    filterSyncStatus,
+    filterLinhaId,
+    linhas,
+    categorias,
+    ncms,
+    descricoesBase,
+  ])
 
   const selectedItem = itens.find((i) => i.id === selectedItemId)
 
@@ -133,8 +147,28 @@ export default function ItemsPage() {
     <div className="h-[calc(100vh-6rem)] flex flex-col space-y-4 animate-fade-in overflow-hidden relative">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Catálogo de Itens</h1>
-          <p className="text-muted-foreground">Gerencie produtos e sincronização Zoho Books.</p>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold tracking-tight">Catálogo de Itens</h1>
+            {filterLinhaId && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  const newParams = new URLSearchParams(searchParams)
+                  newParams.delete('linha_id')
+                  setSearchParams(newParams)
+                }}
+              >
+                <FilterX className="h-4 w-4 mr-2" />
+                Limpar Filtro
+              </Button>
+            )}
+          </div>
+          <p className="text-muted-foreground">
+            {filterLinhaId
+              ? `Mostrando itens da linha: ${linhas.find((l) => l.id === filterLinhaId)?.nome_pt || 'Desconhecida'}`
+              : 'Gerencie produtos e sincronização Zoho Books.'}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button onClick={() => setSelectedItemId('new')}>

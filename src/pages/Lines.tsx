@@ -10,14 +10,21 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useData } from '@/contexts/data-context'
 import { Button } from '@/components/ui/button'
-import { Plus, Pencil } from 'lucide-react'
+import { Plus, Pencil, ArrowRight, FilterX } from 'lucide-react'
 import { LineModal } from '@/components/MetadataModals'
 import { getContrastColor } from '@/lib/utils'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 export default function Lines() {
   const { linhas, categorias } = useData()
   const [modalOpen, setModalOpen] = useState(false)
   const [editData, setEditData] = useState<any>(null)
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const filterCatId = searchParams.get('categoria_id')
+
+  const filteredLinhas = filterCatId ? linhas.filter((l) => l.categoria_id === filterCatId) : linhas
 
   const getCatName = (id: string) => {
     const c = categorias.find((c) => c.id === id)
@@ -34,9 +41,19 @@ export default function Lines() {
     <div className="space-y-4 animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Linhas de Produto</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold tracking-tight">Linhas de Produto</h1>
+            {filterCatId && (
+              <Button variant="secondary" size="sm" onClick={() => setSearchParams({})}>
+                <FilterX className="h-4 w-4 mr-2" />
+                Limpar Filtro
+              </Button>
+            )}
+          </div>
           <p className="text-muted-foreground">
-            Classificações específicas vinculadas às categorias.
+            {filterCatId
+              ? `Mostrando linhas da categoria: ${categorias.find((c) => c.id === filterCatId)?.nome_pt || 'Desconhecida'}`
+              : 'Classificações específicas vinculadas às categorias.'}
           </p>
         </div>
         <Button
@@ -65,7 +82,14 @@ export default function Lines() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {linhas.map((lin) => (
+              {filteredLinhas.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                    Nenhuma linha encontrada.
+                  </TableCell>
+                </TableRow>
+              )}
+              {filteredLinhas.map((lin) => (
                 <TableRow key={lin.id}>
                   <TableCell>
                     <div className="flex flex-col">
@@ -112,16 +136,26 @@ export default function Lines() {
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        setEditData(lin)
-                        setModalOpen(true)
-                      }}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setEditData(lin)
+                          setModalOpen(true)
+                        }}
+                        title="Editar Linha"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/itens?linha_id=${lin.id}`)}
+                      >
+                        Itens <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

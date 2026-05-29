@@ -22,6 +22,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarFooter,
   useSidebar,
 } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
@@ -59,13 +60,6 @@ export function AppSidebar() {
               </span>
             </div>
           </div>
-          <Button variant="ghost" size="icon" onClick={toggleSidebar} className="h-8 w-8 shrink-0">
-            {state === 'expanded' ? (
-              <PanelLeftClose className="h-4 w-4" />
-            ) : (
-              <PanelLeftOpen className="h-4 w-4" />
-            )}
-          </Button>
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -87,6 +81,20 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter className="p-2">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={toggleSidebar} tooltip="Alternar Sidebar">
+              {state === 'expanded' ? (
+                <PanelLeftClose className="h-4 w-4 shrink-0" />
+              ) : (
+                <PanelLeftOpen className="h-4 w-4 shrink-0" />
+              )}
+              <span>{state === 'expanded' ? 'Recolher Menu' : 'Expandir Menu'}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
     </Sidebar>
   )
 }

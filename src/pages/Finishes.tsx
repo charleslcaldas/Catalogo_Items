@@ -49,7 +49,8 @@ export default function Finishes() {
             <TableHeader>
               <TableRow>
                 <TableHead>Código</TableHead>
-                <TableHead>Nome (PT / EN)</TableHead>
+                <TableHead>Nome (PT)</TableHead>
+                <TableHead>Nome (EN)</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -60,33 +61,32 @@ export default function Finishes() {
                     <Badge variant="secondary">{aca.codigo}</Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-col gap-1 items-start">
+                    <span
+                      className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium"
+                      style={
+                        aca.cor_hex
+                          ? { backgroundColor: aca.cor_hex, color: getContrastColor(aca.cor_hex) }
+                          : { backgroundColor: '#E5E7EB', color: '#1F2937' }
+                      }
+                    >
+                      {aca.nome_pt}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    {aca.nome_en ? (
                       <span
-                        className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium"
+                        className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium opacity-90"
                         style={
                           aca.cor_hex
                             ? { backgroundColor: aca.cor_hex, color: getContrastColor(aca.cor_hex) }
-                            : {}
+                            : { backgroundColor: '#E5E7EB', color: '#1F2937' }
                         }
                       >
-                        PT: {aca.nome_pt}
+                        {aca.nome_en}
                       </span>
-                      {aca.nome_en && (
-                        <span
-                          className="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium opacity-80"
-                          style={
-                            aca.cor_hex
-                              ? {
-                                  backgroundColor: aca.cor_hex,
-                                  color: getContrastColor(aca.cor_hex),
-                                }
-                              : {}
-                          }
-                        >
-                          EN: {aca.nome_en}
-                        </span>
-                      )}
-                    </div>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button

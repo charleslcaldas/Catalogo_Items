@@ -55,16 +55,14 @@ export default function DescricoesBasePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (
-      !editingItem?.codigo ||
-      !editingItem?.nome_pt ||
-      !editingItem?.categoria_id ||
-      !editingItem?.linha_id
-    ) {
+    if (!editingItem?.nome_pt || !editingItem?.categoria_id || !editingItem?.linha_id) {
       return toast.error('Preencha os campos obrigatórios')
     }
     setSaving(true)
     try {
+      if (!editingItem.id && !editingItem.codigo) {
+        editingItem.codigo = `DESC-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
+      }
       if (editingItem.id) {
         await pb.collection('descricoes_base').update(editingItem.id, editingItem)
         toast.success('Descrição Base atualizada')
@@ -116,10 +114,10 @@ export default function DescricoesBasePage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Código</TableHead>
                 <TableHead>Descrição (PT)</TableHead>
+                <TableHead>Descrição (EN)</TableHead>
                 <TableHead>Categoria / Linha</TableHead>
-                <TableHead>NCM</TableHead>
+                <TableHead>NCM (Taxas)</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="w-[120px] text-right">Ações</TableHead>
               </TableRow>
@@ -127,15 +125,28 @@ export default function DescricoesBasePage() {
             <TableBody>
               {descricoesBase.map((d) => (
                 <TableRow key={d.id}>
-                  <TableCell className="font-mono font-medium">{d.codigo}</TableCell>
-                  <TableCell>{d.nome_pt}</TableCell>
+                  <TableCell className="font-medium">{d.nome_pt}</TableCell>
+                  <TableCell>{d.nome_en || '-'}</TableCell>
                   <TableCell>
                     <span className="block text-xs text-muted-foreground">
                       {categorias.find((c) => c.id === d.categoria_id)?.nome_pt}
                     </span>
                     {linhas.find((l) => l.id === d.linha_id)?.nome_pt}
                   </TableCell>
-                  <TableCell>{ncms.find((n) => n.id === d.ncm_id)?.codigo || '-'}</TableCell>
+                  <TableCell>
+                    {(() => {
+                      const n = ncms.find((x) => x.id === d.ncm_id)
+                      if (!n) return '-'
+                      return (
+                        <div className="text-xs">
+                          <span className="font-medium block">{n.codigo}</span>
+                          <span className="text-muted-foreground">
+                            II: {n.ii}% | IPI: {n.ipi}% | PIS: {n.pis}% | COF: {n.cofins}%
+                          </span>
+                        </div>
+                      )
+                    })()}
+                  </TableCell>
                   <TableCell>
                     {d.ativo ? (
                       <Badge
@@ -189,16 +200,6 @@ export default function DescricoesBasePage() {
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4 pt-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2 col-span-2">
-                <Label>
-                  Código <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  required
-                  value={editingItem?.codigo || ''}
-                  onChange={(e) => setEditingItem({ ...editingItem, codigo: e.target.value })}
-                />
-              </div>
               <div className="space-y-2 col-span-2">
                 <Label>
                   Descrição Base (PT) <span className="text-destructive">*</span>
