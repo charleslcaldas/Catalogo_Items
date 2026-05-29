@@ -9,6 +9,8 @@ import {
   Receipt,
   UploadCloud,
   Target,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -20,7 +22,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from '@/components/ui/sidebar'
+import { Button } from '@/components/ui/button'
 
 const items = [
   { title: 'Dashboard', url: '/', icon: LayoutDashboard },
@@ -36,22 +40,32 @@ const items = [
 
 export function AppSidebar() {
   const location = useLocation()
+  const { toggleSidebar, state } = useSidebar()
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="p-4">
-        <div className="flex items-center gap-2 px-2">
-          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-            <Package className="h-5 w-5 text-primary-foreground" />
+      <SidebarHeader className="p-2">
+        <div className="flex items-center group-data-[collapsible=icon]:justify-center justify-between">
+          <div className="flex items-center gap-2 group-data-[collapsible=icon]:hidden px-2">
+            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
+              <Package className="h-5 w-5 text-primary-foreground" />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-bold tracking-tight text-sidebar-foreground leading-none">
+                Skip
+              </span>
+              <span className="text-xs text-sidebar-foreground/70 leading-none">
+                Inventory System
+              </span>
+            </div>
           </div>
-          <div className="flex flex-col">
-            <span className="font-bold tracking-tight text-sidebar-foreground leading-none">
-              Skip
-            </span>
-            <span className="text-xs text-sidebar-foreground/70 leading-none">
-              Inventory System
-            </span>
-          </div>
+          <Button variant="ghost" size="icon" onClick={toggleSidebar} className="h-8 w-8 shrink-0">
+            {state === 'expanded' ? (
+              <PanelLeftClose className="h-4 w-4" />
+            ) : (
+              <PanelLeftOpen className="h-4 w-4" />
+            )}
+          </Button>
         </div>
       </SidebarHeader>
       <SidebarContent>

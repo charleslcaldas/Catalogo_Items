@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   Table,
   TableBody,
@@ -8,9 +9,14 @@ import {
 } from '@/components/ui/table'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useData } from '@/contexts/data-context'
+import { Button } from '@/components/ui/button'
+import { Plus, Pencil } from 'lucide-react'
+import { NcmModal } from '@/components/MetadataModals'
 
 export default function NCMPage() {
   const { ncms } = useData()
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editData, setEditData] = useState<any>(null)
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -19,6 +25,15 @@ export default function NCMPage() {
           <h1 className="text-3xl font-bold tracking-tight">Configurações NCM</h1>
           <p className="text-muted-foreground">Tabela de impostos e tributos.</p>
         </div>
+        <Button
+          onClick={() => {
+            setEditData(null)
+            setModalOpen(true)
+          }}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Novo NCM
+        </Button>
       </div>
 
       <Card>
@@ -35,6 +50,7 @@ export default function NCMPage() {
                 <TableHead className="text-right">PIS (%)</TableHead>
                 <TableHead className="text-right">COFINS (%)</TableHead>
                 <TableHead>Observações</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -48,12 +64,26 @@ export default function NCMPage() {
                   <TableCell className="max-w-[200px] truncate" title={ncm.observacoes}>
                     {ncm.observacoes || '-'}
                   </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setEditData(ncm)
+                        setModalOpen(true)
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+
+      <NcmModal open={modalOpen} onOpenChange={setModalOpen} initialData={editData} />
     </div>
   )
 }

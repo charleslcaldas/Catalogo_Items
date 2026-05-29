@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   Table,
   TableBody,
@@ -8,14 +9,25 @@ import {
 } from '@/components/ui/table'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useData } from '@/contexts/data-context'
+import { Button } from '@/components/ui/button'
+import { Plus, Pencil } from 'lucide-react'
+import { LineModal } from '@/components/MetadataModals'
+import { getContrastColor } from '@/lib/utils'
 
 export default function Lines() {
   const { linhas, categorias } = useData()
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editData, setEditData] = useState<any>(null)
 
   const getCatName = (id: string) => {
     const c = categorias.find((c) => c.id === id)
     if (!c) return 'N/A'
     return `${c.nome_pt} / ${c.nome_en || c.nome_pt}`
+  }
+
+  const getCatColor = (id: string) => {
+    const c = categorias.find((c) => c.id === id)
+    return c?.color || null
   }
 
   return (
@@ -27,6 +39,15 @@ export default function Lines() {
             Classificações específicas vinculadas às categorias.
           </p>
         </div>
+        <Button
+          onClick={() => {
+            setEditData(null)
+            setModalOpen(true)
+          }}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Nova Linha
+        </Button>
       </div>
 
       <Card>
@@ -37,9 +58,10 @@ export default function Lines() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Linha (PT)</TableHead>
-                <TableHead>Superlinha (PT)</TableHead>
+                <TableHead>Linha</TableHead>
+                <TableHead>Superlinha</TableHead>
                 <TableHead>Categoria</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -47,23 +69,59 @@ export default function Lines() {
                 <TableRow key={lin.id}>
                   <TableCell>
                     <div className="flex flex-col">
-                      <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-[#E5E7EB] text-[#1F2937] w-fit">
-                        {lin.nome_pt} / {lin.nome_en || lin.nome_pt}
+                      <span
+                        className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold w-fit"
+                        style={
+                          lin.color
+                            ? { backgroundColor: lin.color, color: getContrastColor(lin.color) }
+                            : { backgroundColor: '#E5E7EB', color: '#1F2937' }
+                        }
+                      >
+                        {lin.nome_pt}
                       </span>
-                      {lin.superlinha_pt && (
-                        <span className="text-[12px] text-[#6B7280] mt-1">
-                          {lin.superlinha_pt} / {lin.superlinha_en || lin.superlinha_pt}
+                      {lin.nome_en && (
+                        <span className="text-[12px] text-[#6B7280] mt-1 font-medium">
+                          EN: {lin.nome_en}
                         </span>
                       )}
                     </div>
                   </TableCell>
                   <TableCell>
-                    {lin.superlinha_pt} / {lin.superlinha_en || lin.superlinha_pt}
+                    <div className="flex flex-col">
+                      <span>{lin.superlinha_pt || '-'}</span>
+                      {lin.superlinha_en && (
+                        <span className="text-[12px] text-[#6B7280] mt-1 font-medium">
+                          EN: {lin.superlinha_en}
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
-                    <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-[#E5E7EB] text-[#1F2937] w-fit">
+                    <span
+                      className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold w-fit"
+                      style={
+                        getCatColor(lin.categoria_id)
+                          ? {
+                              backgroundColor: getCatColor(lin.categoria_id)!,
+                              color: getContrastColor(getCatColor(lin.categoria_id)!),
+                            }
+                          : { backgroundColor: '#E5E7EB', color: '#1F2937' }
+                      }
+                    >
                       {getCatName(lin.categoria_id)}
                     </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setEditData(lin)
+                        setModalOpen(true)
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -71,6 +129,8 @@ export default function Lines() {
           </Table>
         </CardContent>
       </Card>
+
+      <LineModal open={modalOpen} onOpenChange={setModalOpen} initialData={editData} />
     </div>
   )
 }

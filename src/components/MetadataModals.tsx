@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -26,26 +26,47 @@ export function CategoryModal({
   open,
   onOpenChange,
   onSaved,
+  initialData,
 }: {
   open: boolean
   onOpenChange: (o: boolean) => void
   onSaved?: (cat: any) => void
+  initialData?: any
 }) {
-  const [data, setData] = useState({ nome_pt: '', nome_en: '' })
+  const [data, setData] = useState({ nome_pt: '', nome_en: '', color: '#000000' })
   const [saving, setSaving] = useState(false)
   const { reloadMetadata } = useData()
+
+  useEffect(() => {
+    if (open) {
+      if (initialData) {
+        setData({
+          nome_pt: initialData.nome_pt || '',
+          nome_en: initialData.nome_en || '',
+          color: initialData.color || '#000000',
+        })
+      } else {
+        setData({ nome_pt: '', nome_en: '', color: '#000000' })
+      }
+    }
+  }, [open, initialData])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!data.nome_pt || !data.nome_en) return toast.error('Preencha todos os campos obrigatórios')
     setSaving(true)
     try {
-      const created = await pb.collection('categorias').create(data)
+      let saved
+      if (initialData?.id) {
+        saved = await pb.collection('categorias').update(initialData.id, data)
+        toast.success('Categoria atualizada com sucesso')
+      } else {
+        saved = await pb.collection('categorias').create(data)
+        toast.success('Novo registro criado com sucesso')
+      }
       await reloadMetadata()
-      toast.success('Novo registro criado com sucesso')
-      onSaved?.(created)
+      onSaved?.(saved)
       onOpenChange(false)
-      setData({ nome_pt: '', nome_en: '' })
     } catch (e) {
       toast.error('Erro ao salvar categoria')
     } finally {
@@ -57,7 +78,7 @@ export function CategoryModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Criar Nova Categoria</DialogTitle>
+          <DialogTitle>{initialData ? 'Editar Categoria' : 'Criar Nova Categoria'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4 pt-4">
           <div className="space-y-2">
@@ -80,12 +101,29 @@ export function CategoryModal({
               onChange={(e) => setData({ ...data, nome_en: e.target.value })}
             />
           </div>
+          <div className="space-y-2">
+            <Label>Cor (Opcional)</Label>
+            <div className="flex gap-2 items-center">
+              <Input
+                type="color"
+                value={data.color}
+                onChange={(e) => setData({ ...data, color: e.target.value })}
+                className="h-10 w-16 p-1 cursor-pointer"
+              />
+              <Input
+                value={data.color}
+                onChange={(e) => setData({ ...data, color: e.target.value })}
+                className="uppercase font-mono"
+                placeholder="#000000"
+              />
+            </div>
+          </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
             <Button type="submit" disabled={saving}>
-              Criar
+              {initialData ? 'Salvar' : 'Criar'}
             </Button>
           </DialogFooter>
         </form>
@@ -98,10 +136,12 @@ export function LineModal({
   open,
   onOpenChange,
   onSaved,
+  initialData,
 }: {
   open: boolean
   onOpenChange: (o: boolean) => void
   onSaved?: (lin: any) => void
+  initialData?: any
 }) {
   const [data, setData] = useState({
     categoria_id: '',
@@ -110,11 +150,38 @@ export function LineModal({
     superlinha_pt: '',
     superlinha_en: '',
     ncm_id: '',
+    color: '#000000',
   })
   const [saving, setSaving] = useState(false)
   const { categorias, ncms, reloadMetadata } = useData()
   const [catModalOpen, setCatModalOpen] = useState(false)
   const [ncmModalOpen, setNcmModalOpen] = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      if (initialData) {
+        setData({
+          categoria_id: initialData.categoria_id || '',
+          nome_pt: initialData.nome_pt || '',
+          nome_en: initialData.nome_en || '',
+          superlinha_pt: initialData.superlinha_pt || '',
+          superlinha_en: initialData.superlinha_en || '',
+          ncm_id: initialData.ncm_id || '',
+          color: initialData.color || '#000000',
+        })
+      } else {
+        setData({
+          categoria_id: '',
+          nome_pt: '',
+          nome_en: '',
+          superlinha_pt: '',
+          superlinha_en: '',
+          ncm_id: '',
+          color: '#000000',
+        })
+      }
+    }
+  }, [open, initialData])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -129,19 +196,17 @@ export function LineModal({
       return toast.error('Preencha todos os campos obrigatórios')
     setSaving(true)
     try {
-      const created = await pb.collection('linhas').create(data)
+      let saved
+      if (initialData?.id) {
+        saved = await pb.collection('linhas').update(initialData.id, data)
+        toast.success('Linha atualizada com sucesso')
+      } else {
+        saved = await pb.collection('linhas').create(data)
+        toast.success('Novo registro criado com sucesso')
+      }
       await reloadMetadata()
-      toast.success('Novo registro criado com sucesso')
-      onSaved?.(created)
+      onSaved?.(saved)
       onOpenChange(false)
-      setData({
-        categoria_id: '',
-        nome_pt: '',
-        nome_en: '',
-        superlinha_pt: '',
-        superlinha_en: '',
-        ncm_id: '',
-      })
     } catch (e) {
       toast.error('Erro ao salvar linha')
     } finally {
@@ -154,7 +219,7 @@ export function LineModal({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Criar Nova Linha</DialogTitle>
+            <DialogTitle>{initialData ? 'Editar Linha' : 'Criar Nova Linha'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={submit} className="space-y-4 pt-4">
             <div className="grid grid-cols-2 gap-4">
@@ -262,13 +327,30 @@ export function LineModal({
                   onChange={(e) => setData({ ...data, superlinha_en: e.target.value })}
                 />
               </div>
+              <div className="space-y-2 col-span-2">
+                <Label>Cor (Opcional)</Label>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    type="color"
+                    value={data.color}
+                    onChange={(e) => setData({ ...data, color: e.target.value })}
+                    className="h-10 w-16 p-1 cursor-pointer"
+                  />
+                  <Input
+                    value={data.color}
+                    onChange={(e) => setData({ ...data, color: e.target.value })}
+                    className="uppercase font-mono"
+                    placeholder="#000000"
+                  />
+                </div>
+              </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
               <Button type="submit" disabled={saving}>
-                Criar
+                {initialData ? 'Salvar' : 'Criar'}
               </Button>
             </DialogFooter>
           </form>
@@ -292,14 +374,31 @@ export function FinishModal({
   open,
   onOpenChange,
   onSaved,
+  initialData,
 }: {
   open: boolean
   onOpenChange: (o: boolean) => void
   onSaved?: (acab: any) => void
+  initialData?: any
 }) {
   const [data, setData] = useState({ codigo: '', nome_pt: '', nome_en: '', cor_hex: '#000000' })
   const [saving, setSaving] = useState(false)
   const { reloadMetadata } = useData()
+
+  useEffect(() => {
+    if (open) {
+      if (initialData) {
+        setData({
+          codigo: initialData.codigo || '',
+          nome_pt: initialData.nome_pt || '',
+          nome_en: initialData.nome_en || '',
+          cor_hex: initialData.cor_hex || '#000000',
+        })
+      } else {
+        setData({ codigo: '', nome_pt: '', nome_en: '', cor_hex: '#000000' })
+      }
+    }
+  }, [open, initialData])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -307,12 +406,17 @@ export function FinishModal({
       return toast.error('Preencha todos os campos obrigatórios')
     setSaving(true)
     try {
-      const created = await pb.collection('acabamentos').create(data)
+      let saved
+      if (initialData?.id) {
+        saved = await pb.collection('acabamentos').update(initialData.id, data)
+        toast.success('Acabamento atualizado com sucesso')
+      } else {
+        saved = await pb.collection('acabamentos').create(data)
+        toast.success('Novo registro criado com sucesso')
+      }
       await reloadMetadata()
-      toast.success('Novo registro criado com sucesso')
-      onSaved?.(created)
+      onSaved?.(saved)
       onOpenChange(false)
-      setData({ codigo: '', nome_pt: '', nome_en: '', cor_hex: '#000000' })
     } catch (e) {
       toast.error('Erro ao salvar acabamento')
     } finally {
@@ -324,7 +428,7 @@ export function FinishModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Criar Novo Acabamento</DialogTitle>
+          <DialogTitle>{initialData ? 'Editar Acabamento' : 'Criar Novo Acabamento'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4 pt-4">
           <div className="grid grid-cols-2 gap-4">
@@ -353,7 +457,7 @@ export function FinishModal({
                 <Input
                   value={data.cor_hex}
                   onChange={(e) => setData({ ...data, cor_hex: e.target.value })}
-                  className="uppercase"
+                  className="uppercase font-mono"
                 />
               </div>
             </div>
@@ -383,7 +487,7 @@ export function FinishModal({
               Cancelar
             </Button>
             <Button type="submit" disabled={saving}>
-              Criar
+              {initialData ? 'Salvar' : 'Criar'}
             </Button>
           </DialogFooter>
         </form>
@@ -396,10 +500,12 @@ export function NcmModal({
   open,
   onOpenChange,
   onSaved,
+  initialData,
 }: {
   open: boolean
   onOpenChange: (o: boolean) => void
   onSaved?: (n: any) => void
+  initialData?: any
 }) {
   const [data, setData] = useState({
     codigo: '',
@@ -412,17 +518,39 @@ export function NcmModal({
   const [saving, setSaving] = useState(false)
   const { reloadMetadata } = useData()
 
+  useEffect(() => {
+    if (open) {
+      if (initialData) {
+        setData({
+          codigo: initialData.codigo || '',
+          ii: initialData.ii || 0,
+          ipi: initialData.ipi || 0,
+          pis: initialData.pis || 0,
+          cofins: initialData.cofins || 0,
+          observacoes: initialData.observacoes || '',
+        })
+      } else {
+        setData({ codigo: '', ii: 0, ipi: 0, pis: 0, cofins: 0, observacoes: '' })
+      }
+    }
+  }, [open, initialData])
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!data.codigo) return toast.error('Preencha todos os campos obrigatórios')
     setSaving(true)
     try {
-      const created = await pb.collection('ncm').create(data)
+      let saved
+      if (initialData?.id) {
+        saved = await pb.collection('ncm').update(initialData.id, data)
+        toast.success('NCM atualizado com sucesso')
+      } else {
+        saved = await pb.collection('ncm').create(data)
+        toast.success('Novo registro criado com sucesso')
+      }
       await reloadMetadata()
-      toast.success('Novo registro criado com sucesso')
-      onSaved?.(created)
+      onSaved?.(saved)
       onOpenChange(false)
-      setData({ codigo: '', ii: 0, ipi: 0, pis: 0, cofins: 0, observacoes: '' })
     } catch (e) {
       toast.error('Erro ao salvar NCM')
     } finally {
@@ -434,7 +562,7 @@ export function NcmModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Criar Novo NCM</DialogTitle>
+          <DialogTitle>{initialData ? 'Editar NCM' : 'Criar Novo NCM'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4 pt-4">
           <div className="space-y-2">
@@ -490,6 +618,7 @@ export function NcmModal({
             <Textarea
               value={data.observacoes}
               onChange={(e) => setData({ ...data, observacoes: e.target.value })}
+              placeholder="Ex: Dumping, Ex-tarifário..."
             />
           </div>
           <DialogFooter>
@@ -497,7 +626,7 @@ export function NcmModal({
               Cancelar
             </Button>
             <Button type="submit" disabled={saving}>
-              Criar
+              {initialData ? 'Salvar' : 'Criar'}
             </Button>
           </DialogFooter>
         </form>

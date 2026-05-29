@@ -2,6 +2,7 @@ export type Categoria = {
   id: string
   nome_pt: string
   nome_en: string
+  color?: string
   created: string
   updated: string
   expand?: {
@@ -33,6 +34,7 @@ export type Linha = {
   nome_en: string
   superlinha_pt: string
   superlinha_en: string
+  color?: string
   created: string
   updated: string
   expand?: {
