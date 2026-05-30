@@ -38,7 +38,7 @@ function AcabamentoBadge({ acabamentoId }: { acabamentoId?: string }) {
 }
 
 export default function ItemsPage() {
-  const { itens, linhas, categorias, ncms, descricoesBase } = useData()
+  const { itens, linhas, categorias, ncms, descricoesBase, acabamentos } = useData()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
 
@@ -115,7 +115,17 @@ export default function ItemsPage() {
 
       return tokens.every((token) => searchableText.includes(token))
     })
-  }, [itens, searchTerm, filterStatus, filterLinhaId, linhas, categorias, ncms, descricoesBase])
+  }, [
+    itens,
+    searchTerm,
+    filterStatus,
+    filterLinhaId,
+    linhas,
+    categorias,
+    ncms,
+    descricoesBase,
+    acabamentos,
+  ])
 
   const selectedItem = itens.find((i) => i.id === selectedItemId)
 
@@ -278,6 +288,7 @@ export default function ItemsPage() {
                               ? new Intl.NumberFormat('en-US', {
                                   style: 'currency',
                                   currency: 'USD',
+                                  currencyDisplay: 'narrowSymbol',
                                 }).format(item.preco_venda)
                               : '-'}
                           </TableCell>
