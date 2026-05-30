@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Table,
   TableBody,
@@ -29,7 +30,7 @@ function AcabamentoBadge({ acabamentoId }: { acabamentoId?: string }) {
 
   return (
     <span
-      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border border-black/10 shadow-sm"
+      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border border-black/10 shadow-sm whitespace-nowrap"
       style={{ backgroundColor: bgColor, color: textColor }}
     >
       {aca.nome_pt}
@@ -86,7 +87,7 @@ export default function ItemsPage() {
 
       const getAcabamentoInfo = (id?: string) => {
         const aca = acabamentos.find((a) => a.id === id)
-        return aca ? `${aca.nome_pt} ${aca.codigo}` : ''
+        return aca ? `${aca.nome_pt} ${aca.nome_en || ''} ${aca.codigo}` : ''
       }
 
       const searchableText = [
@@ -204,7 +205,7 @@ export default function ItemsPage() {
         >
           <Table>
             <TableHeader className="sticky top-0 bg-card z-10 shadow-sm">
-              <TableRow className="h-10">
+              <TableRow className="h-8">
                 <TableHead className="w-10 text-center px-2">
                   <Checkbox
                     checked={
@@ -213,7 +214,7 @@ export default function ItemsPage() {
                     onCheckedChange={toggleSelectAll}
                   />
                 </TableHead>
-                <TableHead className="w-14 text-center px-2">Foto</TableHead>
+                <TableHead className="w-12 text-center px-2">Foto</TableHead>
                 <TableHead className="px-2">SKU</TableHead>
                 <TableHead className="px-2">Descrição Curta</TableHead>
                 <TableHead className="px-2">Tamanho</TableHead>
@@ -249,14 +250,14 @@ export default function ItemsPage() {
                     >
                       <TableCell
                         onClick={(e) => e.stopPropagation()}
-                        className="text-center py-2 px-2"
+                        className="text-center py-1 px-2"
                       >
                         <Checkbox
                           checked={isSelected}
                           onCheckedChange={() => toggleSelect(item.id)}
                         />
                       </TableCell>
-                      <TableCell className="py-2 px-2">
+                      <TableCell className="py-1 px-2">
                         <img
                           src={
                             item.foto_arquivo
@@ -264,35 +265,57 @@ export default function ItemsPage() {
                               : item.foto_url || 'https://img.usecurling.com/p/100/100?q=tools'
                           }
                           alt={item.sku}
-                          className="w-8 h-8 rounded object-cover border bg-muted mx-auto"
+                          className="w-6 h-6 rounded object-cover border bg-muted mx-auto"
                         />
                       </TableCell>
-                      <TableCell className="font-medium whitespace-nowrap py-2 px-2 text-sm">
+                      <TableCell className="font-medium whitespace-nowrap py-1 px-2 text-sm">
                         {item.sku}
                       </TableCell>
 
-                      <TableCell className="max-w-[250px] py-2 px-2 text-sm whitespace-normal break-words leading-snug">
-                        {getDescricaoCurta(item)}
+                      <TableCell
+                        className={cn(
+                          'py-1 px-2 text-sm',
+                          selectedItemId ? 'max-w-[150px]' : 'max-w-[250px]',
+                        )}
+                      >
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div
+                              className={cn(
+                                'cursor-default',
+                                selectedItemId
+                                  ? 'truncate'
+                                  : 'whitespace-normal break-words line-clamp-2 leading-snug',
+                              )}
+                            >
+                              {getDescricaoCurta(item)}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent
+                            side="bottom"
+                            align="start"
+                            className="max-w-xs break-words"
+                          >
+                            <p>{getDescricaoCurta(item)}</p>
+                          </TooltipContent>
+                        </Tooltip>
                       </TableCell>
-                      <TableCell className="whitespace-nowrap py-2 px-2 text-sm">
+
+                      <TableCell className="whitespace-nowrap py-1 px-2 text-sm">
                         {item.tamanho || '-'}
                       </TableCell>
-                      <TableCell className="py-2 px-2">
+                      <TableCell className="py-1 px-2">
                         <AcabamentoBadge acabamentoId={item.acabamento_id} />
                       </TableCell>
 
                       {!selectedItemId && (
                         <>
-                          <TableCell className="whitespace-nowrap py-2 px-2 text-sm">
-                            {item.preco_venda
-                              ? new Intl.NumberFormat('en-US', {
-                                  style: 'currency',
-                                  currency: 'USD',
-                                  currencyDisplay: 'narrowSymbol',
-                                }).format(item.preco_venda)
+                          <TableCell className="whitespace-nowrap py-1 px-2 text-sm">
+                            {typeof item.preco_venda === 'number'
+                              ? `$ ${item.preco_venda.toFixed(2)}`
                               : '-'}
                           </TableCell>
-                          <TableCell className="py-2 px-2">
+                          <TableCell className="py-1 px-2">
                             {item.ativo ? (
                               <Badge
                                 variant="outline"

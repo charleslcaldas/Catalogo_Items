@@ -22,7 +22,7 @@ routerAdd(
           {
             role: 'system',
             content:
-              'You are a professional technical translator. Translate the following text from Portuguese to English. Return ONLY the translated text, without quotes or additional comments.',
+              'You are a professional technical translator. Translate the following text from Portuguese to English. Provide a true semantic translation. Return ONLY the translated text, without quotes or additional comments. NEVER simply append "(EN)" to the text.',
           },
           { role: 'user', content: text },
         ],
