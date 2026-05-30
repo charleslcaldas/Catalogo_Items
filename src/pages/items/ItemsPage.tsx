@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Plus, Search, Layers, PackageOpen, FilterX } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -45,9 +45,16 @@ export default function ItemsPage() {
 
   const filterStatus = searchParams.get('status')
   const filterLinhaId = searchParams.get('linha_id')
+  const filterDate = searchParams.get('date')
 
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+  const selectedItemId = searchParams.get('itemId')
+  const setSelectedItemId = (id: string | null) => {
+    const newParams = new URLSearchParams(searchParams)
+    if (id) newParams.set('itemId', id)
+    else newParams.delete('itemId')
+    setSearchParams(newParams)
+  }
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set())
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false)
 
@@ -76,6 +83,11 @@ export default function ItemsPage() {
     return itens.filter((item) => {
       if (filterStatus === 'Ativo' && !item.ativo) return false
       if (filterLinhaId && item.linha_id !== filterLinhaId) return false
+
+      if (filterDate) {
+        const itemDate = new Date(item.created).toISOString().split('T')[0]
+        if (itemDate !== filterDate) return false
+      }
 
       if (!searchTerm.trim()) return true
       const normalizedTerm = searchTerm
@@ -157,18 +169,19 @@ export default function ItemsPage() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold tracking-tight">Catálogo de Itens</h1>
-              {filterLinhaId && (
+              {(filterLinhaId || filterDate) && (
                 <Button
                   variant="secondary"
                   size="sm"
                   onClick={() => {
                     const newParams = new URLSearchParams(searchParams)
                     newParams.delete('linha_id')
+                    newParams.delete('date')
                     setSearchParams(newParams)
                   }}
                 >
                   <FilterX className="h-4 w-4 mr-2" />
-                  Limpar Filtro
+                  Limpar Filtros
                 </Button>
               )}
             </div>
@@ -178,15 +191,31 @@ export default function ItemsPage() {
                 : 'Gerencie os produtos do seu catálogo.'}
             </p>
           </div>
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Buscar item..."
-              className="pl-9 w-full rounded-full bg-card"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          <div className="flex flex-col sm:flex-row items-center gap-2">
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Buscar item..."
+                className="pl-9 w-full rounded-full bg-card"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <div className="relative">
+              <Input
+                type="date"
+                title="Filtrar por Data de Cadastro"
+                className="w-full sm:w-auto rounded-full bg-card px-3 py-2 text-sm text-muted-foreground min-h-[40px]"
+                value={filterDate || ''}
+                onChange={(e) => {
+                  const newParams = new URLSearchParams(searchParams)
+                  if (e.target.value) newParams.set('date', e.target.value)
+                  else newParams.delete('date')
+                  setSearchParams(newParams)
+                }}
+              />
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -244,10 +273,11 @@ export default function ItemsPage() {
                       key={item.id}
                       className={cn(
                         'cursor-pointer transition-colors',
-                        isRowActive && 'bg-primary/5 hover:bg-primary/10',
+                        isRowActive && 'bg-primary/10 hover:bg-primary/15',
                       )}
                       onClick={() => setSelectedItemId(item.id)}
                     >
+                      {' '}
                       <TableCell
                         onClick={(e) => e.stopPropagation()}
                         className="text-center py-1 px-2"
@@ -271,21 +301,15 @@ export default function ItemsPage() {
                       <TableCell className="font-medium whitespace-nowrap py-1 px-2 text-sm">
                         {item.sku}
                       </TableCell>
-
-                      <TableCell
-                        className={cn(
-                          'py-1 px-2 text-sm',
-                          selectedItemId ? 'max-w-[150px]' : 'max-w-[250px]',
-                        )}
-                      >
+                      <TableCell className={cn('py-1 px-2 text-sm max-w-[200px]')}>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <div
                               className={cn(
-                                'cursor-default',
+                                'cursor-default w-full',
                                 selectedItemId
                                   ? 'truncate'
-                                  : 'whitespace-normal break-words line-clamp-2 leading-snug',
+                                  : 'whitespace-normal break-words leading-snug',
                               )}
                             >
                               {getDescricaoCurta(item)}
@@ -300,14 +324,12 @@ export default function ItemsPage() {
                           </TooltipContent>
                         </Tooltip>
                       </TableCell>
-
                       <TableCell className="whitespace-nowrap py-1 px-2 text-sm">
                         {item.tamanho || '-'}
                       </TableCell>
                       <TableCell className="py-1 px-2">
                         <AcabamentoBadge acabamentoId={item.acabamento_id} />
                       </TableCell>
-
                       {!selectedItemId && (
                         <>
                           <TableCell className="whitespace-nowrap py-1 px-2 text-sm">

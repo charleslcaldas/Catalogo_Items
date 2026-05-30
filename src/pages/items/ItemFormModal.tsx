@@ -25,6 +25,7 @@ import { LineModal, FinishModal, NcmModal } from '@/components/MetadataModals'
 import { getContrastColor } from '@/lib/utils'
 import { toast } from 'sonner'
 import { PriceInput } from '@/components/PriceInput'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 export function ItemFormModal({
   open,
@@ -101,18 +102,34 @@ export function ItemFormModal({
                   <Label>
                     Descrição (PT) <span className="text-destructive">*</span>
                   </Label>
-                  <Input
-                    required
-                    value={formData.descr_pt || ''}
-                    onChange={(e) => setFormData({ ...formData, descr_pt: e.target.value })}
-                  />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Input
+                        required
+                        className="truncate"
+                        value={formData.descr_pt || ''}
+                        onChange={(e) => setFormData({ ...formData, descr_pt: e.target.value })}
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" align="start">
+                      <p className="max-w-xs break-words">{formData.descr_pt || ''}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
                 <div className="space-y-2 col-span-2">
                   <Label>Descrição (EN)</Label>
-                  <Input
-                    value={formData.descr_en || ''}
-                    onChange={(e) => setFormData({ ...formData, descr_en: e.target.value })}
-                  />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Input
+                        className="truncate"
+                        value={formData.descr_en || ''}
+                        onChange={(e) => setFormData({ ...formData, descr_en: e.target.value })}
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" align="start">
+                      <p className="max-w-xs break-words">{formData.descr_en || ''}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
                 <div className="space-y-2 col-span-2">
                   <Label>Foto URL</Label>

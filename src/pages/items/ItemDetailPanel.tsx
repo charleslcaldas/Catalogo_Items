@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useData } from '@/contexts/data-context'
 import type { Item } from '@/types'
-import { X, Copy, ImageIcon, History as HistoryIcon, Activity, Languages } from 'lucide-react'
+import { X, Copy, ImageIcon, History as HistoryIcon, Activity } from 'lucide-react'
 import { toast } from 'sonner'
 import pb from '@/lib/pocketbase/client'
 import { Badge } from '@/components/ui/badge'
@@ -251,8 +251,8 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
           <div className="flex flex-col min-w-0 py-1 overflow-hidden">
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="text-left w-full cursor-default">
-                  <h2 className="font-bold text-lg text-foreground line-clamp-2 leading-tight">
+                <div className="text-left w-full cursor-default overflow-hidden">
+                  <h2 className="font-bold text-lg text-foreground truncate h-7">
                     {fullDescPt || 'Nova Descrição Completa'}
                   </h2>
                 </div>
@@ -264,8 +264,8 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="text-left w-full mt-1 cursor-default">
-                  <h3 className="text-sm text-muted-foreground line-clamp-2 leading-snug">
+                <div className="text-left w-full mt-1 cursor-default overflow-hidden">
+                  <h3 className="text-sm text-muted-foreground truncate h-5">
                     {fullDescEn || 'New Full Description'}
                   </h3>
                 </div>
@@ -290,24 +290,6 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={async () => {
-              if (formData.comprimento_rosca && !formData.comprimento_rosca_en) {
-                handleTranslate('comprimento_rosca', formData.comprimento_rosca, 'pt')
-              }
-              if (formData.informacao_extra && !formData.informacao_extra_en) {
-                handleTranslate('informacao_extra', formData.informacao_extra, 'pt')
-              }
-              if (formData.descricao_extra && !formData.descricao_extra_en) {
-                handleTranslate('descricao_extra', formData.descricao_extra, 'pt')
-              }
-            }}
-            title="Traduzir campos vazios para Inglês"
-          >
-            <Languages className="h-4 w-4 mr-2" /> Traduzir
-          </Button>
           {item && formData.id && (
             <Button
               variant="outline"
