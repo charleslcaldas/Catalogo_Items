@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Plus, Search, Layers, PackageOpen } from 'lucide-react'
+import { Plus, Search, Layers, PackageOpen, FilterX } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -17,7 +17,6 @@ import { ItemDetailPanel } from './ItemDetailPanel'
 import { BulkEditDialog } from './BulkEditDialog'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { cn, getContrastColor } from '@/lib/utils'
-import { FilterX } from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
 
 function AcabamentoBadge({ acabamentoId }: { acabamentoId?: string }) {
@@ -44,7 +43,6 @@ export default function ItemsPage() {
   const navigate = useNavigate()
 
   const filterStatus = searchParams.get('status')
-  const filterSyncStatus = searchParams.get('sync_status')
   const filterLinhaId = searchParams.get('linha_id')
 
   const [searchTerm, setSearchTerm] = useState('')
@@ -75,7 +73,6 @@ export default function ItemsPage() {
   const filteredItems = useMemo(() => {
     return itens.filter((item) => {
       if (filterStatus === 'Ativo' && !item.ativo) return false
-      if (filterSyncStatus === 'Pendente' && item.sincronizado_com_zoho) return false
       if (filterLinhaId && item.linha_id !== filterLinhaId) return false
 
       if (!searchTerm.trim()) return true
@@ -109,17 +106,7 @@ export default function ItemsPage() {
 
       return tokens.every((token) => searchableText.includes(token))
     })
-  }, [
-    itens,
-    searchTerm,
-    filterStatus,
-    filterSyncStatus,
-    filterLinhaId,
-    linhas,
-    categorias,
-    ncms,
-    descricoesBase,
-  ])
+  }, [itens, searchTerm, filterStatus, filterLinhaId, linhas, categorias, ncms, descricoesBase])
 
   const selectedItem = itens.find((i) => i.id === selectedItemId)
 
@@ -146,47 +133,46 @@ export default function ItemsPage() {
   return (
     <div className="h-[calc(100vh-6rem)] flex flex-col space-y-4 animate-fade-in overflow-hidden relative">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold tracking-tight">Catálogo de Itens</h1>
-            {filterLinhaId && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  const newParams = new URLSearchParams(searchParams)
-                  newParams.delete('linha_id')
-                  setSearchParams(newParams)
-                }}
-              >
-                <FilterX className="h-4 w-4 mr-2" />
-                Limpar Filtro
-              </Button>
-            )}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold tracking-tight">Catálogo de Itens</h1>
+              {filterLinhaId && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    const newParams = new URLSearchParams(searchParams)
+                    newParams.delete('linha_id')
+                    setSearchParams(newParams)
+                  }}
+                >
+                  <FilterX className="h-4 w-4 mr-2" />
+                  Limpar Filtro
+                </Button>
+              )}
+            </div>
+            <p className="text-muted-foreground">
+              {filterLinhaId
+                ? `Mostrando itens da linha: ${linhas.find((l) => l.id === filterLinhaId)?.nome_pt || 'Desconhecida'}`
+                : 'Gerencie os produtos do seu catálogo.'}
+            </p>
           </div>
-          <p className="text-muted-foreground">
-            {filterLinhaId
-              ? `Mostrando itens da linha: ${linhas.find((l) => l.id === filterLinhaId)?.nome_pt || 'Desconhecida'}`
-              : 'Gerencie produtos e sincronização Zoho Books.'}
-          </p>
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Buscar item..."
+              className="pl-9 w-full rounded-full bg-card"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Button onClick={() => setSelectedItemId('new')}>
             <Plus className="mr-2 h-4 w-4" /> Novo Item
           </Button>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2 shrink-0">
-        <div className="relative w-full max-w-lg">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Busca inteligente (ex: m8 sextavado inox)"
-            className="pl-10 rounded-full bg-card"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
         </div>
       </div>
 
@@ -239,9 +225,6 @@ export default function ItemsPage() {
                       className={cn(
                         'cursor-pointer transition-colors',
                         isRowActive && 'bg-primary/5 hover:bg-primary/10',
-                        !item.sincronizado_com_zoho &&
-                          !isRowActive &&
-                          'bg-amber-50/30 dark:bg-amber-950/10',
                       )}
                       onClick={() => setSelectedItemId(item.id)}
                     >

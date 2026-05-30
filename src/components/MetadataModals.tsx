@@ -56,6 +56,16 @@ export function CategoryModal({
     if (!data.nome_pt || !data.nome_en) return toast.error('Preencha todos os campos obrigatórios')
     setSaving(true)
     try {
+      if (!initialData?.id) {
+        const existing = await pb
+          .collection('categorias')
+          .getList(1, 1, { filter: `nome_pt = "${data.nome_pt}"` })
+        if (existing.items.length > 0) {
+          setSaving(false)
+          return toast.error('Já existe uma categoria com este nome.')
+        }
+      }
+
       let saved
       if (initialData?.id) {
         saved = await pb.collection('categorias').update(initialData.id, data)
@@ -406,6 +416,16 @@ export function FinishModal({
       return toast.error('Preencha todos os campos obrigatórios')
     setSaving(true)
     try {
+      if (!initialData?.id) {
+        const existing = await pb
+          .collection('acabamentos')
+          .getList(1, 1, { filter: `codigo = "${data.codigo}"` })
+        if (existing.items.length > 0) {
+          setSaving(false)
+          return toast.error('Já existe um acabamento com este código.')
+        }
+      }
+
       let saved
       if (initialData?.id) {
         saved = await pb.collection('acabamentos').update(initialData.id, data)
@@ -540,6 +560,16 @@ export function NcmModal({
     if (!data.codigo) return toast.error('Preencha todos os campos obrigatórios')
     setSaving(true)
     try {
+      if (!initialData?.id) {
+        const existing = await pb
+          .collection('ncm')
+          .getList(1, 1, { filter: `codigo = "${data.codigo}"` })
+        if (existing.items.length > 0) {
+          setSaving(false)
+          return toast.error('Já existe um registro com este NCM.')
+        }
+      }
+
       let saved
       if (initialData?.id) {
         saved = await pb.collection('ncm').update(initialData.id, data)

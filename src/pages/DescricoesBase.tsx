@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { useData, DescricaoBase } from '@/contexts/data-context'
-import { Plus, Edit, Copy } from 'lucide-react'
+import { Plus, Edit, Copy, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import pb from '@/lib/pocketbase/client'
 
@@ -37,6 +37,15 @@ export default function DescricoesBasePage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<Partial<DescricaoBase> | null>(null)
   const [saving, setSaving] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+
+  const filteredDesc = descricoesBase.filter((d) => {
+    const term = searchTerm.toLowerCase()
+    return (
+      d.nome_pt.toLowerCase().includes(term) ||
+      (d.nome_en && d.nome_en.toLowerCase().includes(term))
+    )
+  })
 
   const handleOpenNew = () => {
     setEditingItem({ ativo: true })
@@ -95,11 +104,23 @@ export default function DescricoesBasePage() {
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Descrições Base</h1>
-          <p className="text-muted-foreground">
-            Gerencie os templates padronizados para criação de itens.
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Descrições Base</h1>
+            <p className="text-muted-foreground">
+              Gerencie os templates padronizados para criação de itens.
+            </p>
+          </div>
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Buscar descrições..."
+              className="pl-9 w-full"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         </div>
         <Button onClick={handleOpenNew}>
           <Plus className="mr-2 h-4 w-4" /> Nova Descrição Base
@@ -117,13 +138,13 @@ export default function DescricoesBasePage() {
                 <TableHead>Descrição (PT)</TableHead>
                 <TableHead>Descrição (EN)</TableHead>
                 <TableHead>Categoria / Linha</TableHead>
-                <TableHead>NCM (Taxas)</TableHead>
+                <TableHead>Impostos NCM</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="w-[120px] text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {descricoesBase.map((d) => (
+              {filteredDesc.map((d) => (
                 <TableRow key={d.id}>
                   <TableCell className="font-medium">{d.nome_pt}</TableCell>
                   <TableCell>{d.nome_en || '-'}</TableCell>
@@ -131,7 +152,9 @@ export default function DescricoesBasePage() {
                     <span className="block text-xs text-muted-foreground">
                       {categorias.find((c) => c.id === d.categoria_id)?.nome_pt}
                     </span>
-                    {linhas.find((l) => l.id === d.linha_id)?.nome_pt}
+                    <span className="font-medium text-sm">
+                      {linhas.find((l) => l.id === d.linha_id)?.nome_pt}
+                    </span>
                   </TableCell>
                   <TableCell>
                     {(() => {
@@ -139,7 +162,6 @@ export default function DescricoesBasePage() {
                       if (!n) return '-'
                       return (
                         <div className="text-xs">
-                          <span className="font-medium block">{n.codigo}</span>
                           <span className="text-muted-foreground">
                             II: {n.ii}% | IPI: {n.ipi}% | PIS: {n.pis}% | COF: {n.cofins}%
                           </span>
@@ -181,7 +203,7 @@ export default function DescricoesBasePage() {
                   </TableCell>
                 </TableRow>
               ))}
-              {descricoesBase.length === 0 && (
+              {filteredDesc.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     Nenhuma descrição base encontrada.

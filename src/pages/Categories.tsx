@@ -10,7 +10,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useData } from '@/contexts/data-context'
 import { Button } from '@/components/ui/button'
-import { Plus, Pencil, ArrowRight } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Plus, Pencil, ArrowRight, Search } from 'lucide-react'
 import { CategoryModal } from '@/components/MetadataModals'
 import { getContrastColor } from '@/lib/utils'
 import { useNavigate } from 'react-router-dom'
@@ -19,14 +20,35 @@ export default function Categories() {
   const { categorias } = useData()
   const [modalOpen, setModalOpen] = useState(false)
   const [editData, setEditData] = useState<any>(null)
+  const [searchTerm, setSearchTerm] = useState('')
   const navigate = useNavigate()
+
+  const filteredCategories = categorias.filter((c) => {
+    const term = searchTerm.toLowerCase()
+    return (
+      c.nome_pt.toLowerCase().includes(term) ||
+      (c.nome_en && c.nome_en.toLowerCase().includes(term))
+    )
+  })
 
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Categorias</h1>
-          <p className="text-muted-foreground">Gerencie as categorias principais de produtos.</p>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Categorias</h1>
+            <p className="text-muted-foreground">Gerencie as categorias principais de produtos.</p>
+          </div>
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Buscar categoria..."
+              className="pl-9 w-full"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         </div>
         <Button
           onClick={() => {
@@ -55,8 +77,12 @@ export default function Categories() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {categorias.map((cat) => (
-                <TableRow key={cat.id}>
+              {filteredCategories.map((cat) => (
+                <TableRow
+                  key={cat.id}
+                  className="cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => navigate(`/linhas?categoria_id=${cat.id}`)}
+                >
                   <TableCell className="font-medium">
                     <span
                       className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold w-fit"
@@ -89,7 +115,8 @@ export default function Categories() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation()
                           setEditData(cat)
                           setModalOpen(true)
                         }}
@@ -100,7 +127,10 @@ export default function Categories() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => navigate(`/linhas?categoria_id=${cat.id}`)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          navigate(`/linhas?categoria_id=${cat.id}`)
+                        }}
                       >
                         Linhas <ArrowRight className="ml-2 h-4 w-4" />
                       </Button>
@@ -108,6 +138,13 @@ export default function Categories() {
                   </TableCell>
                 </TableRow>
               ))}
+              {filteredCategories.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    Nenhuma categoria encontrada.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>
