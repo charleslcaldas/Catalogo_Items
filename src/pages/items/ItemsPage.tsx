@@ -29,7 +29,7 @@ function AcabamentoBadge({ acabamentoId }: { acabamentoId?: string }) {
 
   return (
     <span
-      className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border border-black/10 shadow-sm"
+      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border border-black/10 shadow-sm"
       style={{ backgroundColor: bgColor, color: textColor }}
     >
       {aca.nome_pt}
