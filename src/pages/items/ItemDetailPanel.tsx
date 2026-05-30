@@ -13,33 +13,17 @@ import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useData } from '@/contexts/data-context'
 import type { Item } from '@/types'
-import {
-  X,
-  Copy,
-  ImageIcon,
-  Languages,
-  History as HistoryIcon,
-  Activity,
-  Check,
-  ChevronsUpDown,
-  Plus,
-} from 'lucide-react'
+import { X, Copy, ImageIcon, History as HistoryIcon, Activity } from 'lucide-react'
 import { toast } from 'sonner'
 import pb from '@/lib/pocketbase/client'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { GalleryModal } from './GalleryModal'
 import { CategoryModal, LineModal } from '@/components/MetadataModals'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command'
 import { cn } from '@/lib/utils'
+import { SearchableSelect } from '@/components/SearchableSelect'
+import { NewDescBaseModal } from '@/components/NewDescBaseModal'
+import { PriceInput } from '@/components/PriceInput'
 
 function Field({
   label,
@@ -63,84 +47,6 @@ function Field({
   )
 }
 
-function SearchableSelect({
-  options,
-  value,
-  onChange,
-  onAddNew,
-  placeholder = 'Selecione...',
-  emptyText = 'Nenhum resultado.',
-}: {
-  options: { value: string; label: string }[]
-  value: string | undefined
-  onChange: (value: string) => void
-  onAddNew?: () => void
-  placeholder?: string
-  emptyText?: string
-}) {
-  const [open, setOpen] = useState(false)
-  const selected = options.find((o) => o.value === value)
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between h-8 text-sm px-3 font-normal bg-background hover:bg-muted/50 border-input shadow-sm"
-        >
-          <span className="truncate">{selected ? selected.label : placeholder}</span>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-        <Command>
-          <CommandInput placeholder="Buscar..." className="h-8 text-sm" />
-          <CommandList>
-            <CommandEmpty>{emptyText}</CommandEmpty>
-            <CommandGroup>
-              {options.map((opt) => (
-                <CommandItem
-                  key={opt.value}
-                  value={opt.label}
-                  onSelect={() => {
-                    onChange(opt.value)
-                    setOpen(false)
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      'mr-2 h-4 w-4',
-                      value === opt.value ? 'opacity-100' : 'opacity-0',
-                    )}
-                  />
-                  {opt.label}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-          {onAddNew && (
-            <div className="p-1 border-t bg-muted/20">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start h-8 text-sm text-primary font-medium"
-                onClick={() => {
-                  setOpen(false)
-                  onAddNew()
-                }}
-              >
-                <Plus className="mr-2 h-4 w-4" /> Novo
-              </Button>
-            </div>
-          )}
-        </Command>
-      </PopoverContent>
-    </Popover>
-  )
-}
-
 export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () => void }) {
   const { linhas, categorias, acabamentos, ncms, unidadesMedida, descricoesBase, saveItem } =
     useData()
@@ -151,6 +57,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
 
   const [catModalOpen, setCatModalOpen] = useState(false)
   const [lineModalOpen, setLineModalOpen] = useState(false)
+  const [newDescBaseModalOpen, setNewDescBaseModalOpen] = useState(false)
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('')
 
   useEffect(() => {
@@ -170,19 +77,41 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
     }
   }, [item, linhas])
 
-  const handleTranslate = async (field: 'informacao_extra' | 'descricao_extra', text: string) => {
+  const handleTranslate = async (
+    field: 'informacao_extra' | 'descricao_extra',
+    text: string,
+    from: 'pt' | 'en',
+  ) => {
+    const targetField = from === 'pt' ? `${field}_en` : field
     if (!text) {
-      setFormData((p) => ({ ...p, [field + '_en']: '' }))
+      setFormData((p) => ({ ...p, [targetField]: '' }))
       return
     }
+
+    let textToTranslate = text
+    if (from === 'pt') {
+      textToTranslate = textToTranslate
+        .replace(/Rosca Total/gi, 'Full Thread')
+        .replace(/Rosca Parcial/gi, 'Partial Thread')
+    } else {
+      textToTranslate = textToTranslate
+        .replace(/Full Thread/gi, 'Rosca Total')
+        .replace(/Partial Thread/gi, 'Rosca Parcial')
+    }
+
     toast.promise(
-      pb.send('/backend/v1/translate', { method: 'POST', body: JSON.stringify({ text }) }),
+      pb.send('/backend/v1/translate', {
+        method: 'POST',
+        body: JSON.stringify({
+          text: textToTranslate,
+          source: from,
+          target: from === 'pt' ? 'en' : 'pt',
+        }),
+      }),
       {
         loading: 'Traduzindo...',
         success: (res) => {
-          if (res.text) {
-            setFormData((p) => ({ ...p, [field + '_en']: res.text }))
-          }
+          if (res.text) setFormData((p) => ({ ...p, [targetField]: res.text }))
           return 'Tradução concluída'
         },
         error: 'Erro na tradução',
@@ -193,7 +122,6 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
   const handleSave = async () => {
     if (!formData.sku || !formData.linha_id)
       return toast.error('Preencha os campos obrigatórios (SKU, Linha)')
-
     try {
       const descBasePt =
         descricoesBase.find((d) => d.id === formData.descricao_base_id)?.nome_pt ||
@@ -239,7 +167,6 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
     }
   }
 
-  // Derived properties for UI and Headings
   const selAcabamento = acabamentos.find((a) => a.id === formData.acabamento_id)
   const descBasePt =
     descricoesBase.find((d) => d.id === formData.descricao_base_id)?.nome_pt ||
@@ -261,7 +188,6 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
   ]
     .filter(Boolean)
     .join(' ')
-
   const fullDescEn = [
     descBaseEn,
     formData.classe_material,
@@ -274,22 +200,22 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
     .filter(Boolean)
     .join(' ')
 
-  const titlePt = fullDescPt || 'Novo Item'
-  const titleEn = fullDescEn || 'New Item'
-
   const imageUrl =
     formData.foto_arquivo && item?.id
       ? pb.files.getURL(item, formData.foto_arquivo)
       : formData.foto_url || 'https://img.usecurling.com/p/200/200?q=tools&color=gray'
 
-  // Combobox Options
-  const categoryOptions = categorias.map((c) => ({ value: c.id, label: c.nome_pt }))
+  const categoryOptions = categorias.map((c) => ({ value: c.id, label: c.nome_pt, color: c.color }))
   const filteredLinhas = linhas.filter(
     (l) => !selectedCategoryId || l.categoria_id === selectedCategoryId,
   )
-  const lineOptions = filteredLinhas.map((l) => ({ value: l.id, label: l.nome_pt }))
+  const lineOptions = filteredLinhas.map((l) => ({ value: l.id, label: l.nome_pt, color: l.color }))
   const descBaseOptions = descricoesBase.map((d) => ({ value: d.id, label: d.nome_pt }))
-  const acabamentoOptions = acabamentos.map((a) => ({ value: a.id, label: a.nome_pt }))
+  const acabamentoOptions = acabamentos.map((a) => ({
+    value: a.id,
+    label: a.nome_pt,
+    color: a.cor_hex,
+  }))
   const ncmOptions = ncms.map((n) => ({ value: n.id, label: n.codigo }))
 
   const descBaseOptionsEn = descricoesBase.map((d) => ({
@@ -299,14 +225,15 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
   const acabamentoOptionsEn = acabamentos.map((a) => ({
     value: a.id,
     label: a.nome_en || a.nome_pt,
+    color: a.cor_hex,
   }))
 
   return (
     <div className="flex flex-col h-full bg-background relative">
-      <div className="flex items-center justify-between p-4 border-b bg-card z-10 shadow-sm shrink-0">
-        <div className="flex items-center gap-4 flex-1 min-w-0 pr-4">
+      <div className="flex items-start justify-between p-4 border-b bg-card z-10 shadow-sm shrink-0">
+        <div className="flex items-start gap-4 flex-1 min-w-0 pr-4">
           <div
-            className="w-14 h-14 shrink-0 rounded-lg border bg-muted/30 cursor-pointer hover:opacity-80 relative group flex items-center justify-center overflow-hidden"
+            className="w-24 h-24 shrink-0 rounded-lg border bg-muted/30 cursor-pointer hover:opacity-80 relative group flex items-center justify-center overflow-hidden"
             onClick={() => setGalleryOpen(true)}
           >
             <img
@@ -315,16 +242,28 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
               className="max-w-full max-h-full object-contain p-1 mix-blend-multiply"
             />
             <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <ImageIcon className="text-white w-5 h-5" />
+              <ImageIcon className="text-white w-6 h-6" />
             </div>
           </div>
-          <div className="flex flex-col min-w-0">
-            <h2 className="font-bold text-lg text-foreground truncate">
-              {formData.sku || 'SKU Pendente'}
+          <div className="flex flex-col min-w-0 py-1">
+            <h2 className="font-bold text-lg text-foreground whitespace-pre-wrap leading-tight">
+              {fullDescPt || 'Nova Descrição Completa'}
             </h2>
-            <h3 className="text-xs text-muted-foreground font-medium flex items-center gap-1.5 truncate">
-              <Languages className="w-3 h-3 shrink-0" /> {titlePt}
+            <h3 className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap leading-snug">
+              {fullDescEn || 'New Full Description'}
             </h3>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="font-mono text-xs bg-muted/30">
+                {formData.sku || 'SKU Pendente'}
+              </Badge>
+              {formData.ativo ? (
+                <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-emerald-200 shadow-none">
+                  Ativo
+                </Badge>
+              ) : (
+                <Badge variant="secondary">Inativo</Badge>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -358,46 +297,56 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
       </div>
 
       <Tabs defaultValue="pt" className="flex-1 flex flex-col min-h-0 overflow-hidden bg-muted/10">
-        {/* Dynamic Header Section */}
-        <div className="px-4 pt-4 pb-3 bg-card border-b flex flex-col gap-3 shrink-0 shadow-sm z-10">
-          <div className="space-y-1.5">
-            <Label className="text-[10px] font-bold text-primary/70 uppercase tracking-wider">
-              Descrição Completa (PT)
-            </Label>
-            <div className="text-sm font-medium px-3 py-2 bg-muted/30 border border-primary/10 rounded-md min-h-[38px] flex items-center">
-              {fullDescPt || (
-                <span className="text-muted-foreground opacity-50">
-                  Preencha os atributos técnicos...
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-[10px] font-bold text-primary/70 uppercase tracking-wider">
-              Full Description (EN)
-            </Label>
-            <div className="text-sm font-medium px-3 py-2 bg-muted/30 border border-primary/10 rounded-md min-h-[38px] flex items-center">
-              {fullDescEn || (
-                <span className="text-muted-foreground opacity-50">
-                  Fill the technical attributes...
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
+        <div className="px-4 pt-4 shrink-0 bg-card z-10 flex flex-col gap-4">
+          <Field label="Descrição Base (Auto-preenchimento)">
+            <SearchableSelect
+              options={descBaseOptions}
+              value={formData.descricao_base_id}
+              onChange={(v) => {
+                const desc = descricoesBase.find((d) => d.id === v)
+                if (desc) {
+                  setFormData((f) => ({
+                    ...f,
+                    descricao_base_id: v,
+                    ...(desc.linha_id ? { linha_id: desc.linha_id } : {}),
+                    ...(desc.ncm_id ? { ncm_id: desc.ncm_id } : {}),
+                  }))
+                  if (desc.linha_id) {
+                    const linha = linhas.find((l) => l.id === desc.linha_id)
+                    if (linha) setSelectedCategoryId(linha.categoria_id)
+                  } else if (desc.categoria_id) {
+                    setSelectedCategoryId(desc.categoria_id)
+                  }
+                }
+              }}
+              onAddNew={() => setNewDescBaseModalOpen(true)}
+              placeholder="Buscar ou criar descrição base..."
+            />
+          </Field>
 
-        <div className="px-4 pt-4 shrink-0 bg-card z-10">
-          <TabsList className="grid w-full grid-cols-4 bg-muted/50 p-1 rounded-xl">
-            <TabsTrigger value="pt" className="rounded-lg text-xs">
+          <TabsList className="flex w-full bg-transparent border-b border-border p-0 h-auto rounded-none justify-start overflow-x-auto">
+            <TabsTrigger
+              value="pt"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary data-[state=active]:font-bold px-4 py-3 text-sm transition-all"
+            >
               Descrição PT
             </TabsTrigger>
-            <TabsTrigger value="en" className="rounded-lg text-xs">
+            <TabsTrigger
+              value="en"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary data-[state=active]:font-bold px-4 py-3 text-sm transition-all"
+            >
               Descrição EN
             </TabsTrigger>
-            <TabsTrigger value="transactions" className="rounded-lg text-xs">
+            <TabsTrigger
+              value="transactions"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary data-[state=active]:font-bold px-4 py-3 text-sm transition-all"
+            >
               Transações
             </TabsTrigger>
-            <TabsTrigger value="history" className="rounded-lg text-xs">
+            <TabsTrigger
+              value="history"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary data-[state=active]:font-bold px-4 py-3 text-sm transition-all"
+            >
               Histórico
             </TabsTrigger>
           </TabsList>
@@ -436,25 +385,15 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 border-t pt-4">
                 <Field label="Preço Compra">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    className="h-8"
-                    value={formData.preco_compra || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, preco_compra: parseFloat(e.target.value) })
-                    }
+                  <PriceInput
+                    value={formData.preco_compra}
+                    onChange={(val) => setFormData({ ...formData, preco_compra: val })}
                   />
                 </Field>
                 <Field label="Preço Venda">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    className="h-8"
-                    value={formData.preco_venda || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, preco_venda: parseFloat(e.target.value) })
-                    }
+                  <PriceInput
+                    value={formData.preco_venda}
+                    onChange={(val) => setFormData({ ...formData, preco_venda: val })}
                   />
                 </Field>
                 <Field label="Status">
@@ -487,13 +426,6 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
             <div className="bg-card border rounded-lg p-4 shadow-sm flex flex-col gap-4">
               <h4 className="font-semibold text-sm">Atributos Técnicos</h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Field label="Desc. Base">
-                  <SearchableSelect
-                    options={descBaseOptions}
-                    value={formData.descricao_base_id}
-                    onChange={(v) => setFormData((f) => ({ ...f, descricao_base_id: v }))}
-                  />
-                </Field>
                 <Field label="Acabamento">
                   <SearchableSelect
                     options={acabamentoOptions}
@@ -508,7 +440,6 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     onChange={(v) => setFormData((f) => ({ ...f, ncm_id: v }))}
                   />
                 </Field>
-
                 <Field label="Grau/Material">
                   <Input
                     className="h-8"
@@ -530,7 +461,6 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     onChange={(e) => setFormData({ ...formData, tipo_rosca: e.target.value })}
                   />
                 </Field>
-
                 <Field label="Comp. Rosca">
                   <Input
                     className="h-8"
@@ -575,7 +505,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     className="h-8"
                     value={formData.informacao_extra || ''}
                     onChange={(e) => setFormData({ ...formData, informacao_extra: e.target.value })}
-                    onBlur={(e) => handleTranslate('informacao_extra', e.target.value)}
+                    onBlur={(e) => handleTranslate('informacao_extra', e.target.value, 'pt')}
                   />
                 </Field>
                 <Field label="Desc. Extra">
@@ -583,7 +513,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     className="min-h-[60px] resize-none text-sm"
                     value={formData.descricao_extra || ''}
                     onChange={(e) => setFormData({ ...formData, descricao_extra: e.target.value })}
-                    onBlur={(e) => handleTranslate('descricao_extra', e.target.value)}
+                    onBlur={(e) => handleTranslate('descricao_extra', e.target.value, 'pt')}
                   />
                 </Field>
               </div>
@@ -618,13 +548,6 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
             <div className="bg-card border rounded-lg p-4 shadow-sm flex flex-col gap-4">
               <h4 className="font-semibold text-sm">Technical Attributes</h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Field label="Base Desc.">
-                  <SearchableSelect
-                    options={descBaseOptionsEn}
-                    value={formData.descricao_base_id}
-                    onChange={(v) => setFormData((f) => ({ ...f, descricao_base_id: v }))}
-                  />
-                </Field>
                 <Field label="Finish">
                   <SearchableSelect
                     options={acabamentoOptionsEn}
@@ -637,7 +560,6 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     {ncms.find((n) => n.id === formData.ncm_id)?.codigo || '-'}
                   </div>
                 </Field>
-
                 <Field label="Grade/Material">
                   <Input
                     className="h-8"
@@ -659,7 +581,6 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     onChange={(e) => setFormData({ ...formData, tipo_rosca: e.target.value })}
                   />
                 </Field>
-
                 <Field label="Thread Length (EN)">
                   <Input
                     className="h-8"
@@ -694,6 +615,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     onChange={(e) =>
                       setFormData({ ...formData, informacao_extra_en: e.target.value })
                     }
+                    onBlur={(e) => handleTranslate('informacao_extra', e.target.value, 'en')}
                   />
                 </Field>
                 <Field label="Extra Desc. (EN)">
@@ -703,6 +625,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     onChange={(e) =>
                       setFormData({ ...formData, descricao_extra_en: e.target.value })
                     }
+                    onBlur={(e) => handleTranslate('descricao_extra', e.target.value, 'en')}
                   />
                 </Field>
               </div>
@@ -797,6 +720,11 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
           setSelectedCategoryId(line.categoria_id)
           setFormData((f) => ({ ...f, linha_id: line.id }))
         }}
+      />
+      <NewDescBaseModal
+        open={newDescBaseModalOpen}
+        onOpenChange={setNewDescBaseModalOpen}
+        onSaved={(id) => setFormData((f) => ({ ...f, descricao_base_id: id }))}
       />
     </div>
   )

@@ -24,6 +24,7 @@ import { Plus } from 'lucide-react'
 import { LineModal, FinishModal, NcmModal } from '@/components/MetadataModals'
 import { getContrastColor } from '@/lib/utils'
 import { toast } from 'sonner'
+import { PriceInput } from '@/components/PriceInput'
 
 export function ItemFormModal({
   open,
@@ -135,7 +136,19 @@ export function ItemFormModal({
                       value={formData.linha_id}
                       onValueChange={(v) => setFormData({ ...formData, linha_id: v })}
                     >
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger
+                        className="w-full"
+                        style={(() => {
+                          const sel = linhas.find((l) => l.id === formData.linha_id)
+                          return sel?.color
+                            ? {
+                                backgroundColor: sel.color,
+                                color: getContrastColor(sel.color),
+                                borderColor: 'transparent',
+                              }
+                            : {}
+                        })()}
+                      >
                         <SelectValue placeholder="Selecione..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -245,24 +258,16 @@ export function ItemFormModal({
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Preço de Compra</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={formData.preco_compra || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, preco_compra: parseFloat(e.target.value) })
-                    }
+                  <PriceInput
+                    value={formData.preco_compra}
+                    onChange={(val) => setFormData({ ...formData, preco_compra: val })}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>Preço de Venda</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={formData.preco_venda || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, preco_venda: parseFloat(e.target.value) })
-                    }
+                  <PriceInput
+                    value={formData.preco_venda}
+                    onChange={(val) => setFormData({ ...formData, preco_venda: val })}
                   />
                 </div>
                 <div className="space-y-2">
