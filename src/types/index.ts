@@ -23,6 +23,8 @@ export type FotoCatalogo = {
   tamanho: string
   acabamento_id: string
   url_foto: string
+  arquivo?: string
+  descricao?: string
   created: string
   updated: string
   expand?: {
@@ -127,7 +129,11 @@ export type Item = {
   tipo_rosca?: string
   comprimento_rosca?: string
   informacao_extra?: string
+  informacao_extra_en?: string
   descricao_extra?: string
+  descricao_extra_en?: string
+  descricao_curta?: string
+  descricao_curta_en?: string
   tipo?: string
   subtipo?: string
   voltagem?: string

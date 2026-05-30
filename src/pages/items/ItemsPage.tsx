@@ -60,6 +60,7 @@ export default function ItemsPage() {
   const getDescricaoBasePt = (id?: string) => descricoesBase.find((d) => d.id === id)?.nome_pt || ''
 
   const getDescricaoCurta = (item: any) => {
+    if (item.descricao_curta) return item.descricao_curta
     const descPt = item.descricao_base_id
       ? getDescricaoBasePt(item.descricao_base_id)
       : item.descricao_base_pt
@@ -88,6 +89,8 @@ export default function ItemsPage() {
         item.descr_pt,
         item.descr_en,
         getDescricaoBasePt(item.descricao_base_id),
+        item.descricao_curta,
+        item.descricao_curta_en,
         item.descricao_base_pt,
         item.classe_material,
         item.tipo_rosca,
