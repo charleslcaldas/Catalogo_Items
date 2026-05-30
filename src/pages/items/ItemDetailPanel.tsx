@@ -78,7 +78,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
   }, [item, linhas])
 
   const handleTranslate = async (
-    field: 'informacao_extra' | 'descricao_extra',
+    field: 'informacao_extra' | 'descricao_extra' | 'comprimento_rosca',
     text: string,
     from: 'pt' | 'en',
   ) => {
@@ -326,28 +326,28 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
             />
           </Field>
 
-          <TabsList className="flex w-full bg-transparent border-b border-border p-0 h-auto rounded-none justify-start overflow-x-auto">
+          <TabsList className="flex w-full bg-muted/50 border-b border-border p-1 h-auto rounded-md justify-start overflow-x-auto gap-1">
             <TabsTrigger
               value="pt"
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary data-[state=active]:font-bold px-4 py-3 text-sm transition-all"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm px-4 py-2 text-sm transition-all rounded-sm font-medium"
             >
               Descrição PT
             </TabsTrigger>
             <TabsTrigger
               value="en"
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary data-[state=active]:font-bold px-4 py-3 text-sm transition-all"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm px-4 py-2 text-sm transition-all rounded-sm font-medium"
             >
               Descrição EN
             </TabsTrigger>
             <TabsTrigger
               value="transactions"
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary data-[state=active]:font-bold px-4 py-3 text-sm transition-all"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm px-4 py-2 text-sm transition-all rounded-sm font-medium"
             >
               Transações
             </TabsTrigger>
             <TabsTrigger
               value="history"
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary data-[state=active]:font-bold px-4 py-3 text-sm transition-all"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm px-4 py-2 text-sm transition-all rounded-sm font-medium"
             >
               Histórico
             </TabsTrigger>
@@ -470,6 +470,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     onChange={(e) =>
                       setFormData({ ...formData, comprimento_rosca: e.target.value })
                     }
+                    onBlur={(e) => handleTranslate('comprimento_rosca', e.target.value, 'pt')}
                   />
                 </Field>
                 <Field label="Tamanho">
@@ -586,10 +587,11 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                 <Field label="Thread Length (EN)">
                   <Input
                     className="h-8"
-                    value={formData.comprimento_rosca_en || formData.comprimento_rosca || ''}
+                    value={formData.comprimento_rosca_en || ''}
                     onChange={(e) =>
                       setFormData({ ...formData, comprimento_rosca_en: e.target.value })
                     }
+                    onBlur={(e) => handleTranslate('comprimento_rosca', e.target.value, 'en')}
                   />
                 </Field>
                 <Field label="Size">

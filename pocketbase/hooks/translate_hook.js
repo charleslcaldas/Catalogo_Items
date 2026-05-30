@@ -9,10 +9,6 @@ routerAdd(
     const url = $secrets.get('SKIP_AI_GATEWAY_URL') || 'https://api.openai.com/v1'
     const key = $secrets.get('SKIP_AI_GATEWAY_API_KEY') || ''
 
-    if (!key) {
-      return e.json(200, { text: text + ' (EN)' })
-    }
-
     const res = $http.send({
       url: url + '/chat/completions',
       method: 'POST',

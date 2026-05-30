@@ -84,6 +84,11 @@ export default function ItemsPage() {
       const tokens = normalizedTerm.split(/\s+/).filter(Boolean)
       if (tokens.length === 0) return true
 
+      const getAcabamentoInfo = (id?: string) => {
+        const aca = acabamentos.find((a) => a.id === id)
+        return aca ? `${aca.nome_pt} ${aca.codigo}` : ''
+      }
+
       const searchableText = [
         item.sku,
         item.descr_pt,
@@ -100,6 +105,7 @@ export default function ItemsPage() {
         getLinhaName(item.linha_id),
         getCategoriaName(item.linha_id),
         getNcmCode(item.ncm_id),
+        getAcabamentoInfo(item.acabamento_id),
       ]
         .filter(Boolean)
         .join(' ')
@@ -188,8 +194,8 @@ export default function ItemsPage() {
         >
           <Table>
             <TableHeader className="sticky top-0 bg-card z-10 shadow-sm">
-              <TableRow>
-                <TableHead className="w-12 text-center">
+              <TableRow className="h-10">
+                <TableHead className="w-10 text-center px-2">
                   <Checkbox
                     checked={
                       selectedItemIds.size > 0 && selectedItemIds.size === filteredItems.length
@@ -197,15 +203,15 @@ export default function ItemsPage() {
                     onCheckedChange={toggleSelectAll}
                   />
                 </TableHead>
-                <TableHead className="w-[72px] text-center">Foto</TableHead>
-                <TableHead>SKU</TableHead>
-                <TableHead>Descrição Curta</TableHead>
-                <TableHead>Tamanho</TableHead>
-                <TableHead>Acab.</TableHead>
+                <TableHead className="w-14 text-center px-2">Foto</TableHead>
+                <TableHead className="px-2">SKU</TableHead>
+                <TableHead className="px-2">Descrição Curta</TableHead>
+                <TableHead className="px-2">Tamanho</TableHead>
+                <TableHead className="px-2">Acab.</TableHead>
                 {!selectedItemId && (
                   <>
-                    <TableHead>Preço Venda</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead className="px-2">Preço Venda</TableHead>
+                    <TableHead className="px-2">Status</TableHead>
                   </>
                 )}
               </TableRow>
@@ -231,13 +237,16 @@ export default function ItemsPage() {
                       )}
                       onClick={() => setSelectedItemId(item.id)}
                     >
-                      <TableCell onClick={(e) => e.stopPropagation()} className="text-center">
+                      <TableCell
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-center py-2 px-2"
+                      >
                         <Checkbox
                           checked={isSelected}
                           onCheckedChange={() => toggleSelect(item.id)}
                         />
                       </TableCell>
-                      <TableCell className="p-2">
+                      <TableCell className="py-2 px-2">
                         <img
                           src={
                             item.foto_arquivo
@@ -245,30 +254,34 @@ export default function ItemsPage() {
                               : item.foto_url || 'https://img.usecurling.com/p/100/100?q=tools'
                           }
                           alt={item.sku}
-                          className="w-14 h-14 rounded object-cover border bg-muted mx-auto"
+                          className="w-8 h-8 rounded object-cover border bg-muted mx-auto"
                         />
                       </TableCell>
-                      <TableCell className="font-medium whitespace-nowrap">{item.sku}</TableCell>
+                      <TableCell className="font-medium whitespace-nowrap py-2 px-2 text-sm">
+                        {item.sku}
+                      </TableCell>
 
-                      <TableCell className="max-w-[200px] truncate" title={getDescricaoCurta(item)}>
+                      <TableCell className="max-w-[250px] py-2 px-2 text-sm whitespace-normal break-words leading-snug">
                         {getDescricaoCurta(item)}
                       </TableCell>
-                      <TableCell className="whitespace-nowrap">{item.tamanho || '-'}</TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap py-2 px-2 text-sm">
+                        {item.tamanho || '-'}
+                      </TableCell>
+                      <TableCell className="py-2 px-2">
                         <AcabamentoBadge acabamentoId={item.acabamento_id} />
                       </TableCell>
 
                       {!selectedItemId && (
                         <>
-                          <TableCell className="whitespace-nowrap">
+                          <TableCell className="whitespace-nowrap py-2 px-2 text-sm">
                             {item.preco_venda
-                              ? new Intl.NumberFormat('pt-BR', {
+                              ? new Intl.NumberFormat('en-US', {
                                   style: 'currency',
                                   currency: 'USD',
                                 }).format(item.preco_venda)
                               : '-'}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="py-2 px-2">
                             {item.ativo ? (
                               <Badge
                                 variant="outline"
