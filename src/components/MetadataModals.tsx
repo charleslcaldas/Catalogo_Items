@@ -57,9 +57,10 @@ export function CategoryModal({
     setSaving(true)
     try {
       if (!initialData?.id) {
-        const existing = await pb
-          .collection('categorias')
-          .getList(1, 1, { filter: `nome_pt = "${data.nome_pt}"` })
+        const filterStr = initialData?.id
+          ? `nome_pt = "${data.nome_pt}" && id != "${initialData.id}"`
+          : `nome_pt = "${data.nome_pt}"`
+        const existing = await pb.collection('categorias').getList(1, 1, { filter: filterStr })
         if (existing.items.length > 0) {
           setSaving(false)
           return toast.error('Já existe uma categoria com este nome.')
@@ -417,9 +418,10 @@ export function FinishModal({
     setSaving(true)
     try {
       if (!initialData?.id) {
-        const existing = await pb
-          .collection('acabamentos')
-          .getList(1, 1, { filter: `codigo = "${data.codigo}"` })
+        const filterStr = initialData?.id
+          ? `codigo = "${data.codigo}" && id != "${initialData.id}"`
+          : `codigo = "${data.codigo}"`
+        const existing = await pb.collection('acabamentos').getList(1, 1, { filter: filterStr })
         if (existing.items.length > 0) {
           setSaving(false)
           return toast.error('Já existe um acabamento com este código.')
@@ -561,9 +563,10 @@ export function NcmModal({
     setSaving(true)
     try {
       if (!initialData?.id) {
-        const existing = await pb
-          .collection('ncm')
-          .getList(1, 1, { filter: `codigo = "${data.codigo}"` })
+        const filterStr = initialData?.id
+          ? `codigo = "${data.codigo}" && id != "${initialData.id}"`
+          : `codigo = "${data.codigo}"`
+        const existing = await pb.collection('ncm').getList(1, 1, { filter: filterStr })
         if (existing.items.length > 0) {
           setSaving(false)
           return toast.error('Já existe um registro com este NCM.')

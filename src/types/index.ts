@@ -3,6 +3,10 @@ export type Categoria = {
   nome_pt: string
   nome_en: string
   color?: string
+  data_atualizacao?: string
+  validade_preco?: string
+  descricao_catalogo_pt?: string
+  descricao_catalogo_en?: string
   created: string
   updated: string
   expand?: {
