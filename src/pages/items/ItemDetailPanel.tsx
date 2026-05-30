@@ -87,45 +87,60 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
       const dataToSave = { ...formData }
       let translationsDone = false
 
-      const translateText = async (text: string) => {
+      const translateText = async (text: string, fieldLabel: string) => {
         const textToTranslate = text
           .replace(/Rosca Total/gi, 'Full Thread')
           .replace(/Rosca Parcial/gi, 'Partial Thread')
 
-        const res = await pb.send('/backend/v1/translate', {
-          method: 'POST',
-          body: JSON.stringify({
-            text: textToTranslate,
-            source: 'pt',
-            target: 'en',
-          }),
-        })
-        return res.text
+        try {
+          const res = await pb.send('/backend/v1/translate', {
+            method: 'POST',
+            body: JSON.stringify({
+              text: textToTranslate,
+              source: 'pt',
+              target: 'en',
+            }),
+          })
+          if (res.text && res.text.toLowerCase() !== text.toLowerCase()) {
+            return res.text
+          }
+          throw new Error('Identical or empty translation')
+        } catch (err) {
+          toast.warning(
+            `Aviso: Falha ao traduzir "${fieldLabel}". O campo em inglês não foi atualizado.`,
+            { duration: 5000 },
+          )
+          return null
+        }
       }
 
-      if (
-        formData.comprimento_rosca &&
-        (!item || formData.comprimento_rosca !== item.comprimento_rosca)
-      ) {
-        toast.loading('Traduzindo comprimento da rosca...', { id: toastId })
-        dataToSave.comprimento_rosca_en = await translateText(formData.comprimento_rosca)
-        translationsDone = true
-      }
-      if (
-        formData.informacao_extra &&
-        (!item || formData.informacao_extra !== item.informacao_extra)
-      ) {
-        toast.loading('Traduzindo informação extra...', { id: toastId })
-        dataToSave.informacao_extra_en = await translateText(formData.informacao_extra)
-        translationsDone = true
-      }
-      if (
-        formData.descricao_extra &&
-        (!item || formData.descricao_extra !== item.descricao_extra)
-      ) {
-        toast.loading('Traduzindo descrição extra...', { id: toastId })
-        dataToSave.descricao_extra_en = await translateText(formData.descricao_extra)
-        translationsDone = true
+      const fieldsToTranslate = [
+        { pt: 'comprimento_rosca', en: 'comprimento_rosca_en', label: 'Comp. Rosca' },
+        { pt: 'informacao_extra', en: 'informacao_extra_en', label: 'Info Extra' },
+        { pt: 'descricao_extra', en: 'descricao_extra_en', label: 'Desc. Extra' },
+      ] as const
+
+      for (const field of fieldsToTranslate) {
+        const ptVal = formData[field.pt] as string
+        const ptOrig = item?.[field.pt] as string
+
+        if (ptVal && ptVal !== ptOrig) {
+          toast.loading(`Traduzindo ${field.label}...`, { id: toastId })
+          const translated = await translateText(ptVal, field.label)
+          if (translated) {
+            dataToSave[field.en as any] = translated as any
+            translationsDone = true
+          }
+        }
+
+        const finalEn = dataToSave[field.en] as string
+        const finalPt = dataToSave[field.pt] as string
+        if (finalEn && finalPt && finalEn.trim().toLowerCase() === finalPt.trim().toLowerCase()) {
+          dataToSave[field.en as any] = '' as any
+          toast.warning(`Aviso: O campo "${field.label} (EN)" era idêntico ao PT e foi limpo.`, {
+            duration: 5000,
+          })
+        }
       }
 
       const descBasePt =
@@ -152,7 +167,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
         dataToSave.classe_material,
         dataToSave.norma,
         dataToSave.tipo_rosca,
-        dataToSave.comprimento_rosca_en || dataToSave.comprimento_rosca,
+        dataToSave.comprimento_rosca_en, // Strict: no fallback to PT
         dataToSave.informacao_extra_en,
       ]
         .filter(Boolean)
@@ -205,7 +220,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
     formData.classe_material,
     formData.norma,
     formData.tipo_rosca,
-    formData.comprimento_rosca_en || formData.comprimento_rosca,
+    formData.comprimento_rosca_en, // Strict: no fallback to PT
     formData.tamanho,
     selAcabamento?.nome_en || selAcabamento?.nome_pt,
   ]
@@ -514,8 +529,8 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
               <h4 className="font-semibold text-sm">Informações Adicionais</h4>
               <div className="grid grid-cols-1 gap-4">
                 <Field label="Info Extra">
-                  <Input
-                    className="h-8"
+                  <Textarea
+                    className="min-h-[60px] resize-y text-sm"
                     value={formData.informacao_extra || ''}
                     onChange={(e) => setFormData({ ...formData, informacao_extra: e.target.value })}
                   />
@@ -620,8 +635,8 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
               <h4 className="font-semibold text-sm">Additional Information</h4>
               <div className="grid grid-cols-1 gap-4">
                 <Field label="Extra Info (EN)">
-                  <Input
-                    className="h-8"
+                  <Textarea
+                    className="min-h-[60px] resize-y text-sm"
                     value={formData.informacao_extra_en || ''}
                     onChange={(e) =>
                       setFormData({ ...formData, informacao_extra_en: e.target.value })

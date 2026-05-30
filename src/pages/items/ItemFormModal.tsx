@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
@@ -102,34 +103,20 @@ export function ItemFormModal({
                   <Label>
                     Descrição (PT) <span className="text-destructive">*</span>
                   </Label>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Input
-                        required
-                        className="truncate"
-                        value={formData.descr_pt || ''}
-                        onChange={(e) => setFormData({ ...formData, descr_pt: e.target.value })}
-                      />
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" align="start">
-                      <p className="max-w-xs break-words">{formData.descr_pt || ''}</p>
-                    </TooltipContent>
-                  </Tooltip>
+                  <Textarea
+                    required
+                    className="min-h-[80px] resize-y text-sm"
+                    value={formData.descr_pt || ''}
+                    onChange={(e) => setFormData({ ...formData, descr_pt: e.target.value })}
+                  />
                 </div>
                 <div className="space-y-2 col-span-2">
                   <Label>Descrição (EN)</Label>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Input
-                        className="truncate"
-                        value={formData.descr_en || ''}
-                        onChange={(e) => setFormData({ ...formData, descr_en: e.target.value })}
-                      />
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" align="start">
-                      <p className="max-w-xs break-words">{formData.descr_en || ''}</p>
-                    </TooltipContent>
-                  </Tooltip>
+                  <Textarea
+                    className="min-h-[80px] resize-y text-sm"
+                    value={formData.descr_en || ''}
+                    onChange={(e) => setFormData({ ...formData, descr_en: e.target.value })}
+                  />
                 </div>
                 <div className="space-y-2 col-span-2">
                   <Label>Foto URL</Label>
