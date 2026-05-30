@@ -45,16 +45,33 @@ export default function ItemsPage() {
 
   const filterStatus = searchParams.get('status')
   const filterLinhaId = searchParams.get('linha_id')
-  const filterDate = searchParams.get('date')
+  const filterDateStart = searchParams.get('dateStart')
+  const filterDateEnd = searchParams.get('dateEnd')
 
   const [searchTerm, setSearchTerm] = useState('')
+
+  useEffect(() => {
+    const storedItemId = localStorage.getItem('lastSelectedItemId')
+    if (!searchParams.has('itemId') && storedItemId) {
+      const newParams = new URLSearchParams(searchParams)
+      newParams.set('itemId', storedItemId)
+      setSearchParams(newParams, { replace: true })
+    }
+  }, [])
+
   const selectedItemId = searchParams.get('itemId')
   const setSelectedItemId = (id: string | null) => {
     const newParams = new URLSearchParams(searchParams)
-    if (id) newParams.set('itemId', id)
-    else newParams.delete('itemId')
+    if (id) {
+      newParams.set('itemId', id)
+      localStorage.setItem('lastSelectedItemId', id)
+    } else {
+      newParams.delete('itemId')
+      localStorage.removeItem('lastSelectedItemId')
+    }
     setSearchParams(newParams)
   }
+
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set())
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false)
 
@@ -84,9 +101,10 @@ export default function ItemsPage() {
       if (filterStatus === 'Ativo' && !item.ativo) return false
       if (filterLinhaId && item.linha_id !== filterLinhaId) return false
 
-      if (filterDate) {
+      if (filterDateStart || filterDateEnd) {
         const itemDate = new Date(item.created).toISOString().split('T')[0]
-        if (itemDate !== filterDate) return false
+        if (filterDateStart && itemDate < filterDateStart) return false
+        if (filterDateEnd && itemDate > filterDateEnd) return false
       }
 
       if (!searchTerm.trim()) return true
@@ -133,6 +151,8 @@ export default function ItemsPage() {
     searchTerm,
     filterStatus,
     filterLinhaId,
+    filterDateStart,
+    filterDateEnd,
     linhas,
     categorias,
     ncms,
@@ -164,19 +184,20 @@ export default function ItemsPage() {
 
   return (
     <div className="h-[calc(100vh-6rem)] flex flex-col space-y-4 animate-fade-in overflow-hidden relative">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+      <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-4 shrink-0">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-4">
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold tracking-tight">Catálogo de Itens</h1>
-              {(filterLinhaId || filterDate) && (
+              {(filterLinhaId || filterDateStart || filterDateEnd) && (
                 <Button
                   variant="secondary"
                   size="sm"
                   onClick={() => {
                     const newParams = new URLSearchParams(searchParams)
                     newParams.delete('linha_id')
-                    newParams.delete('date')
+                    newParams.delete('dateStart')
+                    newParams.delete('dateEnd')
                     setSearchParams(newParams)
                   }}
                 >
@@ -185,36 +206,58 @@ export default function ItemsPage() {
                 </Button>
               )}
             </div>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground mt-1">
               {filterLinhaId
                 ? `Mostrando itens da linha: ${linhas.find((l) => l.id === filterLinhaId)?.nome_pt || 'Desconhecida'}`
                 : 'Gerencie os produtos do seu catálogo.'}
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row items-center gap-2">
-            <div className="relative w-full sm:w-64">
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <div className="relative w-full sm:w-64 mt-4 sm:mt-0">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
                 placeholder="Buscar item..."
-                className="pl-9 w-full rounded-full bg-card"
+                className="pl-9 w-full rounded-full bg-card h-9"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <div className="relative">
-              <Input
-                type="date"
-                title="Filtrar por Data de Cadastro"
-                className="w-full sm:w-auto rounded-full bg-card px-3 py-2 text-sm text-muted-foreground min-h-[40px]"
-                value={filterDate || ''}
-                onChange={(e) => {
-                  const newParams = new URLSearchParams(searchParams)
-                  if (e.target.value) newParams.set('date', e.target.value)
-                  else newParams.delete('date')
-                  setSearchParams(newParams)
-                }}
-              />
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="flex flex-col w-1/2 sm:w-auto">
+                <span className="text-[10px] font-medium text-muted-foreground ml-2 mb-0.5">
+                  Criado a partir de
+                </span>
+                <Input
+                  type="date"
+                  title="Data Inicial de Cadastro"
+                  className="w-full sm:w-36 rounded-full bg-card px-3 py-1 text-xs text-muted-foreground h-9"
+                  value={filterDateStart || ''}
+                  onChange={(e) => {
+                    const newParams = new URLSearchParams(searchParams)
+                    if (e.target.value) newParams.set('dateStart', e.target.value)
+                    else newParams.delete('dateStart')
+                    setSearchParams(newParams)
+                  }}
+                />
+              </div>
+              <div className="flex flex-col w-1/2 sm:w-auto">
+                <span className="text-[10px] font-medium text-muted-foreground ml-2 mb-0.5">
+                  Criado até
+                </span>
+                <Input
+                  type="date"
+                  title="Data Final de Cadastro"
+                  className="w-full sm:w-36 rounded-full bg-card px-3 py-1 text-xs text-muted-foreground h-9"
+                  value={filterDateEnd || ''}
+                  onChange={(e) => {
+                    const newParams = new URLSearchParams(searchParams)
+                    if (e.target.value) newParams.set('dateEnd', e.target.value)
+                    else newParams.delete('dateEnd')
+                    setSearchParams(newParams)
+                  }}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -273,7 +316,9 @@ export default function ItemsPage() {
                       key={item.id}
                       className={cn(
                         'cursor-pointer transition-colors',
-                        isRowActive && 'bg-primary/10 hover:bg-primary/15',
+                        isRowActive
+                          ? 'bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40'
+                          : 'hover:bg-muted/50',
                       )}
                       onClick={() => setSelectedItemId(item.id)}
                     >

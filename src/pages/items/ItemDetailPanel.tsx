@@ -11,7 +11,6 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useData } from '@/contexts/data-context'
 import type { Item } from '@/types'
 import { X, Copy, ImageIcon, History as HistoryIcon, Activity } from 'lucide-react'
@@ -78,95 +77,105 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
     }
   }, [item, linhas])
 
-  const handleTranslate = async (
-    field: 'informacao_extra' | 'descricao_extra' | 'comprimento_rosca',
-    text: string,
-    from: 'pt' | 'en',
-  ) => {
-    const targetField = from === 'pt' ? `${field}_en` : field
-    if (!text) {
-      setFormData((p) => ({ ...p, [targetField]: '' }))
-      return
-    }
-
-    let textToTranslate = text
-    if (from === 'pt') {
-      textToTranslate = textToTranslate
-        .replace(/Rosca Total/gi, 'Full Thread')
-        .replace(/Rosca Parcial/gi, 'Partial Thread')
-    } else {
-      textToTranslate = textToTranslate
-        .replace(/Full Thread/gi, 'Rosca Total')
-        .replace(/Partial Thread/gi, 'Rosca Parcial')
-    }
-
-    toast.promise(
-      pb.send('/backend/v1/translate', {
-        method: 'POST',
-        body: JSON.stringify({
-          text: textToTranslate,
-          source: from,
-          target: from === 'pt' ? 'en' : 'pt',
-        }),
-      }),
-      {
-        loading: 'Traduzindo...',
-        success: (res) => {
-          if (res.text) setFormData((p) => ({ ...p, [targetField]: res.text }))
-          return 'Tradução concluída'
-        },
-        error: 'Erro na tradução',
-      },
-    )
-  }
-
   const handleSave = async () => {
     if (!formData.sku || !formData.linha_id)
       return toast.error('Preencha os campos obrigatórios (SKU, Linha)')
+
+    const toastId = toast.loading('Salvando item...')
+
     try {
+      const dataToSave = { ...formData }
+      let translationsDone = false
+
+      const translateText = async (text: string) => {
+        const textToTranslate = text
+          .replace(/Rosca Total/gi, 'Full Thread')
+          .replace(/Rosca Parcial/gi, 'Partial Thread')
+
+        const res = await pb.send('/backend/v1/translate', {
+          method: 'POST',
+          body: JSON.stringify({
+            text: textToTranslate,
+            source: 'pt',
+            target: 'en',
+          }),
+        })
+        return res.text
+      }
+
+      if (
+        formData.comprimento_rosca &&
+        (!item || formData.comprimento_rosca !== item.comprimento_rosca)
+      ) {
+        toast.loading('Traduzindo comprimento da rosca...', { id: toastId })
+        dataToSave.comprimento_rosca_en = await translateText(formData.comprimento_rosca)
+        translationsDone = true
+      }
+      if (
+        formData.informacao_extra &&
+        (!item || formData.informacao_extra !== item.informacao_extra)
+      ) {
+        toast.loading('Traduzindo informação extra...', { id: toastId })
+        dataToSave.informacao_extra_en = await translateText(formData.informacao_extra)
+        translationsDone = true
+      }
+      if (
+        formData.descricao_extra &&
+        (!item || formData.descricao_extra !== item.descricao_extra)
+      ) {
+        toast.loading('Traduzindo descrição extra...', { id: toastId })
+        dataToSave.descricao_extra_en = await translateText(formData.descricao_extra)
+        translationsDone = true
+      }
+
       const descBasePt =
-        descricoesBase.find((d) => d.id === formData.descricao_base_id)?.nome_pt ||
-        formData.descricao_base_pt ||
+        descricoesBase.find((d) => d.id === dataToSave.descricao_base_id)?.nome_pt ||
+        dataToSave.descricao_base_pt ||
         ''
       const descricao_curta = [
         descBasePt,
-        formData.classe_material,
-        formData.norma,
-        formData.tipo_rosca,
-        formData.comprimento_rosca,
-        formData.informacao_extra,
+        dataToSave.classe_material,
+        dataToSave.norma,
+        dataToSave.tipo_rosca,
+        dataToSave.comprimento_rosca,
+        dataToSave.informacao_extra,
       ]
         .filter(Boolean)
         .join(' ')
 
       const descBaseEn =
-        descricoesBase.find((d) => d.id === formData.descricao_base_id)?.nome_en ||
-        formData.descricao_base_en ||
+        descricoesBase.find((d) => d.id === dataToSave.descricao_base_id)?.nome_en ||
+        dataToSave.descricao_base_en ||
         ''
       const descricao_curta_en = [
         descBaseEn,
-        formData.classe_material,
-        formData.norma,
-        formData.tipo_rosca,
-        formData.comprimento_rosca_en || formData.comprimento_rosca,
-        formData.informacao_extra_en,
+        dataToSave.classe_material,
+        dataToSave.norma,
+        dataToSave.tipo_rosca,
+        dataToSave.comprimento_rosca_en || dataToSave.comprimento_rosca,
+        dataToSave.informacao_extra_en,
       ]
         .filter(Boolean)
         .join(' ')
 
       await saveItem({
-        ...formData,
+        ...dataToSave,
         descricao_curta,
         descricao_curta_en,
-        descr_pt: descricao_curta || formData.descr_pt || 'Sem descrição',
-        descr_en: descricao_curta_en || formData.descr_en || '',
+        descr_pt: descricao_curta || dataToSave.descr_pt || 'Sem descrição',
+        descr_en: descricao_curta_en || dataToSave.descr_en || '',
         data_atualizacao: new Date().toISOString(),
       } as Item)
 
-      toast.success('Item salvo')
+      toast.success(
+        translationsDone ? 'Item salvo e traduzido com sucesso!' : 'Item salvo com sucesso!',
+        { id: toastId },
+      )
+      setFormData((prev) => ({ ...prev, ...dataToSave }))
+
       if (!item) onClose()
     } catch (err: any) {
-      toast.error('Erro ao salvar: ' + err.message)
+      toast.error('Erro ao salvar: ' + err.message, { id: toastId })
     }
   }
 
@@ -248,32 +257,13 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
               <ImageIcon className="text-white w-6 h-6" />
             </div>
           </div>
-          <div className="flex flex-col min-w-0 py-1 overflow-hidden">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="text-left w-full cursor-default overflow-hidden">
-                  <h2 className="font-bold text-lg text-foreground truncate h-7">
-                    {fullDescPt || 'Nova Descrição Completa'}
-                  </h2>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" align="start" className="max-w-md break-words">
-                <p>{fullDescPt || 'Nova Descrição Completa'}</p>
-              </TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="text-left w-full mt-1 cursor-default overflow-hidden">
-                  <h3 className="text-sm text-muted-foreground truncate h-5">
-                    {fullDescEn || 'New Full Description'}
-                  </h3>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" align="start" className="max-w-md break-words">
-                <p>{fullDescEn || 'New Full Description'}</p>
-              </TooltipContent>
-            </Tooltip>
+          <div className="flex flex-col min-w-0 py-1 flex-1">
+            <h2 className="font-bold text-lg text-foreground break-words whitespace-normal leading-tight">
+              {fullDescPt || 'Nova Descrição Completa'}
+            </h2>
+            <h3 className="text-sm text-muted-foreground break-words whitespace-normal leading-snug mt-1">
+              {fullDescEn || 'New Full Description'}
+            </h3>
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <Badge variant="outline" className="font-mono text-xs bg-muted/30">
@@ -491,7 +481,6 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     onChange={(e) =>
                       setFormData({ ...formData, comprimento_rosca: e.target.value })
                     }
-                    onBlur={(e) => handleTranslate('comprimento_rosca', e.target.value, 'pt')}
                   />
                 </Field>
                 <Field label="Tamanho">
@@ -529,7 +518,6 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     className="h-8"
                     value={formData.informacao_extra || ''}
                     onChange={(e) => setFormData({ ...formData, informacao_extra: e.target.value })}
-                    onBlur={(e) => handleTranslate('informacao_extra', e.target.value, 'pt')}
                   />
                 </Field>
                 <Field label="Desc. Extra">
@@ -537,7 +525,6 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     className="min-h-[60px] resize-none text-sm"
                     value={formData.descricao_extra || ''}
                     onChange={(e) => setFormData({ ...formData, descricao_extra: e.target.value })}
-                    onBlur={(e) => handleTranslate('descricao_extra', e.target.value, 'pt')}
                   />
                 </Field>
               </div>
@@ -612,7 +599,6 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     onChange={(e) =>
                       setFormData({ ...formData, comprimento_rosca_en: e.target.value })
                     }
-                    onBlur={(e) => handleTranslate('comprimento_rosca', e.target.value, 'en')}
                   />
                 </Field>
                 <Field label="Size">
@@ -640,7 +626,6 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     onChange={(e) =>
                       setFormData({ ...formData, informacao_extra_en: e.target.value })
                     }
-                    onBlur={(e) => handleTranslate('informacao_extra', e.target.value, 'en')}
                   />
                 </Field>
                 <Field label="Extra Desc. (EN)">
@@ -650,7 +635,6 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     onChange={(e) =>
                       setFormData({ ...formData, descricao_extra_en: e.target.value })
                     }
-                    onBlur={(e) => handleTranslate('descricao_extra', e.target.value, 'en')}
                   />
                 </Field>
               </div>
