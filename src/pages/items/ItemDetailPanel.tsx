@@ -157,6 +157,8 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
         ...formData,
         descricao_curta,
         descricao_curta_en,
+        descr_pt: descricao_curta || formData.descr_pt || 'Sem descrição',
+        descr_en: descricao_curta_en || formData.descr_en || '',
         data_atualizacao: new Date().toISOString(),
       } as Item)
 
