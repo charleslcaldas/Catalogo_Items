@@ -322,7 +322,6 @@ export default function ItemsPage() {
                       )}
                       onClick={() => setSelectedItemId(item.id)}
                     >
-                      {' '}
                       <TableCell
                         onClick={(e) => e.stopPropagation()}
                         className="text-center py-1 px-2"
