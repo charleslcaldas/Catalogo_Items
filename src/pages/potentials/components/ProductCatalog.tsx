@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Search, Plus, Check } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -17,6 +17,7 @@ import { cn, getContrastColor } from '@/lib/utils'
 import type { Item } from '@/types'
 import type { SelectedItemRecord } from '../AddItemsToPotential'
 import pb from '@/lib/pocketbase/client'
+import type { UnidadeMedida } from '@/types'
 
 interface ProductCatalogProps {
   selectedItems: SelectedItemRecord[]
@@ -26,9 +27,22 @@ interface ProductCatalogProps {
   onDuplicate: (item: Item) => void
 }
 
-export function ProductCatalog({ selectedItems, onToggle, onAddNew }: ProductCatalogProps) {
+export function ProductCatalog({
+  selectedItems,
+  onToggle,
+  onAddNew,
+  onUpdateItem,
+}: ProductCatalogProps) {
   const { itens, acabamentos } = useData()
   const [searchTerm, setSearchTerm] = useState('')
+  const [unidades, setUnidades] = useState<UnidadeMedida[]>([])
+
+  useEffect(() => {
+    pb.collection('unidades_medida')
+      .getFullList<UnidadeMedida>()
+      .then(setUnidades)
+      .catch(console.error)
+  }, [])
 
   const filteredItems = useMemo(() => {
     if (!searchTerm.trim()) return itens.filter((i) => i.ativo)
@@ -93,14 +107,19 @@ export function ProductCatalog({ selectedItems, onToggle, onAddNew }: ProductCat
               <TableHead className="text-[11px] px-2">Descrição</TableHead>
               <TableHead className="w-24 text-[11px] px-2">Tamanho</TableHead>
               <TableHead className="w-32 text-[11px] px-2">Acabamento</TableHead>
+              <TableHead className="w-20 text-[11px] px-2">Unidade</TableHead>
+              <TableHead className="w-24 text-[11px] px-2 text-center">Quantidade</TableHead>
               <TableHead className="w-24 text-[11px] px-2">Preço</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredItems.map((item) => {
-              const isSelected = selectedItems.some((si) => si.id === item.id)
+              const selectedItem = selectedItems.find((si) => si.id === item.id)
+              const isSelected = !!selectedItem
               const aca = acabamentos.find((a) => a.id === item.acabamento_id)
               const desc = item.descricao_curta || item.descr_pt || '-'
+              const unidadeObj = unidades.find((u) => u.id === item.unidade_id)
+              const unidadeNome = unidadeObj ? unidadeObj.nome : item.unidade || '-'
 
               return (
                 <TableRow
@@ -166,6 +185,19 @@ export function ProductCatalog({ selectedItems, onToggle, onAddNew }: ProductCat
                     ) : (
                       '-'
                     )}
+                  </TableCell>
+                  <TableCell className="py-1 px-2 text-[11px] whitespace-nowrap">
+                    {unidadeNome}
+                  </TableCell>
+                  <TableCell className="py-1 px-2 text-center" onClick={(e) => e.stopPropagation()}>
+                    <Input
+                      type="number"
+                      min="1"
+                      disabled={!isSelected}
+                      value={selectedItem ? selectedItem.data.quantidade : ''}
+                      onChange={(e) => onUpdateItem(item.id, 'quantidade', e.target.value)}
+                      className="h-7 w-16 text-xs text-center mx-auto"
+                    />
                   </TableCell>
                   <TableCell className="py-1 px-2 text-[11px] whitespace-nowrap">
                     {typeof item.preco_venda === 'number'

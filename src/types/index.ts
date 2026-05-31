@@ -49,6 +49,13 @@ export type Linha = {
   }
 }
 
+export type UnidadeMedida = {
+  id: string
+  nome: string
+  created: string
+  updated: string
+}
+
 export type Acabamento = {
   id: string
   codigo: string
@@ -149,11 +156,13 @@ export type Item = {
   foto_arquivo?: string
   fornecedor_ultima_atualizacao?: string
   unidade?: string
+  unidade_id?: string
   created: string
   updated: string
   expand?: {
     acabamento_id?: Acabamento
     linha_id?: Linha
     ncm_id?: NCM
+    unidade_id?: UnidadeMedida
   }
 }

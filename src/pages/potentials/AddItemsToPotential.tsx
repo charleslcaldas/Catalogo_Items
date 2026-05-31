@@ -12,7 +12,7 @@ import { PotencialForm } from './components/PotencialForm'
 import { SelectedItemsTable } from './components/SelectedItemsTable'
 import { savePotencialFull, getPotencialItens } from '@/services/potenciais'
 import pb from '@/lib/pocketbase/client'
-import type { Potencial, Item } from '@/types'
+import type { Potencial, Item, UnidadeMedida } from '@/types'
 
 export type SelectedItemData = {
   item: Item
@@ -50,6 +50,14 @@ export default function AddItemsToPotential() {
   const [isSearchQuoteOpen, setIsSearchQuoteOpen] = useState(false)
   const [isItemModalOpen, setIsItemModalOpen] = useState(false)
   const [itemToEdit, setItemToEdit] = useState<Partial<Item> | undefined>(undefined)
+  const [unidades, setUnidades] = useState<UnidadeMedida[]>([])
+
+  useEffect(() => {
+    pb.collection('unidades_medida')
+      .getFullList<UnidadeMedida>()
+      .then(setUnidades)
+      .catch(console.error)
+  }, [])
 
   useEffect(() => {
     const id = searchParams.get('id')
@@ -67,6 +75,8 @@ export default function AddItemsToPotential() {
       if (idx >= 0) {
         return prev.filter((si) => si.id !== item.id)
       } else {
+        const unidadeObj = unidades.find((u) => u.id === item.unidade_id)
+        const unidadeNome = unidadeObj ? unidadeObj.nome : item.unidade || 'Pcs'
         return [
           ...prev,
           {
@@ -74,7 +84,7 @@ export default function AddItemsToPotential() {
             data: {
               item,
               quantidade: 1,
-              unidade_medida: item.unidade || 'Pcs',
+              unidade_medida: unidadeNome,
               preco_unitario: item.preco_venda !== undefined ? item.preco_venda : '',
               observacoes: '',
               ordem: prev.length + 1,
@@ -205,20 +215,24 @@ export default function AddItemsToPotential() {
   }
 
   const handleItemSaved = (newItem: Item) => {
-    setSelectedItems((prev) => [
-      ...prev,
-      {
-        id: newItem.id,
-        data: {
-          item: newItem,
-          quantidade: 1,
-          unidade_medida: newItem.unidade || 'Pcs',
-          preco_unitario: newItem.preco_venda !== undefined ? newItem.preco_venda : '',
-          observacoes: '',
-          ordem: prev.length + 1,
+    setSelectedItems((prev) => {
+      const unidadeObj = unidades.find((u) => u.id === newItem.unidade_id)
+      const unidadeNome = unidadeObj ? unidadeObj.nome : newItem.unidade || 'Pcs'
+      return [
+        ...prev,
+        {
+          id: newItem.id,
+          data: {
+            item: newItem,
+            quantidade: 1,
+            unidade_medida: unidadeNome,
+            preco_unitario: newItem.preco_venda !== undefined ? newItem.preco_venda : '',
+            observacoes: '',
+            ordem: prev.length + 1,
+          },
         },
-      },
-    ])
+      ]
+    })
   }
 
   const getStatusBadge = () => {
