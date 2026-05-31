@@ -138,9 +138,9 @@ export default function PotentialsPage() {
           <Table>
             <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
               <TableRow>
-                <TableHead>Número</TableHead>
-                <TableHead>Nome</TableHead>
+                <TableHead>Número Potencial</TableHead>
                 <TableHead>Cliente</TableHead>
+                <TableHead>Nome Potencial</TableHead>
                 <TableHead>Proprietário</TableHead>
                 <TableHead>Estágio</TableHead>
                 <TableHead>Status dos Itens</TableHead>
@@ -165,8 +165,8 @@ export default function PotentialsPage() {
                 potentials.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.numero_potencial}</TableCell>
-                    <TableCell>{p.nome_potencial || '-'}</TableCell>
                     <TableCell>{p.cliente || '-'}</TableCell>
+                    <TableCell>{p.nome_potencial || '-'}</TableCell>
                     <TableCell>{p.proprietario || '-'}</TableCell>
                     <TableCell>{p.estagio || '-'}</TableCell>
                     <TableCell>{getStatusBadge(p)}</TableCell>

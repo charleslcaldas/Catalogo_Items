@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Search } from 'lucide-react'
+import { Search, Plus, ArrowLeft, Save } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+
 import { ProductCatalog } from './components/ProductCatalog'
-import { SelectionPanel } from './components/SelectionPanel'
 import { QuickItemModal } from './components/QuickItemModal'
 import { SearchQuoteModal } from './components/SearchQuoteModal'
+import { PotencialForm } from './components/PotencialForm'
+import { SelectedItemsTable } from './components/SelectedItemsTable'
 import { savePotencialFull, getPotencialItens } from '@/services/potenciais'
 import pb from '@/lib/pocketbase/client'
 import type { Potencial, Item } from '@/types'
@@ -23,10 +26,24 @@ export default function AddItemsToPotential() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [currentPotential, setCurrentPotential] = useState<Potencial | null>(null)
-  const [selectedItems, setSelectedItems] = useState<Map<string, SelectedItemData>>(new Map())
-  const [isSaving, setIsSaving] = useState(false)
 
-  // Modals state
+  // Form State
+  const [formData, setFormData] = useState({
+    numero_potencial: '',
+    cliente: '',
+    nome_potencial: '',
+    proprietario: '',
+    estagio: '',
+    observacoes: '',
+    status: 'rascunho' as 'rascunho' | 'ativo',
+  })
+
+  // Selected Items State
+  const [selectedItems, setSelectedItems] = useState<Map<string, SelectedItemData>>(new Map())
+
+  // UI State
+  const [isSelecting, setIsSelecting] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [isSearchQuoteOpen, setIsSearchQuoteOpen] = useState(false)
   const [isItemModalOpen, setIsItemModalOpen] = useState(false)
   const [itemToEdit, setItemToEdit] = useState<Partial<Item> | undefined>(undefined)
@@ -36,13 +53,8 @@ export default function AddItemsToPotential() {
     if (id && !currentPotential) {
       pb.collection('potenciais')
         .getOne(id)
-        .then((quote) => {
-          handleQuoteSelected(quote as Potencial)
-        })
-        .catch((err) => {
-          console.error('Failed to load quote from URL', err)
-          toast.error('Erro ao carregar a cotação a partir da URL.')
-        })
+        .then((quote) => handleQuoteSelected(quote as Potencial))
+        .catch(() => toast.error('Erro ao carregar a cotação a partir da URL.'))
     }
   }, [searchParams])
 
@@ -55,7 +67,7 @@ export default function AddItemsToPotential() {
         next.set(item.id, {
           item,
           quantidade: 1,
-          unidade_medida: 'Pcs',
+          unidade_medida: item.unidade || 'Pcs',
           preco_unitario: item.preco_venda !== undefined ? item.preco_venda : '',
           observacoes: '',
         })
@@ -69,7 +81,6 @@ export default function AddItemsToPotential() {
       toast.error('Preencha a quantidade, unidade e preço para todos os itens selecionados.')
       return
     }
-
     setSelectedItems((prev) => {
       const next = new Map(prev)
       const data = next.get(id)
@@ -92,49 +103,33 @@ export default function AddItemsToPotential() {
     })
   }
 
-  const handleSavePotencial = async (data: {
-    numero: string
-    cliente: string
-    observacoes: string
-    status: 'rascunho' | 'ativo'
-    nome_potencial: string
-    proprietario: string
-    estagio: string
-  }) => {
+  const handleSave = async () => {
+    if (!formData.numero_potencial) {
+      return toast.error('O número da cotação é obrigatório.')
+    }
     setIsSaving(true)
     try {
-      const itemsData = Array.from(selectedItems.values()).map((si) => ({
-        item_id: si.item.id,
-        quantidade: Number(si.quantidade),
-        unidade_medida: si.unidade_medida,
-        preco_unitario: Number(si.preco_unitario) || 0,
-        observacoes: si.observacoes,
-      }))
+      const itemsData = Array.from(selectedItems.values())
+        .filter((si) => Number(si.quantidade) > 0)
+        .map((si) => ({
+          item_id: si.item.id,
+          quantidade: Number(si.quantidade),
+          unidade_medida: si.unidade_medida,
+          preco_unitario: Number(si.preco_unitario) || 0,
+          observacoes: si.observacoes,
+        }))
 
       const saved = await savePotencialFull(
         currentPotential?.id || null,
-        {
-          numero_potencial: data.numero,
-          cliente: data.cliente,
-          observacoes: data.observacoes,
-          status: data.status,
-          nome_potencial: data.nome_potencial,
-          proprietario: data.proprietario,
-          estagio: data.estagio,
-        },
+        { ...formData },
         itemsData,
       )
-
       toast.success(`Cotação ${saved.numero_potencial} salva com sucesso!`, {
         className: 'bg-green-500 text-white border-none',
       })
-
-      setCurrentPotential(null)
-      setSelectedItems(new Map())
       navigate('/potenciais')
     } catch (error) {
       toast.error('Erro ao salvar a cotação.')
-      console.error(error)
     } finally {
       setIsSaving(false)
     }
@@ -142,7 +137,17 @@ export default function AddItemsToPotential() {
 
   const handleQuoteSelected = async (quote: Potencial) => {
     setCurrentPotential(quote)
+    setFormData({
+      numero_potencial: quote.numero_potencial || '',
+      cliente: quote.cliente || '',
+      nome_potencial: quote.nome_potencial || '',
+      proprietario: quote.proprietario || '',
+      estagio: quote.estagio || '',
+      observacoes: quote.observacoes || '',
+      status: (quote.status as 'rascunho' | 'ativo') || 'rascunho',
+    })
     setIsSearchQuoteOpen(false)
+
     try {
       const items = await getPotencialItens(quote.id)
       const newMap = new Map<string, SelectedItemData>()
@@ -168,7 +173,7 @@ export default function AddItemsToPotential() {
       next.set(newItem.id, {
         item: newItem,
         quantidade: 1,
-        unidade_medida: 'Pcs',
+        unidade_medida: newItem.unidade || 'Pcs',
         preco_unitario: newItem.preco_venda !== undefined ? newItem.preco_venda : '',
         observacoes: '',
       })
@@ -176,37 +181,51 @@ export default function AddItemsToPotential() {
     })
   }
 
-  return (
-    <div className="h-[calc(100vh-4rem)] flex flex-col p-4 md:p-6 max-w-[1600px] mx-auto w-full">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4 shrink-0">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {currentPotential
-              ? `Editando Cotação: ${currentPotential.numero_potencial}`
-              : 'Nova Cotação'}
-          </h1>
-          {currentPotential && (
-            <p className="text-sm text-muted-foreground">
-              Cliente: {currentPotential.cliente || '-'}
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={() => setIsSearchQuoteOpen(true)}>
-            <Search className="h-4 w-4 mr-2" /> Buscar Cotação
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={() => navigate('/potenciais')}
-            className="text-sm font-medium text-muted-foreground"
-          >
-            Voltar
-          </Button>
-        </div>
-      </div>
+  const getStatusBadge = () => {
+    if (selectedItems.size === 0) {
+      return (
+        <Badge variant="secondary" className="bg-slate-200 text-slate-700">
+          Sem itens
+        </Badge>
+      )
+    }
+    const isCompleted = ['Proposta Enviada', 'Fechado Ganho', 'Fechado Perdido'].includes(
+      formData.estagio,
+    )
+    if (isCompleted) {
+      return (
+        <Badge className="bg-green-100 text-green-800 hover:bg-green-100 border-green-200">
+          Itens completo
+        </Badge>
+      )
+    }
+    return (
+      <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 border-amber-200">
+        Itens parcial
+      </Badge>
+    )
+  }
 
-      <div className="flex-1 flex flex-col md:flex-row gap-4 md:gap-6 min-h-0 pb-4">
-        <div className="w-full md:w-[70%] flex flex-col min-h-[400px] md:min-h-0">
+  if (isSelecting) {
+    return (
+      <div className="h-[calc(100vh-4rem)] flex flex-col p-4 md:p-6 max-w-[1600px] mx-auto w-full bg-slate-50/50">
+        <div className="flex items-center justify-between mb-4 shrink-0 bg-white p-4 rounded-lg border shadow-sm">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => setIsSelecting(false)}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight">Catálogo de Produtos</h1>
+              <p className="text-sm text-muted-foreground">
+                Selecione os itens para a cotação {formData.numero_potencial || 'Nova Cotação'}
+              </p>
+            </div>
+          </div>
+          <Button onClick={() => setIsSelecting(false)}>
+            Concluir Seleção ({selectedItems.size})
+          </Button>
+        </div>
+        <div className="flex-1 min-h-0">
           <ProductCatalog
             selectedItems={selectedItems}
             onToggle={handleToggleItem}
@@ -221,24 +240,62 @@ export default function AddItemsToPotential() {
             }}
           />
         </div>
-        <div className="w-full md:w-[30%] flex flex-col min-h-[500px] md:min-h-0">
-          <SelectionPanel
-            items={Array.from(selectedItems.values())}
-            currentPotential={currentPotential}
-            onUpdate={handleUpdateItem}
-            onRemove={handleRemoveItem}
-            onSave={handleSavePotencial}
-            isSaving={isSaving}
-          />
+        <QuickItemModal
+          open={isItemModalOpen}
+          onOpenChange={setIsItemModalOpen}
+          initialData={itemToEdit}
+          onSaved={handleItemSaved}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col p-4 md:p-6 max-w-[1600px] mx-auto w-full min-h-[calc(100vh-4rem)] space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {currentPotential ? `Cotação: ${currentPotential.numero_potencial}` : 'Nova Cotação'}
+          </h1>
+          <p className="text-sm text-muted-foreground">Preencha os detalhes e adicione itens</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" onClick={() => setIsSearchQuoteOpen(true)}>
+            <Search className="h-4 w-4 mr-2" /> Buscar Cotação
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/potenciais')}>
+            Cancelar
+          </Button>
+          <Button disabled={isSaving} onClick={handleSave}>
+            <Save className="h-4 w-4 mr-2" /> Salvar Cotação
+          </Button>
         </div>
       </div>
 
-      <QuickItemModal
-        open={isItemModalOpen}
-        onOpenChange={setIsItemModalOpen}
-        initialData={itemToEdit}
-        onSaved={handleItemSaved}
+      <PotencialForm
+        formData={formData}
+        setFormData={setFormData}
+        currentPotential={currentPotential}
+        statusBadge={getStatusBadge()}
       />
+
+      <div className="bg-white rounded-lg border shadow-sm flex flex-col flex-1">
+        <div className="p-4 border-b flex items-center justify-between bg-slate-50/50 rounded-t-lg">
+          <div>
+            <h2 className="text-lg font-semibold">Itens da Cotação</h2>
+            <p className="text-sm text-muted-foreground">Gerencie os produtos desta cotação</p>
+          </div>
+          <Button onClick={() => setIsSelecting(true)}>
+            <Plus className="h-4 w-4 mr-2" /> Incluir itens
+          </Button>
+        </div>
+        <SelectedItemsTable
+          selectedItems={selectedItems}
+          handleUpdateItem={handleUpdateItem}
+          handleRemoveItem={handleRemoveItem}
+          setIsSelecting={setIsSelecting}
+        />
+      </div>
 
       <SearchQuoteModal
         open={isSearchQuoteOpen}

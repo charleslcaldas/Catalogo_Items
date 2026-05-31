@@ -174,21 +174,23 @@ export function ProductCatalog({
                       {item.preco_venda ? `$ ${item.preco_venda.toFixed(2)}` : '-'}
                     </TableCell>
                     <TableCell className="text-center">
-                      <Input
-                        type="number"
-                        min="1"
-                        placeholder="0"
-                        className={cn(
-                          'h-8 w-20 text-center mx-auto',
-                          isSelected &&
-                            (!selectedData?.quantidade || Number(selectedData.quantidade) <= 0)
-                            ? 'border-destructive focus-visible:ring-destructive'
-                            : '',
-                        )}
-                        disabled={!isSelected}
-                        value={isSelected ? selectedData?.quantidade : ''}
-                        onChange={(e) => onUpdateItem(item.id, 'quantidade', e.target.value)}
-                      />
+                      {isSelected ? (
+                        <Input
+                          type="number"
+                          min="1"
+                          placeholder="Qtde"
+                          className={cn(
+                            'h-8 w-20 text-center mx-auto',
+                            !selectedData?.quantidade || Number(selectedData.quantidade) <= 0
+                              ? 'border-destructive focus-visible:ring-destructive'
+                              : '',
+                          )}
+                          value={selectedData?.quantidade ?? ''}
+                          onChange={(e) => onUpdateItem(item.id, 'quantidade', e.target.value)}
+                        />
+                      ) : (
+                        <span className="text-muted-foreground text-sm">-</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
