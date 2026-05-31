@@ -33,51 +33,60 @@ export function PotencialForm({
   statusBadge,
 }: PotencialFormProps) {
   return (
-    <div className="bg-white rounded-lg border shadow-sm p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      <div className="space-y-2">
-        <Label>
-          Número da Cotação <span className="text-destructive">*</span>
+    <div className="bg-white rounded-lg border shadow-sm p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-center">
+      <div className="flex items-center gap-2">
+        <Label className="w-32 text-right shrink-0 font-medium text-muted-foreground">
+          Nº Cotação <span className="text-destructive">*</span>
         </Label>
         <Input
           value={formData.numero_potencial}
           onChange={(e) => setFormData((p: any) => ({ ...p, numero_potencial: e.target.value }))}
           placeholder="Ex: POT-2026-001"
-          className={
-            !formData.numero_potencial ? 'border-destructive focus-visible:ring-destructive' : ''
-          }
+          className={`h-8 flex-1 ${!formData.numero_potencial ? 'border-destructive focus-visible:ring-destructive' : ''}`}
         />
       </div>
-      <div className="space-y-2">
-        <Label>Cliente</Label>
+      <div className="flex items-center gap-2">
+        <Label className="w-32 text-right shrink-0 font-medium text-muted-foreground">
+          Cliente
+        </Label>
         <Input
           value={formData.cliente}
           onChange={(e) => setFormData((p: any) => ({ ...p, cliente: e.target.value }))}
           placeholder="Nome do cliente"
+          className="h-8 flex-1"
         />
       </div>
-      <div className="space-y-2">
-        <Label>Nome da Cotação</Label>
+      <div className="flex items-center gap-2">
+        <Label className="w-32 text-right shrink-0 font-medium text-muted-foreground">
+          Nome Cotação
+        </Label>
         <Input
           value={formData.nome_potencial}
           onChange={(e) => setFormData((p: any) => ({ ...p, nome_potencial: e.target.value }))}
           placeholder="Ex: Fornecimento Obra Y"
+          className="h-8 flex-1"
         />
       </div>
-      <div className="space-y-2">
-        <Label>Proprietário</Label>
+      <div className="flex items-center gap-2">
+        <Label className="w-32 text-right shrink-0 font-medium text-muted-foreground">
+          Proprietário
+        </Label>
         <Input
           value={formData.proprietario}
           onChange={(e) => setFormData((p: any) => ({ ...p, proprietario: e.target.value }))}
           placeholder="Responsável"
+          className="h-8 flex-1"
         />
       </div>
-      <div className="space-y-2">
-        <Label>Estágio</Label>
+      <div className="flex items-center gap-2">
+        <Label className="w-32 text-right shrink-0 font-medium text-muted-foreground">
+          Estágio
+        </Label>
         <Select
           value={formData.estagio}
           onValueChange={(v) => setFormData((p: any) => ({ ...p, estagio: v }))}
         >
-          <SelectTrigger>
+          <SelectTrigger className="h-8 flex-1">
             <SelectValue placeholder="Selecione..." />
           </SelectTrigger>
           <SelectContent>
@@ -89,29 +98,35 @@ export function PotencialForm({
           </SelectContent>
         </Select>
       </div>
-      <div className="space-y-2">
-        <Label>Data da Solicitação</Label>
+      <div className="flex items-center gap-2">
+        <Label className="w-32 text-right shrink-0 font-medium text-muted-foreground">
+          Data Solicitação
+        </Label>
         <Input
           value={
             currentPotential?.created
               ? format(new Date(currentPotential.created), 'dd/MM/yyyy HH:mm')
-              : 'Automático após salvar'
+              : 'Automático'
           }
           readOnly
-          className="bg-muted text-muted-foreground"
+          className="h-8 flex-1 bg-muted text-muted-foreground"
         />
       </div>
-      <div className="space-y-2">
-        <Label>Status dos Itens</Label>
-        <div className="h-10 flex items-center">{statusBadge}</div>
+      <div className="flex items-center gap-2">
+        <Label className="w-32 text-right shrink-0 font-medium text-muted-foreground">
+          Status Itens
+        </Label>
+        <div className="flex-1 flex items-center h-8">{statusBadge}</div>
       </div>
-      <div className="space-y-2 lg:col-span-4">
-        <Label>Observações Gerais</Label>
+      <div className="col-span-1 md:col-span-2 lg:col-span-3 xl:col-span-4 flex items-start gap-2 mt-2">
+        <Label className="w-32 text-right shrink-0 font-medium text-muted-foreground mt-2">
+          Observações
+        </Label>
         <Textarea
           value={formData.observacoes}
           onChange={(e) => setFormData((p: any) => ({ ...p, observacoes: e.target.value }))}
           placeholder="Detalhes adicionais da cotação..."
-          className="min-h-[80px]"
+          className="min-h-[60px] flex-1 resize-y"
         />
       </div>
     </div>

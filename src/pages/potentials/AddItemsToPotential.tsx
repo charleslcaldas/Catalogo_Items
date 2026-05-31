@@ -260,7 +260,7 @@ export default function AddItemsToPotential() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
             {currentPotential
-              ? `Cotação: ${currentPotential.numero_potencial}${currentPotential.cliente ? ` - ${currentPotential.cliente}` : ''}`
+              ? `Editar Cotação - Cliente: ${currentPotential.cliente || 'Desconhecido'}`
               : 'Nova Cotação'}
           </h1>
           <p className="text-sm text-muted-foreground">Preencha os detalhes e adicione itens</p>

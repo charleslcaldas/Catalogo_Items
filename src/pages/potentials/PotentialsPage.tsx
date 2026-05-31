@@ -179,8 +179,8 @@ export default function PotentialsPage() {
                 </TableRow>
               ) : (
                 potentials.map((p) => (
-                  <TableRow key={p.id} className="h-12 py-1">
-                    <TableCell className="py-2 text-sm font-medium">
+                  <TableRow key={p.id} className="h-8 py-0">
+                    <TableCell className="py-1 text-sm font-medium">
                       <Link
                         to={`/potenciais/adicionar?id=${p.id}`}
                         className="text-primary hover:underline"
@@ -188,8 +188,8 @@ export default function PotentialsPage() {
                         {p.numero_potencial}
                       </Link>
                     </TableCell>
-                    <TableCell className="py-2 text-sm">{p.cliente || '-'}</TableCell>
-                    <TableCell className="py-2 text-sm font-medium">
+                    <TableCell className="py-1 text-sm">{p.cliente || '-'}</TableCell>
+                    <TableCell className="py-1 text-sm font-medium">
                       {p.nome_potencial ? (
                         <Link
                           to={`/potenciais/adicionar?id=${p.id}`}
@@ -201,13 +201,13 @@ export default function PotentialsPage() {
                         '-'
                       )}
                     </TableCell>
-                    <TableCell className="py-2 text-sm text-muted-foreground">
+                    <TableCell className="py-1 text-sm text-muted-foreground">
                       {p.proprietario || '-'}
                     </TableCell>
-                    <TableCell className="py-2 text-sm text-muted-foreground">
+                    <TableCell className="py-1 text-sm text-muted-foreground">
                       {p.estagio || '-'}
                     </TableCell>
-                    <TableCell className="py-2">{getStatusBadge(p)}</TableCell>
+                    <TableCell className="py-1">{getStatusBadge(p)}</TableCell>
                   </TableRow>
                 ))
               )}

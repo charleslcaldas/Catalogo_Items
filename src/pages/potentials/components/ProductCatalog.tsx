@@ -3,6 +3,8 @@ import { Search, Loader2, Plus, Copy, PackageOpen } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Badge } from '@/components/ui/badge'
+import { getContrastColor } from '@/lib/utils'
 import {
   Table,
   TableBody,
@@ -76,7 +78,7 @@ export function ProductCatalog({
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Buscar por SKU ou Descrição (ex: PAR SEX M8)..."
+            placeholder="Buscar por SKU, Descrição ou Acabamento..."
             className="pl-8 w-full"
             value={search}
             onChange={(e) => {
@@ -155,20 +157,29 @@ export function ProductCatalog({
                     <TableCell>
                       <Checkbox checked={isSelected} onCheckedChange={() => onToggle(item)} />
                     </TableCell>
-                    <TableCell className="font-medium whitespace-nowrap">{item.sku}</TableCell>
+                    <TableCell className="whitespace-nowrap text-xs">{item.sku}</TableCell>
                     <TableCell>
-                      <div className="font-medium text-sm text-balance max-w-[250px] leading-snug">
-                        {item.descr_pt}
-                      </div>
-                      <div className="text-xs text-muted-foreground text-balance max-w-[250px] mt-1 leading-snug">
-                        {item.descr_en}
+                      <div className="text-sm whitespace-normal min-w-[250px] leading-snug">
+                        {item.descr_pt || item.descricao_curta || '-'}
                       </div>
                     </TableCell>
-                    <TableCell className="whitespace-nowrap">{item.tamanho || '-'}</TableCell>
+                    <TableCell className="whitespace-nowrap text-sm">
+                      {item.tamanho || '-'}
+                    </TableCell>
                     <TableCell className="whitespace-nowrap">
-                      {item.expand?.acabamento_id
-                        ? `${item.expand.acabamento_id.nome_pt} / ${item.expand.acabamento_id.nome_en || item.expand.acabamento_id.nome_pt}`
-                        : '-'}
+                      {item.expand?.acabamento_id ? (
+                        <Badge
+                          style={{
+                            backgroundColor: item.expand.acabamento_id.cor_hex || '#e2e8f0',
+                            color: getContrastColor(item.expand.acabamento_id.cor_hex || '#e2e8f0'),
+                          }}
+                          className="whitespace-nowrap border-0 shadow-none font-medium"
+                        >
+                          {item.expand.acabamento_id.nome_pt}
+                        </Badge>
+                      ) : (
+                        '-'
+                      )}
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap">
                       {item.preco_venda ? `$ ${item.preco_venda.toFixed(2)}` : '-'}

@@ -1,6 +1,8 @@
 import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { getContrastColor } from '@/lib/utils'
 import {
   Table,
   TableBody,
@@ -39,10 +41,7 @@ export function SelectedItemsTable({
 
   const formatCurrency = (value: number | '') => {
     if (value === '') return '-'
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(Number(value))
+    return `$ ${Number(value).toFixed(2)}`
   }
 
   return (
@@ -50,14 +49,14 @@ export function SelectedItemsTable({
       <Table>
         <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
           <TableRow className="h-10">
-            <TableHead className="w-24 text-xs">SKU</TableHead>
-            <TableHead className="min-w-[200px] w-full text-xs">Descrição Curta</TableHead>
+            <TableHead className="w-32 text-xs px-4">SKU</TableHead>
+            <TableHead className="min-w-[250px] w-full text-xs">Descrição Curta</TableHead>
             <TableHead className="w-24 text-xs">Tamanho</TableHead>
             <TableHead className="w-32 text-xs">Acabamento</TableHead>
             <TableHead className="w-24 text-xs">Quant.</TableHead>
             <TableHead className="w-20 text-xs">Unidade</TableHead>
             <TableHead className="w-32 text-xs">Preço Unit.</TableHead>
-            <TableHead className="w-32 text-xs">Total</TableHead>
+            <TableHead className="w-32 text-xs text-right">Total</TableHead>
             <TableHead className="w-12 text-center text-xs">Ações</TableHead>
           </TableRow>
         </TableHeader>
@@ -73,25 +72,24 @@ export function SelectedItemsTable({
 
             return (
               <TableRow key={id} className="h-12 py-1">
-                <TableCell className="py-2 text-sm font-medium">{data.item.sku || '-'}</TableCell>
-                <TableCell className="py-2 text-sm truncate max-w-xs" title={descricao}>
+                <TableCell className="py-2 text-xs px-4">{data.item.sku || '-'}</TableCell>
+                <TableCell className="py-2 text-sm whitespace-normal min-w-[250px]">
                   {descricao}
                 </TableCell>
-                <TableCell className="py-2 text-sm">{data.item.tamanho || '-'}</TableCell>
+                <TableCell className="py-2 text-sm whitespace-nowrap">
+                  {data.item.tamanho || '-'}
+                </TableCell>
                 <TableCell className="py-2 text-sm">
                   {acabamento ? (
-                    <div className="flex items-center gap-2">
-                      {acabamento.cor_hex && (
-                        <div
-                          className="w-3 h-3 rounded-full border shadow-sm shrink-0"
-                          style={{ backgroundColor: acabamento.cor_hex }}
-                          title={acabamento.nome_pt}
-                        />
-                      )}
-                      <span className="truncate max-w-[80px]" title={acabamento.nome_pt}>
-                        {acabamento.nome_pt}
-                      </span>
-                    </div>
+                    <Badge
+                      style={{
+                        backgroundColor: acabamento.cor_hex || '#e2e8f0',
+                        color: getContrastColor(acabamento.cor_hex || '#e2e8f0'),
+                      }}
+                      className="whitespace-nowrap border-0 shadow-none font-medium"
+                    >
+                      {acabamento.nome_pt}
+                    </Badge>
                   ) : (
                     '-'
                   )}
@@ -111,14 +109,14 @@ export function SelectedItemsTable({
                 </TableCell>
                 <TableCell className="py-2">
                   <div className="relative">
-                    <span className="absolute left-2 top-1.5 text-muted-foreground text-sm">
-                      R$
+                    <span className="absolute left-2 top-1.5 text-muted-foreground text-sm font-medium">
+                      $
                     </span>
                     <Input
                       type="number"
                       min="0"
                       step="0.01"
-                      className="h-8 w-24 pl-8 pr-2 text-right"
+                      className="h-8 w-24 pl-6 pr-2 text-right"
                       value={data.preco_unitario}
                       onChange={(e) => handleUpdateItem(id, 'preco_unitario', e.target.value)}
                     />
