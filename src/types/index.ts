@@ -100,6 +100,7 @@ export type PotencialItem = {
   unidade_medida?: string
   preco_unitario: number
   observacoes: string
+  ordem?: number
   created: string
   updated: string
   expand?: {

@@ -20,6 +20,7 @@ export const searchPotenciais = (term: string) => {
 export const getPotencialItens = (potencialId: string) => {
   return pb.collection<PotencialItem>('potencial_itens').getFullList({
     filter: `potencial_id = "${potencialId}"`,
+    sort: 'ordem',
     expand: 'item_id,item_id.acabamento_id',
   })
 }

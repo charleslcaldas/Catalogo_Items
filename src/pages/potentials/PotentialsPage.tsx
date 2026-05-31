@@ -94,29 +94,30 @@ export default function PotentialsPage() {
   })
 
   const getStatusBadge = (p: Potencial) => {
-    const status = itemStatuses[p.id] || 'empty'
-    if (status === 'empty') {
-      return (
-        <Badge
-          variant="secondary"
-          className="bg-slate-100 text-slate-600 border-slate-200 font-normal"
-        >
-          🚫 Sem Itens
-        </Badge>
-      )
-    }
+    const status = p.status || 'Sem Itens'
 
-    if (status === 'complete') {
+    if (status === 'Completo') {
       return (
-        <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-emerald-200 font-normal">
+        <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-emerald-200 font-normal h-5 text-[10px] px-2 rounded-full">
           ✅ Completo
         </Badge>
       )
     }
 
+    if (status === 'Itens incompletos' || status === 'rascunho') {
+      return (
+        <Badge className="bg-amber-50 text-amber-700 hover:bg-amber-50 border-amber-200 font-normal h-5 text-[10px] px-2 rounded-full">
+          ⚠️ Itens incompletos
+        </Badge>
+      )
+    }
+
     return (
-      <Badge className="bg-amber-50 text-amber-700 hover:bg-amber-50 border-amber-200 font-normal">
-        ⚠️ Itens incompletos
+      <Badge
+        variant="secondary"
+        className="bg-slate-100 text-slate-600 border-slate-200 font-normal h-5 text-[10px] px-2 rounded-full"
+      >
+        🚫 Sem Itens
       </Badge>
     )
   }
@@ -154,13 +155,13 @@ export default function PotentialsPage() {
         <div className="flex-1 overflow-auto">
           <Table>
             <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
-              <TableRow className="h-10">
-                <TableHead className="text-xs">Número Potencial</TableHead>
-                <TableHead className="text-xs">Cliente</TableHead>
-                <TableHead className="text-xs">Nome Potencial</TableHead>
-                <TableHead className="text-xs">Proprietário</TableHead>
-                <TableHead className="text-xs">Estágio</TableHead>
-                <TableHead className="text-xs">Status dos Itens</TableHead>
+              <TableRow className="h-8">
+                <TableHead className="text-[11px] py-1">Número Potencial</TableHead>
+                <TableHead className="text-[11px] py-1">Cliente</TableHead>
+                <TableHead className="text-[11px] py-1">Nome Potencial</TableHead>
+                <TableHead className="text-[11px] py-1">Proprietário</TableHead>
+                <TableHead className="text-[11px] py-1">Estágio</TableHead>
+                <TableHead className="text-[11px] py-1">Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -168,19 +169,19 @@ export default function PotentialsPage() {
                 <TableRow>
                   <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
-                    Carregando...
+                    <span className="text-sm">Carregando...</span>
                   </TableCell>
                 </TableRow>
               ) : potentials.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground text-sm">
                     Nenhuma cotação encontrada.
                   </TableCell>
                 </TableRow>
               ) : (
                 potentials.map((p) => (
-                  <TableRow key={p.id} className="h-8 py-0">
-                    <TableCell className="py-1 text-sm font-medium">
+                  <TableRow key={p.id} className="h-10 py-0">
+                    <TableCell className="py-1 text-xs font-medium">
                       <Link
                         to={`/potenciais/adicionar?id=${p.id}`}
                         className="text-primary hover:underline"
@@ -188,8 +189,8 @@ export default function PotentialsPage() {
                         {p.numero_potencial}
                       </Link>
                     </TableCell>
-                    <TableCell className="py-1 text-sm">{p.cliente || '-'}</TableCell>
-                    <TableCell className="py-1 text-sm font-medium">
+                    <TableCell className="py-1 text-xs">{p.cliente || '-'}</TableCell>
+                    <TableCell className="py-1 text-xs font-medium">
                       {p.nome_potencial ? (
                         <Link
                           to={`/potenciais/adicionar?id=${p.id}`}
@@ -201,10 +202,10 @@ export default function PotentialsPage() {
                         '-'
                       )}
                     </TableCell>
-                    <TableCell className="py-1 text-sm text-muted-foreground">
+                    <TableCell className="py-1 text-xs text-muted-foreground">
                       {p.proprietario || '-'}
                     </TableCell>
-                    <TableCell className="py-1 text-sm text-muted-foreground">
+                    <TableCell className="py-1 text-xs text-muted-foreground">
                       {p.estagio || '-'}
                     </TableCell>
                     <TableCell className="py-1">{getStatusBadge(p)}</TableCell>

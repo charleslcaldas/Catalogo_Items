@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-31T02:40:58.859Z",
+  "generatedAt": "2026-05-31T03:10:57.768Z",
   "collections": [
     {
       "name": "users",
@@ -816,6 +816,12 @@
         {
           "name": "unidade_medida",
           "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ordem",
+          "type": "number",
           "required": false,
           "system": false
         }
