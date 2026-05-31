@@ -13,6 +13,7 @@ import NCMPage from './pages/NCM'
 import DescricoesBasePage from './pages/DescricoesBase'
 import ImportPage from './pages/Import'
 import AddItemsToPotential from './pages/potentials/AddItemsToPotential'
+import PotentialsPage from './pages/potentials/PotentialsPage'
 import Login from './pages/Login'
 import { DataProvider } from './contexts/data-context'
 import { AuthProvider } from './hooks/use-auth'
@@ -37,6 +38,7 @@ const App = () => (
                 <Route path="/ncm" element={<NCMPage />} />
                 <Route path="/descricoes-base" element={<DescricoesBasePage />} />
                 <Route path="/importar" element={<ImportPage />} />
+                <Route path="/potenciais" element={<PotentialsPage />} />
                 <Route path="/potenciais/adicionar" element={<AddItemsToPotential />} />
               </Route>
             </Route>

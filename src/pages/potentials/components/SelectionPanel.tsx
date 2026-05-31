@@ -25,6 +25,9 @@ interface SelectionPanelProps {
     cliente: string
     observacoes: string
     status: 'rascunho' | 'ativo'
+    nome_potencial: string
+    proprietario: string
+    estagio: string
   }) => void
 }
 
@@ -40,12 +43,18 @@ export function SelectionPanel({
   const [numero, setNumero] = useState('')
   const [cliente, setCliente] = useState('')
   const [observacoes, setObservacoes] = useState('')
+  const [nomePotencial, setNomePotencial] = useState('')
+  const [proprietario, setProprietario] = useState('')
+  const [estagio, setEstagio] = useState('')
 
   useEffect(() => {
     if (currentPotential) {
-      setNumero(currentPotential.numero_potencial)
+      setNumero(currentPotential.numero_potencial || '')
       setCliente(currentPotential.cliente || '')
       setObservacoes(currentPotential.observacoes || '')
+      setNomePotencial(currentPotential.nome_potencial || '')
+      setProprietario(currentPotential.proprietario || '')
+      setEstagio(currentPotential.estagio || '')
     }
   }, [currentPotential])
 
@@ -74,7 +83,7 @@ export function SelectionPanel({
   return (
     <div className="flex flex-col h-full bg-white rounded-lg border shadow-sm overflow-hidden">
       <div className="p-4 border-b font-semibold bg-slate-50 shrink-0 flex items-center justify-between">
-        <span>{step === 1 ? '1. Resumo da Seleção' : '2. Finalizar Cotação'}</span>
+        <span>{step === 1 ? '1. Resumo da Seleção' : '2. Detalhes da Cotação'}</span>
         {step === 2 && (
           <Button variant="ghost" size="sm" onClick={() => setStep(1)} className="text-xs h-7">
             Voltar
@@ -174,7 +183,7 @@ export function SelectionPanel({
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>
-                Número do Potencial <span className="text-destructive">*</span>
+                Número da Cotação <span className="text-destructive">*</span>
               </Label>
               <Input
                 placeholder="Ex: POT-2026-001"
@@ -184,12 +193,43 @@ export function SelectionPanel({
               />
             </div>
             <div className="space-y-2">
+              <Label>Nome da Cotação</Label>
+              <Input
+                placeholder="Ex: Fornecimento Obra Y"
+                value={nomePotencial}
+                onChange={(e) => setNomePotencial(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
               <Label>Cliente</Label>
               <Input
                 placeholder="Nome do cliente"
                 value={cliente}
                 onChange={(e) => setCliente(e.target.value)}
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Proprietário</Label>
+              <Input
+                placeholder="Responsável pela cotação"
+                value={proprietario}
+                onChange={(e) => setProprietario(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Estágio</Label>
+              <Select value={estagio} onValueChange={setEstagio}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o estágio" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Qualificação">Qualificação</SelectItem>
+                  <SelectItem value="Em Negociação">Em Negociação</SelectItem>
+                  <SelectItem value="Proposta Enviada">Proposta Enviada</SelectItem>
+                  <SelectItem value="Fechado Ganho">Fechado Ganho</SelectItem>
+                  <SelectItem value="Fechado Perdido">Fechado Perdido</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Observações Gerais</Label>
@@ -232,14 +272,34 @@ export function SelectionPanel({
             <Button
               className="w-full bg-slate-600 hover:bg-slate-700 text-white"
               disabled={isSaving || !numero}
-              onClick={() => onSave({ numero, cliente, observacoes, status: 'rascunho' })}
+              onClick={() =>
+                onSave({
+                  numero,
+                  cliente,
+                  observacoes,
+                  status: 'rascunho',
+                  nome_potencial: nomePotencial,
+                  proprietario,
+                  estagio,
+                })
+              }
             >
               <Save className="mr-2 h-4 w-4" /> Salvar como Rascunho
             </Button>
             <Button
               className="w-full bg-green-600 hover:bg-green-700 text-white"
               disabled={isSaving || !numero}
-              onClick={() => onSave({ numero, cliente, observacoes, status: 'ativo' })}
+              onClick={() =>
+                onSave({
+                  numero,
+                  cliente,
+                  observacoes,
+                  status: 'ativo',
+                  nome_potencial: nomePotencial,
+                  proprietario,
+                  estagio,
+                })
+              }
             >
               <Check className="mr-2 h-4 w-4" /> Finalizar e Ativar
             </Button>

@@ -84,6 +84,9 @@ export type Potencial = {
   numero_potencial: string
   cliente: string
   status: string
+  nome_potencial?: string
+  proprietario?: string
+  estagio?: string
   observacoes?: string
   created: string
   updated: string

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-30T14:04:32.896Z",
+  "generatedAt": "2026-05-31T01:26:26.980Z",
   "collections": [
     {
       "name": "users",
@@ -729,9 +729,32 @@
           "type": "text",
           "required": false,
           "system": false
+        },
+        {
+          "name": "nome_potencial",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "proprietario",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "estagio",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
-      "indexes": ["CREATE UNIQUE INDEX idx_potenciais_numero ON potenciais (numero_potencial)"]
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_potenciais_numero ON potenciais (numero_potencial)",
+        "CREATE INDEX `idx_potenciais_nome` ON `potenciais` (nome_potencial)",
+        "CREATE INDEX `idx_potenciais_proprietario` ON `potenciais` (proprietario)",
+        "CREATE INDEX `idx_potenciais_estagio` ON `potenciais` (estagio)"
+      ]
     },
     {
       "name": "potencial_itens",

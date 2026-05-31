@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,7 @@ import { SelectionPanel } from './components/SelectionPanel'
 import { QuickItemModal } from './components/QuickItemModal'
 import { SearchQuoteModal } from './components/SearchQuoteModal'
 import { savePotencialFull, getPotencialItens } from '@/services/potenciais'
+import pb from '@/lib/pocketbase/client'
 import type { Potencial, Item } from '@/types'
 
 export type SelectedItemData = {
@@ -20,6 +21,7 @@ export type SelectedItemData = {
 
 export default function AddItemsToPotential() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [currentPotential, setCurrentPotential] = useState<Potencial | null>(null)
   const [selectedItems, setSelectedItems] = useState<Map<string, SelectedItemData>>(new Map())
   const [isSaving, setIsSaving] = useState(false)
@@ -28,6 +30,21 @@ export default function AddItemsToPotential() {
   const [isSearchQuoteOpen, setIsSearchQuoteOpen] = useState(false)
   const [isItemModalOpen, setIsItemModalOpen] = useState(false)
   const [itemToEdit, setItemToEdit] = useState<Partial<Item> | undefined>(undefined)
+
+  useEffect(() => {
+    const id = searchParams.get('id')
+    if (id && !currentPotential) {
+      pb.collection('potenciais')
+        .getOne(id)
+        .then((quote) => {
+          handleQuoteSelected(quote as Potencial)
+        })
+        .catch((err) => {
+          console.error('Failed to load quote from URL', err)
+          toast.error('Erro ao carregar a cotação a partir da URL.')
+        })
+    }
+  }, [searchParams])
 
   const handleToggleItem = (item: Item) => {
     setSelectedItems((prev) => {
@@ -80,6 +97,9 @@ export default function AddItemsToPotential() {
     cliente: string
     observacoes: string
     status: 'rascunho' | 'ativo'
+    nome_potencial: string
+    proprietario: string
+    estagio: string
   }) => {
     setIsSaving(true)
     try {
@@ -98,6 +118,9 @@ export default function AddItemsToPotential() {
           cliente: data.cliente,
           observacoes: data.observacoes,
           status: data.status,
+          nome_potencial: data.nome_potencial,
+          proprietario: data.proprietario,
+          estagio: data.estagio,
         },
         itemsData,
       )
@@ -108,6 +131,7 @@ export default function AddItemsToPotential() {
 
       setCurrentPotential(null)
       setSelectedItems(new Map())
+      navigate('/potenciais')
     } catch (error) {
       toast.error('Erro ao salvar a cotação.')
       console.error(error)
@@ -173,7 +197,7 @@ export default function AddItemsToPotential() {
           </Button>
           <Button
             variant="ghost"
-            onClick={() => navigate(-1)}
+            onClick={() => navigate('/potenciais')}
             className="text-sm font-medium text-muted-foreground"
           >
             Voltar
@@ -186,6 +210,7 @@ export default function AddItemsToPotential() {
           <ProductCatalog
             selectedItems={selectedItems}
             onToggle={handleToggleItem}
+            onUpdateItem={handleUpdateItem}
             onAddNew={() => {
               setItemToEdit(undefined)
               setIsItemModalOpen(true)
