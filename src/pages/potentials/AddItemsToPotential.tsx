@@ -126,7 +126,7 @@ export default function AddItemsToPotential() {
     })
   }
 
-  const handleSave = async (statusOverride: 'Itens incompletos' | 'Completo') => {
+  const handleSave = async (statusOverride: 'Incompleto' | 'Completo') => {
     if (!formData.numero_potencial) {
       return toast.error('O número da cotação é obrigatório.')
     }
@@ -242,7 +242,7 @@ export default function AddItemsToPotential() {
     }
     return (
       <Badge className="bg-amber-50 text-amber-700 hover:bg-amber-50 border-amber-200 font-normal rounded-full px-2 h-5 text-[10px]">
-        ⚠️ Itens incompletos
+        ⚠️ Incompleto
       </Badge>
     )
   }
@@ -326,19 +326,19 @@ export default function AddItemsToPotential() {
           <Button
             variant="secondary"
             size="sm"
-            className="h-8"
+            className="h-8 rounded-full"
             disabled={isSaving}
-            onClick={() => handleSave('Itens incompletos')}
+            onClick={() => handleSave('Incompleto')}
           >
-            <Save className="h-3 w-3 mr-2" /> Salvar Rascunho
+            <Save className="h-3.5 w-3.5 mr-1.5" /> Salvar Rascunho
           </Button>
           <Button
             disabled={isSaving}
             size="sm"
-            className="h-8"
+            className="h-8 rounded-full"
             onClick={() => handleSave('Completo')}
           >
-            <CheckCircle className="h-3 w-3 mr-2" /> Salvar e Concluir
+            <CheckCircle className="h-3.5 w-3.5 mr-1.5" /> Salvar e Concluir
           </Button>
         </div>
       </div>
@@ -357,10 +357,10 @@ export default function AddItemsToPotential() {
           </div>
           <Button
             size="sm"
-            className="rounded-full h-7 px-3 text-xs"
+            className="rounded-full h-8 px-4 text-xs font-medium shadow-sm"
             onClick={() => setIsSelecting(true)}
           >
-            <Plus className="h-3 w-3 mr-1" /> Incluir Itens
+            <Plus className="h-3.5 w-3.5 mr-1.5" /> Incluir Itens
           </Button>
         </div>
         <SelectedItemsTable

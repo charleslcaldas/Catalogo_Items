@@ -9,7 +9,7 @@ export default function Layout() {
       <AppSidebar />
       <SidebarInset>
         <AppHeader />
-        <main className="flex-1 p-4 md:p-6 md:max-w-[1400px] mx-auto w-full">
+        <main className="flex-1 p-2 md:p-4 md:max-w-[1400px] mx-auto w-full pt-2">
           <Outlet />
         </main>
       </SidebarInset>

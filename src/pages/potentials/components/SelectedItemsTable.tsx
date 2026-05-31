@@ -53,7 +53,7 @@ export function SelectedItemsTable({
         <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
           <TableRow className="h-8">
             <TableHead className="w-10 px-1"></TableHead>
-            <TableHead className="w-36 text-[11px] px-4">SKU</TableHead>
+            <TableHead className="w-48 text-[11px] px-4">SKU</TableHead>
             <TableHead className="min-w-[200px] w-full text-[11px]">Descrição Curta</TableHead>
             <TableHead className="w-24 text-[11px]">Tamanho</TableHead>
             <TableHead className="w-32 text-[11px]">Acabamento</TableHead>
@@ -102,23 +102,27 @@ export function SelectedItemsTable({
                 <TableCell className="py-1 text-[10px] font-normal px-4 font-mono whitespace-nowrap">
                   {data.item.sku || '-'}
                 </TableCell>
-                <TableCell className="py-1 text-xs whitespace-normal min-w-[200px]">
-                  {data.item.descricao_extra ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="cursor-help underline decoration-dashed underline-offset-2">
-                          {descricao}
-                        </span>
-                      </TooltipTrigger>
+                <TableCell className="py-1 text-[11px] whitespace-normal min-w-[200px] leading-tight">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span
+                        className={cn(
+                          data.item.descricao_extra
+                            ? 'cursor-help underline decoration-dashed underline-offset-2'
+                            : 'cursor-default',
+                        )}
+                      >
+                        {descricao}
+                      </span>
+                    </TooltipTrigger>
+                    {data.item.descricao_extra && (
                       <TooltipContent className="max-w-xs text-xs">
                         {data.item.descricao_extra}
                       </TooltipContent>
-                    </Tooltip>
-                  ) : (
-                    <span>{descricao}</span>
-                  )}
+                    )}
+                  </Tooltip>
                 </TableCell>
-                <TableCell className="py-1 text-xs whitespace-nowrap">
+                <TableCell className="py-1 text-[11px] whitespace-nowrap">
                   {data.item.tamanho || '-'}
                 </TableCell>
                 <TableCell className="py-1 text-xs">

@@ -23,18 +23,36 @@ export default function PotentialsPage() {
   >({})
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [filterEstagio, setFilterEstagio] = useState('all')
+  const [filterStatus, setFilterStatus] = useState('all')
+  const [filterDateStart, setFilterDateStart] = useState('')
+  const [filterDateEnd, setFilterDateEnd] = useState('')
 
   const loadPotentials = async () => {
     setLoading(true)
     try {
-      let filter = ''
+      const filters = []
       if (search) {
         const t = search.replace(/"/g, '')
-        filter = `numero_potencial ~ "${t}" || cliente ~ "${t}" || nome_potencial ~ "${t}" || proprietario ~ "${t}"`
+        filters.push(
+          `(numero_potencial ~ "${t}" || cliente ~ "${t}" || nome_potencial ~ "${t}" || proprietario ~ "${t}")`,
+        )
+      }
+      if (filterEstagio !== 'all') {
+        filters.push(`estagio = "${filterEstagio}"`)
+      }
+      if (filterStatus !== 'all') {
+        filters.push(`status = "${filterStatus}"`)
+      }
+      if (filterDateStart) {
+        filters.push(`created >= "${filterDateStart} 00:00:00"`)
+      }
+      if (filterDateEnd) {
+        filters.push(`created <= "${filterDateEnd} 23:59:59"`)
       }
 
       const res = await pb.collection<Potencial>('potenciais').getList(1, 50, {
-        filter,
+        filter: filters.join(' && '),
         sort: '-created',
       })
 
@@ -83,7 +101,7 @@ export default function PotentialsPage() {
       loadPotentials()
     }, 300)
     return () => clearTimeout(delay)
-  }, [search])
+  }, [search, filterEstagio, filterStatus, filterDateStart, filterDateEnd])
 
   useRealtime('potenciais', () => {
     loadPotentials()
@@ -104,7 +122,7 @@ export default function PotentialsPage() {
       )
     }
 
-    if (status === 'Itens incompletos' || status === 'rascunho') {
+    if (status === 'Incompleto' || status === 'rascunho') {
       return (
         <Badge className="bg-amber-50 text-amber-700 hover:bg-amber-50 border-amber-200 font-normal h-5 text-[10px] px-2 rounded-full">
           ⚠️ Itens incompletos
@@ -139,16 +157,59 @@ export default function PotentialsPage() {
       </div>
 
       <div className="bg-white rounded-lg border shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden">
-        <div className="p-4 border-b flex items-center gap-4 shrink-0">
-          <div className="relative flex-1 max-w-md">
+        <div className="p-4 border-b flex flex-wrap items-center gap-4 shrink-0 bg-slate-50/50">
+          <div className="relative flex-1 min-w-[250px] max-w-md">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
-              placeholder="Buscar por número, cliente, nome ou proprietário..."
-              className="pl-8"
+              placeholder="Buscar cotação..."
+              className="pl-8 h-8 text-xs rounded-full bg-white"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
+          </div>
+
+          <div className="flex items-center gap-3 flex-wrap">
+            <select
+              className="h-8 rounded-full border-input bg-white px-3 text-xs ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+            >
+              <option value="all">Todos Status</option>
+              <option value="Completo">Completo</option>
+              <option value="Incompleto">Incompleto</option>
+              <option value="Sem Itens">Sem Itens</option>
+            </select>
+
+            <select
+              className="h-8 rounded-full border-input bg-white px-3 text-xs ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border"
+              value={filterEstagio}
+              onChange={(e) => setFilterEstagio(e.target.value)}
+            >
+              <option value="all">Todos Estágios</option>
+              <option value="Qualificação">Qualificação</option>
+              <option value="Proposta">Proposta</option>
+              <option value="Negociação">Negociação</option>
+              <option value="Fechado Ganho">Fechado Ganho</option>
+              <option value="Fechado Perdido">Fechado Perdido</option>
+            </select>
+
+            <div className="flex items-center gap-2 bg-white rounded-full border px-3 h-8">
+              <span className="text-xs text-muted-foreground font-medium">De:</span>
+              <input
+                type="date"
+                className="text-xs focus:outline-none bg-transparent"
+                value={filterDateStart}
+                onChange={(e) => setFilterDateStart(e.target.value)}
+              />
+              <span className="text-xs text-muted-foreground font-medium">Até:</span>
+              <input
+                type="date"
+                className="text-xs focus:outline-none bg-transparent"
+                value={filterDateEnd}
+                onChange={(e) => setFilterDateEnd(e.target.value)}
+              />
+            </div>
           </div>
         </div>
 
@@ -180,8 +241,8 @@ export default function PotentialsPage() {
                 </TableRow>
               ) : (
                 potentials.map((p) => (
-                  <TableRow key={p.id} className="h-10 py-0">
-                    <TableCell className="py-1 text-xs font-medium">
+                  <TableRow key={p.id} className="h-9 py-0 hover:bg-slate-50/50">
+                    <TableCell className="py-1 text-[11px] font-medium">
                       <Link
                         to={`/potenciais/adicionar?id=${p.id}`}
                         className="text-primary hover:underline"
@@ -189,8 +250,8 @@ export default function PotentialsPage() {
                         {p.numero_potencial}
                       </Link>
                     </TableCell>
-                    <TableCell className="py-1 text-xs">{p.cliente || '-'}</TableCell>
-                    <TableCell className="py-1 text-xs font-medium">
+                    <TableCell className="py-1 text-[11px]">{p.cliente || '-'}</TableCell>
+                    <TableCell className="py-1 text-[11px] font-medium">
                       {p.nome_potencial ? (
                         <Link
                           to={`/potenciais/adicionar?id=${p.id}`}
@@ -202,10 +263,10 @@ export default function PotentialsPage() {
                         '-'
                       )}
                     </TableCell>
-                    <TableCell className="py-1 text-xs text-muted-foreground">
+                    <TableCell className="py-1 text-[11px] text-muted-foreground">
                       {p.proprietario || '-'}
                     </TableCell>
-                    <TableCell className="py-1 text-xs text-muted-foreground">
+                    <TableCell className="py-1 text-[11px] text-muted-foreground">
                       {p.estagio || '-'}
                     </TableCell>
                     <TableCell className="py-1">{getStatusBadge(p)}</TableCell>

@@ -37,7 +37,7 @@ export function ItemFormModal({
   onOpenChange: (open: boolean) => void
   item?: Item
 }) {
-  const { linhas, acabamentos, ncms, atributosLinha, saveItem } = useData()
+  const { linhas, acabamentos, ncms, atributosLinha, descricoesBase, saveItem } = useData()
   const [formData, setFormData] = useState<Partial<Item>>({})
   const [lineModalOpen, setLineModalOpen] = useState(false)
   const [finishModalOpen, setFinishModalOpen] = useState(false)
@@ -73,10 +73,11 @@ export function ItemFormModal({
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <Tabs defaultValue="geral" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="geral">Geral</TabsTrigger>
               <TabsTrigger value="atributos">Atributos</TabsTrigger>
-              <TabsTrigger value="financeiro">Preço & Status</TabsTrigger>
+              <TabsTrigger value="especificacoes">Especificações</TabsTrigger>
+              <TabsTrigger value="financeiro">Preço/Status</TabsTrigger>
             </TabsList>
 
             <TabsContent value="geral" className="space-y-4 pt-4">
@@ -167,7 +168,7 @@ export function ItemFormModal({
                       type="button"
                       variant="outline"
                       size="icon"
-                      className="text-green-600 shrink-0"
+                      className="text-green-600 shrink-0 rounded-full h-9 w-9"
                       onClick={() => setLineModalOpen(true)}
                     >
                       <Plus className="h-4 w-4" />
@@ -212,7 +213,7 @@ export function ItemFormModal({
                       type="button"
                       variant="outline"
                       size="icon"
-                      className="text-green-600 shrink-0"
+                      className="text-green-600 shrink-0 rounded-full h-9 w-9"
                       onClick={() => setFinishModalOpen(true)}
                     >
                       <Plus className="h-4 w-4" />
@@ -241,7 +242,7 @@ export function ItemFormModal({
                       type="button"
                       variant="outline"
                       size="icon"
-                      className="text-green-600 shrink-0"
+                      className="text-green-600 shrink-0 rounded-full h-9 w-9"
                       onClick={() => setNcmModalOpen(true)}
                     >
                       <Plus className="h-4 w-4" />
@@ -253,6 +254,87 @@ export function ItemFormModal({
                   <Input
                     value={formData.tamanho || ''}
                     onChange={(e) => setFormData({ ...formData, tamanho: e.target.value })}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="especificacoes" className="space-y-4 pt-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2 col-span-2">
+                  <Label>Descrição Base</Label>
+                  <Select
+                    value={formData.descricao_base_id}
+                    onValueChange={(v) => {
+                      const db = descricoesBase.find((d) => d.id === v)
+                      if (db) {
+                        setFormData({
+                          ...formData,
+                          descricao_base_id: v,
+                          descricao_base_pt: db.nome_pt,
+                          descricao_base_en: db.nome_en,
+                        })
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Selecione ou deixe em branco..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {descricoesBase
+                        .filter((d) => !formData.linha_id || d.linha_id === formData.linha_id)
+                        .map((d) => (
+                          <SelectItem key={d.id} value={d.id}>
+                            {d.codigo} - {d.nome_pt}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Classe Material</Label>
+                  <Input
+                    value={formData.classe_material || ''}
+                    onChange={(e) => setFormData({ ...formData, classe_material: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Norma</Label>
+                  <Input
+                    value={formData.norma || ''}
+                    onChange={(e) => setFormData({ ...formData, norma: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Tipo Rosca</Label>
+                  <Input
+                    value={formData.tipo_rosca || ''}
+                    onChange={(e) => setFormData({ ...formData, tipo_rosca: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Comprimento Rosca</Label>
+                  <Input
+                    value={formData.comprimento_rosca || ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, comprimento_rosca: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-2 col-span-2">
+                  <Label>Informação Extra</Label>
+                  <Textarea
+                    className="min-h-[60px] text-sm"
+                    value={formData.informacao_extra || ''}
+                    onChange={(e) => setFormData({ ...formData, informacao_extra: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2 col-span-2">
+                  <Label>Descrição Curta (Auto-gerada/Manual)</Label>
+                  <Input
+                    value={formData.descricao_curta || ''}
+                    onChange={(e) => setFormData({ ...formData, descricao_curta: e.target.value })}
+                    placeholder="Se vazio, será gerada automaticamente"
                   />
                 </div>
               </div>
@@ -290,10 +372,18 @@ export function ItemFormModal({
             </TabsContent>
           </Tabs>
           <DialogFooter className="mt-6">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-full"
+              onClick={() => onOpenChange(false)}
+            >
               Cancelar
             </Button>
-            <Button type="submit">Salvar</Button>
+            <Button type="submit" size="sm" className="rounded-full">
+              Salvar
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

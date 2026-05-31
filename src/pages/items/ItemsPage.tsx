@@ -45,9 +45,6 @@ export default function ItemsPage() {
 
   const filterStatus = searchParams.get('status')
   const filterLinhaId = searchParams.get('linha_id')
-  const filterDateStart = searchParams.get('dateStart')
-  const filterDateEnd = searchParams.get('dateEnd')
-
   const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
@@ -101,12 +98,6 @@ export default function ItemsPage() {
       if (filterStatus === 'Ativo' && !item.ativo) return false
       if (filterLinhaId && item.linha_id !== filterLinhaId) return false
 
-      if (filterDateStart || filterDateEnd) {
-        const itemDate = new Date(item.created).toISOString().split('T')[0]
-        if (filterDateStart && itemDate < filterDateStart) return false
-        if (filterDateEnd && itemDate > filterDateEnd) return false
-      }
-
       if (!searchTerm.trim()) return true
       const normalizedTerm = searchTerm
         .toLowerCase()
@@ -151,8 +142,6 @@ export default function ItemsPage() {
     searchTerm,
     filterStatus,
     filterLinhaId,
-    filterDateStart,
-    filterDateEnd,
     linhas,
     categorias,
     ncms,
@@ -183,95 +172,51 @@ export default function ItemsPage() {
   }
 
   return (
-    <div className="h-[calc(100vh-6rem)] flex flex-col space-y-4 animate-fade-in overflow-hidden relative">
-      <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-4 shrink-0">
-        <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">Catálogo de Itens</h1>
-              {(filterLinhaId || filterDateStart || filterDateEnd) && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    const newParams = new URLSearchParams(searchParams)
-                    newParams.delete('linha_id')
-                    newParams.delete('dateStart')
-                    newParams.delete('dateEnd')
-                    setSearchParams(newParams)
-                  }}
-                >
-                  <FilterX className="h-4 w-4 mr-2" />
-                  Limpar Filtros
-                </Button>
-              )}
-            </div>
-            <p className="text-muted-foreground mt-1">
-              {filterLinhaId
-                ? `Mostrando itens da linha: ${linhas.find((l) => l.id === filterLinhaId)?.nome_pt || 'Desconhecida'}`
-                : 'Gerencie os produtos do seu catálogo.'}
-            </p>
+    <div className="flex flex-col space-y-4 animate-fade-in relative pb-12 pt-2">
+      <div className="flex items-center justify-between gap-4 shrink-0">
+        <div className="flex items-center gap-4 w-full max-w-3xl">
+          <h1 className="font-bold tracking-tight whitespace-nowrap text-[1.18rem] m-0">
+            Catálogo de Itens
+          </h1>
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Buscar item..."
+              className="pl-9 w-full rounded-full bg-card h-8 text-xs"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
-          <div className="flex flex-col sm:flex-row items-center gap-3">
-            <div className="relative w-full sm:w-64 mt-4 sm:mt-0">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Buscar item..."
-                className="pl-9 w-full rounded-full bg-card h-9"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <div className="flex flex-col w-1/2 sm:w-auto">
-                <span className="text-[10px] font-medium text-muted-foreground ml-2 mb-0.5">
-                  Criado a partir de
-                </span>
-                <Input
-                  type="date"
-                  title="Data Inicial de Cadastro"
-                  className="w-full sm:w-36 rounded-full bg-card px-3 py-1 text-xs text-muted-foreground h-9"
-                  value={filterDateStart || ''}
-                  onChange={(e) => {
-                    const newParams = new URLSearchParams(searchParams)
-                    if (e.target.value) newParams.set('dateStart', e.target.value)
-                    else newParams.delete('dateStart')
-                    setSearchParams(newParams)
-                  }}
-                />
-              </div>
-              <div className="flex flex-col w-1/2 sm:w-auto">
-                <span className="text-[10px] font-medium text-muted-foreground ml-2 mb-0.5">
-                  Criado até
-                </span>
-                <Input
-                  type="date"
-                  title="Data Final de Cadastro"
-                  className="w-full sm:w-36 rounded-full bg-card px-3 py-1 text-xs text-muted-foreground h-9"
-                  value={filterDateEnd || ''}
-                  onChange={(e) => {
-                    const newParams = new URLSearchParams(searchParams)
-                    if (e.target.value) newParams.set('dateEnd', e.target.value)
-                    else newParams.delete('dateEnd')
-                    setSearchParams(newParams)
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button onClick={() => setSelectedItemId('new')}>
-            <Plus className="mr-2 h-4 w-4" /> Novo Item
+          <Button
+            onClick={() => setSelectedItemId('new')}
+            size="sm"
+            className="rounded-full h-8 px-4 shrink-0"
+          >
+            <Plus className="mr-1.5 h-3.5 w-3.5" /> Novo Item
           </Button>
+          {filterLinhaId && (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="rounded-full h-8 px-3 shrink-0"
+              onClick={() => {
+                const newParams = new URLSearchParams(searchParams)
+                newParams.delete('linha_id')
+                setSearchParams(newParams)
+              }}
+            >
+              <FilterX className="h-3.5 w-3.5 mr-1.5" />
+              Limpar
+            </Button>
+          )}
         </div>
       </div>
 
-      <div className="flex gap-4 flex-1 min-h-0 overflow-hidden">
+      <div className="flex gap-4 flex-1 items-start">
         <div
           className={cn(
-            'border rounded-xl bg-card overflow-auto relative transition-all duration-300 shadow-sm',
+            'border rounded-xl bg-card relative transition-all duration-300 shadow-sm overflow-x-auto',
             selectedItemId ? 'w-[40%] hidden lg:block' : 'w-full',
           )}
         >
@@ -359,13 +304,15 @@ export default function ItemsPage() {
                               {getDescricaoCurta(item)}
                             </div>
                           </TooltipTrigger>
-                          <TooltipContent
-                            side="bottom"
-                            align="start"
-                            className="max-w-xs break-words"
-                          >
-                            <p>{getDescricaoCurta(item)}</p>
-                          </TooltipContent>
+                          {item.descricao_extra && (
+                            <TooltipContent
+                              side="bottom"
+                              align="start"
+                              className="max-w-xs break-words text-xs"
+                            >
+                              <p>{item.descricao_extra}</p>
+                            </TooltipContent>
+                          )}
                         </Tooltip>
                       </TableCell>
                       <TableCell className="whitespace-nowrap py-1 px-2 text-sm">
@@ -376,7 +323,7 @@ export default function ItemsPage() {
                       </TableCell>
                       {!selectedItemId && (
                         <>
-                          <TableCell className="whitespace-nowrap py-1 px-2 text-sm">
+                          <TableCell className="whitespace-nowrap py-1 px-2 text-xs">
                             {typeof item.preco_venda === 'number'
                               ? `$ ${item.preco_venda.toFixed(2)}`
                               : '-'}
@@ -407,10 +354,10 @@ export default function ItemsPage() {
 
         <div
           className={cn(
-            'border rounded-xl bg-card overflow-hidden flex flex-col transition-all duration-300',
+            'border rounded-xl bg-card flex flex-col transition-all duration-300 shadow-sm',
             selectedItemId
               ? 'w-full lg:w-[60%] animate-in slide-in-from-right-8'
-              : 'w-0 opacity-0 border-0',
+              : 'w-0 opacity-0 border-0 hidden',
           )}
         >
           {selectedItemId && (
@@ -433,7 +380,7 @@ export default function ItemsPage() {
           </div>
           <div className="w-px h-4 bg-border" />
           <Button onClick={() => setIsBulkEditOpen(true)} size="sm" className="rounded-full">
-            <Layers className="w-4 h-4 mr-2" /> Editar em Massa
+            <Layers className="w-3.5 h-3.5 mr-1.5" /> Editar em Massa
           </Button>
           <Button
             onClick={() => setSelectedItemIds(new Set())}
