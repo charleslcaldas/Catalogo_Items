@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/table'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { SelectedItemRecord, SelectedItemData } from '../AddItemsToPotential'
+import pb from '@/lib/pocketbase/client'
 
 interface SelectedItemsTableProps {
   selectedItems: SelectedItemRecord[]
@@ -47,20 +48,41 @@ export function SelectedItemsTable({
     return `$${Number(value).toFixed(2)}`
   }
 
+  const handleQuantityBlur = async (id: string, quantidade: string | number) => {
+    // Only attempt auto-save if id is a saved PocketBase record (15 chars)
+    if (id && id.length === 15) {
+      try {
+        await pb.collection('potencial_itens').update(id, { quantidade: Number(quantidade) || 0 })
+      } catch (err) {
+        console.error('Auto-save quantity failed', err)
+      }
+    }
+  }
+
+  const handlePriceBlur = async (id: string, preco: string | number) => {
+    if (id && id.length === 15) {
+      try {
+        await pb.collection('potencial_itens').update(id, { preco_unitario: Number(preco) || 0 })
+      } catch (err) {
+        console.error('Auto-save price failed', err)
+      }
+    }
+  }
+
   return (
     <div className="flex-1 overflow-auto bg-white">
-      <Table>
+      <Table className="w-full">
         <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
           <TableRow className="h-8">
             <TableHead className="w-10 px-1"></TableHead>
-            <TableHead className="w-48 text-[11px] px-4">SKU</TableHead>
-            <TableHead className="min-w-[200px] w-full text-[11px]">Descrição Curta</TableHead>
-            <TableHead className="w-24 text-[11px]">Tamanho</TableHead>
-            <TableHead className="w-32 text-[11px]">Acabamento</TableHead>
-            <TableHead className="w-20 text-[11px] text-center">Unidade</TableHead>
-            <TableHead className="w-20 text-[11px]">Quant.</TableHead>
+            <TableHead className="w-24 text-[11px] px-4">SKU</TableHead>
+            <TableHead className="w-auto text-[11px]">Descrição Curta</TableHead>
+            <TableHead className="w-20 text-[11px]">Tamanho</TableHead>
+            <TableHead className="w-24 text-[11px]">Acabamento</TableHead>
+            <TableHead className="w-16 text-[11px] text-center">Unidade</TableHead>
+            <TableHead className="w-24 text-[11px]">Quant.</TableHead>
             <TableHead className="w-28 text-[11px]">Preço Unit.</TableHead>
-            <TableHead className="w-28 text-[11px] text-right">Total</TableHead>
+            <TableHead className="w-24 text-[11px] text-right">Total</TableHead>
             <TableHead className="w-10 text-center text-[11px]">Ação</TableHead>
           </TableRow>
         </TableHeader>
@@ -102,7 +124,7 @@ export function SelectedItemsTable({
                 <TableCell className="py-1 text-[10px] font-normal px-4 font-mono whitespace-nowrap">
                   {data.item.sku || '-'}
                 </TableCell>
-                <TableCell className="py-1 text-[11px] whitespace-normal min-w-[200px] leading-tight">
+                <TableCell className="py-1 text-[11px] whitespace-normal leading-tight">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span
@@ -146,13 +168,17 @@ export function SelectedItemsTable({
                 <TableCell className="py-1">
                   <Input
                     type="number"
+                    min="0"
                     lang="en-US"
                     step="0.01"
-                    className="h-7 w-16 px-2 text-right text-xs bg-white"
+                    className="h-7 w-20 px-2 text-right text-xs bg-white"
                     value={data.quantidade}
-                    onChange={(e) =>
-                      handleUpdateItem(id, 'quantidade', e.target.value.replace(/,/g, '.'))
-                    }
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/,/g, '.')
+                      if (Number(val) < 0) return
+                      handleUpdateItem(id, 'quantidade', val)
+                    }}
+                    onBlur={() => handleQuantityBlur(id, data.quantidade)}
                   />
                 </TableCell>
                 <TableCell className="py-1">
@@ -162,13 +188,17 @@ export function SelectedItemsTable({
                     </span>
                     <Input
                       type="number"
+                      min="0"
                       lang="en-US"
                       step="0.01"
-                      className="h-7 w-20 pl-5 pr-2 text-right text-xs bg-white"
+                      className="h-7 w-24 pl-5 pr-2 text-right text-xs bg-white"
                       value={data.preco_unitario}
-                      onChange={(e) =>
-                        handleUpdateItem(id, 'preco_unitario', e.target.value.replace(/,/g, '.'))
-                      }
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/,/g, '.')
+                        if (Number(val) < 0) return
+                        handleUpdateItem(id, 'preco_unitario', val)
+                      }}
+                      onBlur={() => handlePriceBlur(id, data.preco_unitario)}
                     />
                   </div>
                 </TableCell>
