@@ -18,7 +18,9 @@ import { useRealtime } from '@/hooks/use-realtime'
 
 export default function PotentialsPage() {
   const [potentials, setPotentials] = useState<Potencial[]>([])
-  const [itemCounts, setItemCounts] = useState<Record<string, number>>({})
+  const [itemStatuses, setItemStatuses] = useState<
+    Record<string, 'empty' | 'incomplete' | 'complete'>
+  >({})
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
 
@@ -41,15 +43,32 @@ export default function PotentialsPage() {
         const itemsFilter = ids.map((id) => `potencial_id = "${id}"`).join(' || ')
         const itemsRes = await pb
           .collection('potencial_itens')
-          .getFullList({ filter: itemsFilter, fields: 'id,potencial_id' })
+          .getFullList({ filter: itemsFilter, fields: 'id,potencial_id,quantidade,preco_unitario' })
 
-        const counts: Record<string, number> = {}
-        itemsRes.forEach((item) => {
-          counts[item.potencial_id] = (counts[item.potencial_id] || 0) + 1
+        const statuses: Record<string, 'empty' | 'incomplete' | 'complete'> = {}
+
+        ids.forEach((id) => {
+          statuses[id] = 'empty'
         })
-        setItemCounts(counts)
+
+        const itemsByPotential: Record<string, any[]> = {}
+        itemsRes.forEach((item) => {
+          if (!itemsByPotential[item.potencial_id]) itemsByPotential[item.potencial_id] = []
+          itemsByPotential[item.potencial_id].push(item)
+        })
+
+        Object.entries(itemsByPotential).forEach(([pid, items]) => {
+          if (items.length === 0) {
+            statuses[pid] = 'empty'
+          } else {
+            const hasIncomplete = items.some((i) => !i.quantidade || !i.preco_unitario)
+            statuses[pid] = hasIncomplete ? 'incomplete' : 'complete'
+          }
+        })
+
+        setItemStatuses(statuses)
       } else {
-        setItemCounts({})
+        setItemStatuses({})
       }
       setPotentials(res.items)
     } catch (error) {
@@ -75,31 +94,29 @@ export default function PotentialsPage() {
   })
 
   const getStatusBadge = (p: Potencial) => {
-    const count = itemCounts[p.id] || 0
-    if (count === 0) {
+    const status = itemStatuses[p.id] || 'empty'
+    if (status === 'empty') {
       return (
-        <Badge variant="secondary" className="bg-slate-200 text-slate-700">
-          Sem itens
+        <Badge
+          variant="secondary"
+          className="bg-slate-100 text-slate-600 border-slate-200 font-normal"
+        >
+          🚫 Sem Itens
         </Badge>
       )
     }
 
-    const isCompleted =
-      p.estagio === 'Proposta Enviada' ||
-      p.estagio === 'Fechado Ganho' ||
-      p.estagio === 'Fechado Perdido'
-
-    if (isCompleted) {
+    if (status === 'complete') {
       return (
-        <Badge className="bg-green-100 text-green-800 hover:bg-green-100 border-green-200">
-          Itens completo
+        <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-emerald-200 font-normal">
+          ✅ Completo
         </Badge>
       )
     }
 
     return (
-      <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 border-amber-200">
-        Itens parcial
+      <Badge className="bg-amber-50 text-amber-700 hover:bg-amber-50 border-amber-200 font-normal">
+        ⚠️ Itens incompletos
       </Badge>
     )
   }
@@ -137,44 +154,60 @@ export default function PotentialsPage() {
         <div className="flex-1 overflow-auto">
           <Table>
             <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
-              <TableRow>
-                <TableHead>Número Potencial</TableHead>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Nome Potencial</TableHead>
-                <TableHead>Proprietário</TableHead>
-                <TableHead>Estágio</TableHead>
-                <TableHead>Status dos Itens</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
+              <TableRow className="h-10">
+                <TableHead className="text-xs">Número Potencial</TableHead>
+                <TableHead className="text-xs">Cliente</TableHead>
+                <TableHead className="text-xs">Nome Potencial</TableHead>
+                <TableHead className="text-xs">Proprietário</TableHead>
+                <TableHead className="text-xs">Estágio</TableHead>
+                <TableHead className="text-xs">Status dos Itens</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading && potentials.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
                     Carregando...
                   </TableCell>
                 </TableRow>
               ) : potentials.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
                     Nenhuma cotação encontrada.
                   </TableCell>
                 </TableRow>
               ) : (
                 potentials.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell className="font-medium">{p.numero_potencial}</TableCell>
-                    <TableCell>{p.cliente || '-'}</TableCell>
-                    <TableCell>{p.nome_potencial || '-'}</TableCell>
-                    <TableCell>{p.proprietario || '-'}</TableCell>
-                    <TableCell>{p.estagio || '-'}</TableCell>
-                    <TableCell>{getStatusBadge(p)}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link to={`/potenciais/adicionar?id=${p.id}`}>Editar</Link>
-                      </Button>
+                  <TableRow key={p.id} className="h-12 py-1">
+                    <TableCell className="py-2 text-sm font-medium">
+                      <Link
+                        to={`/potenciais/adicionar?id=${p.id}`}
+                        className="text-primary hover:underline"
+                      >
+                        {p.numero_potencial}
+                      </Link>
                     </TableCell>
+                    <TableCell className="py-2 text-sm">{p.cliente || '-'}</TableCell>
+                    <TableCell className="py-2 text-sm font-medium">
+                      {p.nome_potencial ? (
+                        <Link
+                          to={`/potenciais/adicionar?id=${p.id}`}
+                          className="text-primary hover:underline"
+                        >
+                          {p.nome_potencial}
+                        </Link>
+                      ) : (
+                        '-'
+                      )}
+                    </TableCell>
+                    <TableCell className="py-2 text-sm text-muted-foreground">
+                      {p.proprietario || '-'}
+                    </TableCell>
+                    <TableCell className="py-2 text-sm text-muted-foreground">
+                      {p.estagio || '-'}
+                    </TableCell>
+                    <TableCell className="py-2">{getStatusBadge(p)}</TableCell>
                   </TableRow>
                 ))
               )}

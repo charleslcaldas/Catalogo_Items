@@ -1,3 +1,6 @@
+import { Trash2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   Table,
   TableBody,
@@ -6,24 +9,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Trash2, PackageOpen, Plus } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { SelectedItemData } from '../AddItemsToPotential'
+import type { SelectedItemData } from '../AddItemsToPotential'
 
 interface SelectedItemsTableProps {
   selectedItems: Map<string, SelectedItemData>
   handleUpdateItem: (id: string, field: keyof SelectedItemData, value: string) => void
   handleRemoveItem: (id: string) => void
-  setIsSelecting: (v: boolean) => void
+  setIsSelecting: (selecting: boolean) => void
 }
 
 export function SelectedItemsTable({
@@ -32,131 +24,124 @@ export function SelectedItemsTable({
   handleRemoveItem,
   setIsSelecting,
 }: SelectedItemsTableProps) {
-  if (selectedItems.size === 0) {
+  const items = Array.from(selectedItems.entries())
+
+  if (items.length === 0) {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-muted-foreground py-16">
-        <PackageOpen className="h-16 w-16 mb-4 opacity-20" />
-        <p className="mb-4">Nenhum item adicionado à cotação.</p>
+      <div className="flex flex-col items-center justify-center h-48 text-muted-foreground bg-white">
+        <p className="mb-4">Nenhum item selecionado para esta cotação.</p>
         <Button variant="outline" onClick={() => setIsSelecting(true)}>
-          <Plus className="h-4 w-4 mr-2" /> Buscar e Adicionar Itens
+          Adicionar Itens
         </Button>
       </div>
     )
   }
 
-  const itemsArray = Array.from(selectedItems.values())
-  const totalEstimado = itemsArray.reduce(
-    (acc, si) => acc + (Number(si.quantidade) || 0) * (Number(si.preco_unitario) || 0),
-    0,
-  )
+  const formatCurrency = (value: number | '') => {
+    if (value === '') return '-'
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(Number(value))
+  }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-auto min-h-[300px]">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[120px]">SKU</TableHead>
-              <TableHead>Descrição</TableHead>
-              <TableHead className="w-[150px]">Acabamento</TableHead>
-              <TableHead className="w-[120px] text-center">Qtde</TableHead>
-              <TableHead className="w-[120px]">Unidade</TableHead>
-              <TableHead className="w-[120px] text-right">Preço Unit.</TableHead>
-              <TableHead className="w-[120px] text-right">Total</TableHead>
-              <TableHead className="w-[60px]"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {itemsArray.map((si) => {
-              const item = si.item
-              const total = (Number(si.quantidade) || 0) * (Number(si.preco_unitario) || 0)
-              return (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.sku}</TableCell>
-                  <TableCell>
-                    <div className="line-clamp-1">{item.descr_pt}</div>
-                    <div className="text-xs text-muted-foreground line-clamp-1">
-                      {item.descr_en}
+    <div className="flex-1 overflow-auto bg-white">
+      <Table>
+        <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
+          <TableRow className="h-10">
+            <TableHead className="w-24 text-xs">SKU</TableHead>
+            <TableHead className="min-w-[200px] w-full text-xs">Descrição Curta</TableHead>
+            <TableHead className="w-24 text-xs">Tamanho</TableHead>
+            <TableHead className="w-32 text-xs">Acabamento</TableHead>
+            <TableHead className="w-24 text-xs">Quant.</TableHead>
+            <TableHead className="w-20 text-xs">Unidade</TableHead>
+            <TableHead className="w-32 text-xs">Preço Unit.</TableHead>
+            <TableHead className="w-32 text-xs">Total</TableHead>
+            <TableHead className="w-12 text-center text-xs">Ações</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {items.map(([id, data]) => {
+            const total =
+              typeof data.quantidade === 'number' && typeof data.preco_unitario === 'number'
+                ? data.quantidade * data.preco_unitario
+                : 0
+
+            const acabamento = data.item.expand?.acabamento_id
+            const descricao = data.item.descricao_curta || data.item.descr_pt || '-'
+
+            return (
+              <TableRow key={id} className="h-12 py-1">
+                <TableCell className="py-2 text-sm font-medium">{data.item.sku || '-'}</TableCell>
+                <TableCell className="py-2 text-sm truncate max-w-xs" title={descricao}>
+                  {descricao}
+                </TableCell>
+                <TableCell className="py-2 text-sm">{data.item.tamanho || '-'}</TableCell>
+                <TableCell className="py-2 text-sm">
+                  {acabamento ? (
+                    <div className="flex items-center gap-2">
+                      {acabamento.cor_hex && (
+                        <div
+                          className="w-3 h-3 rounded-full border shadow-sm shrink-0"
+                          style={{ backgroundColor: acabamento.cor_hex }}
+                          title={acabamento.nome_pt}
+                        />
+                      )}
+                      <span className="truncate max-w-[80px]" title={acabamento.nome_pt}>
+                        {acabamento.nome_pt}
+                      </span>
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    {item.expand?.acabamento_id ? item.expand.acabamento_id.nome_pt : '-'}
-                  </TableCell>
-                  <TableCell className="text-center">
+                  ) : (
+                    '-'
+                  )}
+                </TableCell>
+                <TableCell className="py-2">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="1"
+                    className="h-8 w-20 px-2 text-right"
+                    value={data.quantidade}
+                    onChange={(e) => handleUpdateItem(id, 'quantidade', e.target.value)}
+                  />
+                </TableCell>
+                <TableCell className="py-2 text-sm text-center">
+                  {data.unidade_medida || '-'}
+                </TableCell>
+                <TableCell className="py-2">
+                  <div className="relative">
+                    <span className="absolute left-2 top-1.5 text-muted-foreground text-sm">
+                      R$
+                    </span>
                     <Input
                       type="number"
-                      min="1"
-                      className={cn(
-                        'w-20 h-8 mx-auto text-center',
-                        !si.quantidade || Number(si.quantidade) <= 0
-                          ? 'border-destructive focus-visible:ring-destructive'
-                          : '',
-                      )}
-                      value={si.quantidade}
-                      onChange={(e) => handleUpdateItem(item.id, 'quantidade', e.target.value)}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Select
-                      value={si.unidade_medida}
-                      onValueChange={(v) => handleUpdateItem(item.id, 'unidade_medida', v)}
-                    >
-                      <SelectTrigger
-                        className={cn(
-                          'w-[100px] h-8',
-                          !si.unidade_medida ? 'border-destructive' : '',
-                        )}
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Pcs">Pcs</SelectItem>
-                        <SelectItem value="MPC">MPC</SelectItem>
-                        <SelectItem value="Centena">Centena</SelectItem>
-                        <SelectItem value="Quilo">Quilo</SelectItem>
-                        <SelectItem value="Metro">Metro</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Input
-                      type="number"
+                      min="0"
                       step="0.01"
-                      className={cn(
-                        'w-24 h-8 ml-auto text-right',
-                        si.preco_unitario === '' ? 'border-destructive' : '',
-                      )}
-                      value={si.preco_unitario}
-                      onChange={(e) => handleUpdateItem(item.id, 'preco_unitario', e.target.value)}
+                      className="h-8 w-24 pl-8 pr-2 text-right"
+                      value={data.preco_unitario}
+                      onChange={(e) => handleUpdateItem(id, 'preco_unitario', e.target.value)}
                     />
-                  </TableCell>
-                  <TableCell className="text-right font-medium text-primary">
-                    $ {total.toFixed(2)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleRemoveItem(item.id)}
-                      className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              )
-            })}
-          </TableBody>
-        </Table>
-      </div>
-      <div className="p-4 border-t bg-slate-50 flex justify-end rounded-b-lg">
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-muted-foreground uppercase font-medium">
-            Total Estimado
-          </span>
-          <span className="font-bold text-2xl text-primary">$ {totalEstimado.toFixed(2)}</span>
-        </div>
-      </div>
+                  </div>
+                </TableCell>
+                <TableCell className="py-2 text-sm font-semibold text-right">
+                  {formatCurrency(total)}
+                </TableCell>
+                <TableCell className="py-2 text-center">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    onClick={() => handleRemoveItem(id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            )
+          })}
+        </TableBody>
+      </Table>
     </div>
   )
 }

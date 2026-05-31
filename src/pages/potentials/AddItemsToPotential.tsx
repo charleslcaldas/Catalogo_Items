@@ -184,24 +184,28 @@ export default function AddItemsToPotential() {
   const getStatusBadge = () => {
     if (selectedItems.size === 0) {
       return (
-        <Badge variant="secondary" className="bg-slate-200 text-slate-700">
-          Sem itens
+        <Badge
+          variant="secondary"
+          className="bg-slate-100 text-slate-600 border-slate-200 font-normal"
+        >
+          🚫 Sem Itens
         </Badge>
       )
     }
-    const isCompleted = ['Proposta Enviada', 'Fechado Ganho', 'Fechado Perdido'].includes(
-      formData.estagio,
-    )
-    if (isCompleted) {
+
+    const items = Array.from(selectedItems.values())
+    const hasIncomplete = items.some((i) => !i.quantidade || !i.preco_unitario)
+
+    if (!hasIncomplete) {
       return (
-        <Badge className="bg-green-100 text-green-800 hover:bg-green-100 border-green-200">
-          Itens completo
+        <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-emerald-200 font-normal">
+          ✅ Completo
         </Badge>
       )
     }
     return (
-      <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 border-amber-200">
-        Itens parcial
+      <Badge className="bg-amber-50 text-amber-700 hover:bg-amber-50 border-amber-200 font-normal">
+        ⚠️ Itens incompletos
       </Badge>
     )
   }
@@ -255,7 +259,9 @@ export default function AddItemsToPotential() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            {currentPotential ? `Cotação: ${currentPotential.numero_potencial}` : 'Nova Cotação'}
+            {currentPotential
+              ? `Cotação: ${currentPotential.numero_potencial}${currentPotential.cliente ? ` - ${currentPotential.cliente}` : ''}`
+              : 'Nova Cotação'}
           </h1>
           <p className="text-sm text-muted-foreground">Preencha os detalhes e adicione itens</p>
         </div>
