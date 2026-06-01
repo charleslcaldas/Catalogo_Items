@@ -62,9 +62,12 @@ export function ProductCatalog({
         const text = [
           item.sku,
           item.descr_pt,
+          item.descr_en,
           item.descricao_curta,
+          item.descricao_curta_en,
           item.tamanho,
           aca?.nome_pt,
+          aca?.nome_en,
           aca?.codigo,
         ]
           .filter(Boolean)

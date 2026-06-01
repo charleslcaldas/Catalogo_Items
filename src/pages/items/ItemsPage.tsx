@@ -239,6 +239,7 @@ export default function ItemsPage() {
                 {!selectedItemId && (
                   <>
                     <TableHead className="px-2">Preço Venda</TableHead>
+                    <TableHead className="px-2">Validade Preço</TableHead>
                     <TableHead className="px-2">Status</TableHead>
                   </>
                 )}
@@ -326,6 +327,11 @@ export default function ItemsPage() {
                           <TableCell className="whitespace-nowrap py-1 px-2 text-xs">
                             {typeof item.preco_venda === 'number'
                               ? `$ ${item.preco_venda.toFixed(2)}`
+                              : '-'}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap py-1 px-2 text-xs">
+                            {item.validade_preco
+                              ? item.validade_preco.split('T')[0].split('-').reverse().join('/')
                               : '-'}
                           </TableCell>
                           <TableCell className="py-1 px-2">

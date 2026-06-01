@@ -94,39 +94,7 @@ export function ItemFormModal({
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 grid grid-cols-12 gap-4">
-            <div className="col-span-12 sm:col-span-8 space-y-2">
-              <Label>{isPt ? 'Descrição Base' : 'Base Description'}</Label>
-              <Select
-                value={formData.descricao_base_id}
-                onValueChange={(v) => {
-                  const db = descricoesBase.find((d) => d.id === v)
-                  if (db) {
-                    setFormData({
-                      ...formData,
-                      descricao_base_id: v,
-                      descricao_base_pt: db.nome_pt,
-                      descricao_base_en: db.nome_en,
-                      linha_id: db.linha_id,
-                    })
-                  }
-                }}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecione ou deixe em branco..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {descricoesBase
-                    .filter((d) => !formData.linha_id || d.linha_id === formData.linha_id)
-                    .map((d) => (
-                      <SelectItem key={d.id} value={d.id}>
-                        {d.codigo} - {isPt ? d.nome_pt : d.nome_en || d.nome_pt}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="col-span-12 sm:col-span-4 space-y-2">
+            <div className="col-span-12 sm:col-span-6 space-y-2">
               <Label>
                 SKU <span className="text-destructive">*</span>
               </Label>
@@ -246,6 +214,42 @@ export function ItemFormModal({
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 grid grid-cols-12 gap-4">
+            <div className="col-span-12 flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
+              <Label className="sm:w-1/3 shrink-0 font-medium text-sm">
+                {isPt ? 'Descrição Base (Auto/Manual)' : 'Base Description (Auto/Manual)'}
+              </Label>
+              <div className="flex-1">
+                <Select
+                  value={formData.descricao_base_id}
+                  onValueChange={(v) => {
+                    const db = descricoesBase.find((d) => d.id === v)
+                    if (db) {
+                      setFormData({
+                        ...formData,
+                        descricao_base_id: v,
+                        descricao_base_pt: db.nome_pt,
+                        descricao_base_en: db.nome_en,
+                        linha_id: db.linha_id,
+                      })
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecione ou deixe em branco..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {descricoesBase
+                      .filter((d) => !formData.linha_id || d.linha_id === formData.linha_id)
+                      .map((d) => (
+                        <SelectItem key={d.id} value={d.id}>
+                          {d.codigo} - {isPt ? d.nome_pt : d.nome_en || d.nome_pt}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             <div className="col-span-12 sm:col-span-4 space-y-2">
               <Label>{isPt ? 'Categoria' : 'Category'}</Label>
               <Input
