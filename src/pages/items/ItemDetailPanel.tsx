@@ -156,20 +156,30 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
         ''
       const selAcabamento = acabamentos.find((a) => a.id === dataToSave.acabamento_id)
 
-      const autoDescCompletaPt = [descBasePt, dataToSave.tamanho, selAcabamento?.nome_pt]
+      const autoDescCompletaPt = [
+        descBasePt,
+        dataToSave.tamanho,
+        selAcabamento?.nome_pt,
+        dataToSave.material,
+        dataToSave.norma,
+        dataToSave.tipo_rosca,
+      ]
         .filter(Boolean)
         .join(' ')
       const autoDescCompletaEn = [
         descBaseEn,
         dataToSave.tamanho,
         selAcabamento?.nome_en || selAcabamento?.nome_pt,
+        dataToSave.material,
+        dataToSave.norma,
+        dataToSave.tipo_rosca,
       ]
         .filter(Boolean)
         .join(' ')
 
       const descricao_curta = [
         descBasePt,
-        dataToSave.classe_material,
+        dataToSave.material,
         dataToSave.norma,
         dataToSave.tipo_rosca,
         dataToSave.comprimento_rosca,
@@ -180,7 +190,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
 
       const descricao_curta_en = [
         descBaseEn,
-        dataToSave.classe_material,
+        dataToSave.material,
         dataToSave.norma,
         dataToSave.tipo_rosca,
         dataToSave.comprimento_rosca_en,
@@ -191,8 +201,8 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
 
       await saveItem({
         ...dataToSave,
-        descricao_curta: dataToSave.descricao_curta || descricao_curta,
-        descricao_curta_en: dataToSave.descricao_curta_en || descricao_curta_en,
+        descricao_curta: descricao_curta,
+        descricao_curta_en: descricao_curta_en,
         descr_pt: autoDescCompletaPt || 'Sem descrição',
         descr_en: autoDescCompletaEn || '',
         data_atualizacao: new Date().toISOString(),
@@ -221,13 +231,45 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
     formData.descricao_base_en ||
     ''
 
-  const autoDescCompletaPt = [descBasePt, formData.tamanho, selAcabamento?.nome_pt]
+  const autoDescCompletaPt = [
+    descBasePt,
+    formData.tamanho,
+    selAcabamento?.nome_pt,
+    formData.material,
+    formData.norma,
+    formData.tipo_rosca,
+  ]
     .filter(Boolean)
     .join(' ')
   const autoDescCompletaEn = [
     descBaseEn,
     formData.tamanho,
     selAcabamento?.nome_en || selAcabamento?.nome_pt,
+    formData.material,
+    formData.norma,
+    formData.tipo_rosca,
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  const autoDescCurtaPt = [
+    descBasePt,
+    formData.material,
+    formData.norma,
+    formData.tipo_rosca,
+    formData.comprimento_rosca,
+    formData.informacao_extra,
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  const autoDescCurtaEn = [
+    descBaseEn,
+    formData.material,
+    formData.norma,
+    formData.tipo_rosca,
+    formData.comprimento_rosca_en,
+    formData.informacao_extra_en,
   ]
     .filter(Boolean)
     .join(' ')
@@ -460,8 +502,8 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                   <Input
                     className="h-8 text-xs"
                     disabled={!isEditing}
-                    value={formData.classe_material || ''}
-                    onChange={(e) => setFormData({ ...formData, classe_material: e.target.value })}
+                    value={formData.material || ''}
+                    onChange={(e) => setFormData({ ...formData, material: e.target.value })}
                   />
                 </Field>
                 <Field label="Norma" className="md:col-span-3">
@@ -579,12 +621,11 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     onChange={(val) => setFormData({ ...formData, preco_venda: val })}
                   />
                 </Field>
-                <Field label="Descrição Curta (PT)" className="md:col-span-6">
+                <Field label="Descrição Curta (PT) (Auto)" className="md:col-span-6">
                   <Input
-                    className="h-8 text-xs"
-                    disabled={!isEditing}
-                    value={formData.descricao_curta || ''}
-                    onChange={(e) => setFormData({ ...formData, descricao_curta: e.target.value })}
+                    className="h-8 text-xs bg-muted/50 font-medium"
+                    disabled
+                    value={autoDescCurtaPt}
                   />
                 </Field>
               </div>
@@ -635,12 +676,12 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <Field label="Descrição Completa (PT) (Automática)" className="md:col-span-12">
+                <Field label="Descrição Completa (PT) (Auto)" className="md:col-span-12">
                   <Textarea
                     className="min-h-[50px] resize-none text-xs bg-muted/50 font-medium text-muted-foreground"
                     disabled
                     value={autoDescCompletaPt}
-                    title="Esta descrição é gerada automaticamente baseada na Descrição Base, Tamanho e Acabamento."
+                    title="Esta descrição é gerada automaticamente baseada nos atributos selecionados."
                   />
                 </Field>
               </div>
@@ -649,9 +690,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
 
           <TabsContent value="en" className="m-0 space-y-4 animate-fade-in-up">
             <div className="bg-card border rounded-lg p-4 shadow-sm flex flex-col gap-3">
-              <h4 className="font-semibold text-xs border-b pb-1 mb-1">
-                General & Attributes (EN)
-              </h4>
+              <h4 className="font-semibold text-xs border-b pb-1 mb-1">Geral & Atributos (EN)</h4>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                 <Field label="Base Description (EN)" className="md:col-span-9">
@@ -701,8 +740,8 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                   <Input
                     className="h-8 text-xs"
                     disabled={!isEditing}
-                    value={formData.classe_material || ''}
-                    onChange={(e) => setFormData({ ...formData, classe_material: e.target.value })}
+                    value={formData.material || ''}
+                    onChange={(e) => setFormData({ ...formData, material: e.target.value })}
                   />
                 </Field>
                 <Field label="Standard" className="md:col-span-3">
@@ -790,7 +829,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
             </div>
 
             <div className="bg-card border rounded-lg p-4 shadow-sm flex flex-col gap-3">
-              <h4 className="font-semibold text-xs border-b pb-1 mb-1">Price & Text (EN)</h4>
+              <h4 className="font-semibold text-xs border-b pb-1 mb-1">Preço e Texto (EN)</h4>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                 <Field label="Purchase Price" className="md:col-span-3">
@@ -807,14 +846,11 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     onChange={(val) => setFormData({ ...formData, preco_venda: val })}
                   />
                 </Field>
-                <Field label="Short Description (EN)" className="md:col-span-6">
+                <Field label="Short Description (EN) (Auto)" className="md:col-span-6">
                   <Input
-                    className="h-8 text-xs"
-                    disabled={!isEditing}
-                    value={formData.descricao_curta_en || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, descricao_curta_en: e.target.value })
-                    }
+                    className="h-8 text-xs bg-muted/50 font-medium"
+                    disabled
+                    value={autoDescCurtaEn}
                   />
                 </Field>
               </div>
@@ -874,7 +910,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     className="min-h-[50px] resize-none text-xs bg-muted/50 font-medium text-muted-foreground"
                     disabled
                     value={autoDescCompletaEn}
-                    title="This description is auto-generated based on Base Description, Size and Finish."
+                    title="This description is auto-generated based on selected attributes."
                   />
                 </Field>
               </div>
