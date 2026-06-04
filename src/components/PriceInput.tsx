@@ -6,10 +6,12 @@ export function PriceInput({
   value,
   onChange,
   className,
+  disabled,
 }: {
   value: number | undefined
   onChange: (val: number | undefined) => void
   className?: string
+  disabled?: boolean
 }) {
   const [strVal, setStrVal] = useState(value !== undefined ? String(value) : '')
 
@@ -44,6 +46,7 @@ export function PriceInput({
       value={strVal}
       onChange={handleChange}
       placeholder="0.00"
+      disabled={disabled}
     />
   )
 }

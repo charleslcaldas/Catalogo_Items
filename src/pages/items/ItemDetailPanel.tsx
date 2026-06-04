@@ -13,7 +13,7 @@ import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useData } from '@/contexts/data-context'
 import type { Item } from '@/types'
-import { X, Copy, ImageIcon, History as HistoryIcon, Activity } from 'lucide-react'
+import { X, Copy, ImageIcon, History as HistoryIcon, Activity, Edit2 } from 'lucide-react'
 import { toast } from 'sonner'
 import pb from '@/lib/pocketbase/client'
 import { Badge } from '@/components/ui/badge'
@@ -54,6 +54,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
   const [formData, setFormData] = useState<Partial<Item>>({})
   const [galleryOpen, setGalleryOpen] = useState(false)
   const [transactions, setTransactions] = useState<any[]>([])
+  const [isEditing, setIsEditing] = useState(false)
 
   const [catModalOpen, setCatModalOpen] = useState(false)
   const [lineModalOpen, setLineModalOpen] = useState(false)
@@ -65,6 +66,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
       setFormData(item)
       const linha = linhas.find((l) => l.id === item.linha_id)
       if (linha) setSelectedCategoryId(linha.categoria_id)
+      setIsEditing(false)
 
       pb.collection('potencial_itens')
         .getList(1, 20, { filter: `item_id="${item.id}"`, expand: 'potencial_id' })
@@ -74,6 +76,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
       setFormData({ ativo: true, sincronizado_com_zoho: false })
       setSelectedCategoryId('')
       setTransactions([])
+      setIsEditing(true)
     }
   }, [item, linhas])
 
@@ -147,6 +150,23 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
         descricoesBase.find((d) => d.id === dataToSave.descricao_base_id)?.nome_pt ||
         dataToSave.descricao_base_pt ||
         ''
+      const descBaseEn =
+        descricoesBase.find((d) => d.id === dataToSave.descricao_base_id)?.nome_en ||
+        dataToSave.descricao_base_en ||
+        ''
+      const selAcabamento = acabamentos.find((a) => a.id === dataToSave.acabamento_id)
+
+      const autoDescCompletaPt = [descBasePt, dataToSave.tamanho, selAcabamento?.nome_pt]
+        .filter(Boolean)
+        .join(' ')
+      const autoDescCompletaEn = [
+        descBaseEn,
+        dataToSave.tamanho,
+        selAcabamento?.nome_en || selAcabamento?.nome_pt,
+      ]
+        .filter(Boolean)
+        .join(' ')
+
       const descricao_curta = [
         descBasePt,
         dataToSave.classe_material,
@@ -158,10 +178,6 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
         .filter(Boolean)
         .join(' ')
 
-      const descBaseEn =
-        descricoesBase.find((d) => d.id === dataToSave.descricao_base_id)?.nome_en ||
-        dataToSave.descricao_base_en ||
-        ''
       const descricao_curta_en = [
         descBaseEn,
         dataToSave.classe_material,
@@ -177,8 +193,8 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
         ...dataToSave,
         descricao_curta: dataToSave.descricao_curta || descricao_curta,
         descricao_curta_en: dataToSave.descricao_curta_en || descricao_curta_en,
-        descr_pt: dataToSave.descr_pt || descricao_curta || 'Sem descrição',
-        descr_en: dataToSave.descr_en || descricao_curta_en || '',
+        descr_pt: autoDescCompletaPt || 'Sem descrição',
+        descr_en: autoDescCompletaEn || '',
         data_atualizacao: new Date().toISOString(),
       } as Item)
 
@@ -187,6 +203,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
         { id: toastId },
       )
       setFormData((prev) => ({ ...prev, ...dataToSave }))
+      setIsEditing(false)
 
       if (!item) onClose()
     } catch (err: any) {
@@ -204,23 +221,11 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
     formData.descricao_base_en ||
     ''
 
-  const fullDescPt = [
-    descBasePt,
-    formData.classe_material,
-    formData.norma,
-    formData.tipo_rosca,
-    formData.comprimento_rosca,
-    formData.tamanho,
-    selAcabamento?.nome_pt,
-  ]
+  const autoDescCompletaPt = [descBasePt, formData.tamanho, selAcabamento?.nome_pt]
     .filter(Boolean)
     .join(' ')
-  const fullDescEn = [
+  const autoDescCompletaEn = [
     descBaseEn,
-    formData.classe_material,
-    formData.norma,
-    formData.tipo_rosca,
-    formData.comprimento_rosca_en,
     formData.tamanho,
     selAcabamento?.nome_en || selAcabamento?.nome_pt,
   ]
@@ -253,23 +258,25 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
         <div className="flex items-center gap-3 flex-1 min-w-0 pr-4">
           <div
             className="w-10 h-10 shrink-0 rounded-md border bg-muted/30 cursor-pointer hover:opacity-80 relative group flex items-center justify-center overflow-hidden shadow-sm"
-            onClick={() => setGalleryOpen(true)}
+            onClick={() => isEditing && setGalleryOpen(true)}
           >
             <img
               src={imageUrl}
               alt="Item"
               className="max-w-full max-h-full object-contain p-0.5 mix-blend-multiply"
             />
-            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <ImageIcon className="text-white w-4 h-4" />
-            </div>
+            {isEditing && (
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <ImageIcon className="text-white w-4 h-4" />
+              </div>
+            )}
           </div>
           <div className="flex flex-col min-w-0 flex-1">
             <h2 className="font-bold text-sm text-foreground break-words whitespace-normal leading-tight">
-              {fullDescPt || 'Nova Descrição Completa'}
+              {autoDescCompletaPt || 'Nova Descrição Completa'}
             </h2>
             <h3 className="text-[10px] text-muted-foreground break-words whitespace-normal leading-snug mt-0.5">
-              {fullDescEn || 'New Full Description'}
+              {autoDescCompletaEn || 'New Full Description'}
             </h3>
 
             <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -294,20 +301,47 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
               variant="outline"
               size="sm"
               className="rounded-full h-8 text-xs"
+              disabled={isEditing}
               onClick={() => {
                 const c = { ...formData }
                 delete c.id
                 c.sku += '-COPY'
                 setFormData(c)
+                setIsEditing(true)
                 toast.success('Duplicado na tela')
               }}
             >
               <Copy className="h-3 w-3 mr-1.5" /> Duplicar
             </Button>
           )}
-          <Button onClick={handleSave} size="sm" className="rounded-full h-8 px-4 text-xs">
-            Salvar
-          </Button>
+          {!isEditing ? (
+            <Button
+              onClick={() => setIsEditing(true)}
+              size="sm"
+              className="rounded-full h-8 px-4 text-xs"
+            >
+              <Edit2 className="h-3 w-3 mr-1.5" /> Editar
+            </Button>
+          ) : (
+            <>
+              {item && (
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setFormData(item)
+                    setIsEditing(false)
+                  }}
+                  size="sm"
+                  className="rounded-full h-8 px-4 text-xs"
+                >
+                  Cancelar
+                </Button>
+              )}
+              <Button onClick={handleSave} size="sm" className="rounded-full h-8 px-4 text-xs">
+                Salvar
+              </Button>
+            </>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -357,33 +391,36 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                 <Field label="Descrição Base (Auto/Manual)" className="md:col-span-9">
                   <div className="flex gap-2">
-                    <SearchableSelect
-                      options={descBaseOptions}
-                      value={formData.descricao_base_id}
-                      onChange={(v) => {
-                        const desc = descricoesBase.find((d) => d.id === v)
-                        if (desc) {
-                          setFormData((f) => ({
-                            ...f,
-                            descricao_base_id: v,
-                            descricao_base_pt: desc.nome_pt,
-                            descricao_base_en: desc.nome_en,
-                            ...(desc.linha_id ? { linha_id: desc.linha_id } : {}),
-                            ...(desc.ncm_id ? { ncm_id: desc.ncm_id } : {}),
-                          }))
-                          if (desc.linha_id) {
-                            const linha = linhas.find((l) => l.id === desc.linha_id)
-                            if (linha) setSelectedCategoryId(linha.categoria_id)
-                          } else if (desc.categoria_id) {
-                            setSelectedCategoryId(desc.categoria_id)
+                    <div className={cn('flex-1', !isEditing && 'pointer-events-none opacity-80')}>
+                      <SearchableSelect
+                        options={descBaseOptions}
+                        value={formData.descricao_base_id}
+                        onChange={(v) => {
+                          const desc = descricoesBase.find((d) => d.id === v)
+                          if (desc) {
+                            setFormData((f) => ({
+                              ...f,
+                              descricao_base_id: v,
+                              descricao_base_pt: desc.nome_pt,
+                              descricao_base_en: desc.nome_en,
+                              ...(desc.linha_id ? { linha_id: desc.linha_id } : {}),
+                              ...(desc.ncm_id ? { ncm_id: desc.ncm_id } : {}),
+                            }))
+                            if (desc.linha_id) {
+                              const linha = linhas.find((l) => l.id === desc.linha_id)
+                              if (linha) setSelectedCategoryId(linha.categoria_id)
+                            } else if (desc.categoria_id) {
+                              setSelectedCategoryId(desc.categoria_id)
+                            }
                           }
-                        }
-                      }}
-                      onAddNew={() => setNewDescBaseModalOpen(true)}
-                    />
+                        }}
+                        onAddNew={() => setNewDescBaseModalOpen(true)}
+                      />
+                    </div>
                     <Input
-                      className="h-8 text-xs flex-1"
-                      placeholder="Sobrescrever texto..."
+                      className="h-8 text-xs w-[140px] shrink-0"
+                      placeholder="Sobrescrever..."
+                      disabled={!isEditing}
                       value={formData.descricao_base_pt || ''}
                       onChange={(e) =>
                         setFormData({ ...formData, descricao_base_pt: e.target.value })
@@ -394,6 +431,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                 <Field label="Tamanho" className="md:col-span-3">
                   <Input
                     className="h-8 text-xs"
+                    disabled={!isEditing}
                     value={formData.tamanho || ''}
                     onChange={(e) => setFormData({ ...formData, tamanho: e.target.value })}
                   />
@@ -402,15 +440,18 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                 <Field label="Acabamento" className="md:col-span-3">
-                  <SearchableSelect
-                    options={acabamentoOptions}
-                    value={formData.acabamento_id}
-                    onChange={(v) => setFormData((f) => ({ ...f, acabamento_id: v }))}
-                  />
+                  <div className={cn(!isEditing && 'pointer-events-none opacity-80')}>
+                    <SearchableSelect
+                      options={acabamentoOptions}
+                      value={formData.acabamento_id}
+                      onChange={(v) => setFormData((f) => ({ ...f, acabamento_id: v }))}
+                    />
+                  </div>
                 </Field>
                 <Field label="SKU" className="md:col-span-3">
                   <Input
                     className="h-8 text-xs"
+                    disabled={!isEditing}
                     value={formData.sku || ''}
                     onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                   />
@@ -418,6 +459,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                 <Field label="Grau/Material" className="md:col-span-3">
                   <Input
                     className="h-8 text-xs"
+                    disabled={!isEditing}
                     value={formData.classe_material || ''}
                     onChange={(e) => setFormData({ ...formData, classe_material: e.target.value })}
                   />
@@ -425,6 +467,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                 <Field label="Norma" className="md:col-span-3">
                   <Input
                     className="h-8 text-xs"
+                    disabled={!isEditing}
                     value={formData.norma || ''}
                     onChange={(e) => setFormData({ ...formData, norma: e.target.value })}
                   />
@@ -435,6 +478,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                 <Field label="Tipo Rosca" className="md:col-span-2">
                   <Input
                     className="h-8 text-xs"
+                    disabled={!isEditing}
                     value={formData.tipo_rosca || ''}
                     onChange={(e) => setFormData({ ...formData, tipo_rosca: e.target.value })}
                   />
@@ -442,6 +486,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                 <Field label="Comp. Rosca" className="md:col-span-2">
                   <Input
                     className="h-8 text-xs"
+                    disabled={!isEditing}
                     value={formData.comprimento_rosca || ''}
                     onChange={(e) =>
                       setFormData({ ...formData, comprimento_rosca: e.target.value })
@@ -449,28 +494,33 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                   />
                 </Field>
                 <Field label="Categoria" className="md:col-span-3">
-                  <SearchableSelect
-                    options={categoryOptions}
-                    value={selectedCategoryId}
-                    onChange={(v) => {
-                      setSelectedCategoryId(v)
-                      setFormData((f) => ({ ...f, linha_id: '' }))
-                    }}
-                    onAddNew={() => setCatModalOpen(true)}
-                  />
+                  <div className={cn(!isEditing && 'pointer-events-none opacity-80')}>
+                    <SearchableSelect
+                      options={categoryOptions}
+                      value={selectedCategoryId}
+                      onChange={(v) => {
+                        setSelectedCategoryId(v)
+                        setFormData((f) => ({ ...f, linha_id: '' }))
+                      }}
+                      onAddNew={() => setCatModalOpen(true)}
+                    />
+                  </div>
                 </Field>
                 <Field label="Linha" className="md:col-span-3">
-                  <SearchableSelect
-                    options={lineOptions}
-                    value={formData.linha_id}
-                    onChange={(v) => setFormData((f) => ({ ...f, linha_id: v }))}
-                    onAddNew={() => setLineModalOpen(true)}
-                  />
+                  <div className={cn(!isEditing && 'pointer-events-none opacity-80')}>
+                    <SearchableSelect
+                      options={lineOptions}
+                      value={formData.linha_id}
+                      onChange={(v) => setFormData((f) => ({ ...f, linha_id: v }))}
+                      onAddNew={() => setLineModalOpen(true)}
+                    />
+                  </div>
                 </Field>
                 <Field label="Status" className="md:col-span-2">
                   <div className="flex items-center gap-2 h-8">
                     <Switch
                       checked={formData.ativo ?? true}
+                      disabled={!isEditing}
                       onCheckedChange={(c) => setFormData({ ...formData, ativo: c })}
                     />
                     <span className="text-xs font-medium">
@@ -481,9 +531,10 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <Field label="Unid. Medida" className="md:col-span-2">
+                <Field label="Unid. Medida" className="md:col-span-3">
                   <Select
                     value={formData.unidade_id || ''}
+                    disabled={!isEditing}
                     onValueChange={(v) => setFormData((f) => ({ ...f, unidade_id: v }))}
                   >
                     <SelectTrigger className="h-8 text-xs">
@@ -498,12 +549,14 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label="NCM (Seletor)" className="md:col-span-3">
-                  <SearchableSelect
-                    options={ncmOptions}
-                    value={formData.ncm_id}
-                    onChange={(v) => setFormData((f) => ({ ...f, ncm_id: v }))}
-                  />
+                <Field label="NCM (Seletor)" className="md:col-span-9">
+                  <div className={cn(!isEditing && 'pointer-events-none opacity-80')}>
+                    <SearchableSelect
+                      options={ncmOptions}
+                      value={formData.ncm_id}
+                      onChange={(v) => setFormData((f) => ({ ...f, ncm_id: v }))}
+                    />
+                  </div>
                 </Field>
               </div>
             </div>
@@ -514,12 +567,14 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                 <Field label="Preço Compra" className="md:col-span-3">
                   <PriceInput
+                    disabled={!isEditing}
                     value={formData.preco_compra}
                     onChange={(val) => setFormData({ ...formData, preco_compra: val })}
                   />
                 </Field>
                 <Field label="Preço Venda" className="md:col-span-3">
                   <PriceInput
+                    disabled={!isEditing}
                     value={formData.preco_venda}
                     onChange={(val) => setFormData({ ...formData, preco_venda: val })}
                   />
@@ -527,6 +582,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                 <Field label="Descrição Curta (PT)" className="md:col-span-6">
                   <Input
                     className="h-8 text-xs"
+                    disabled={!isEditing}
                     value={formData.descricao_curta || ''}
                     onChange={(e) => setFormData({ ...formData, descricao_curta: e.target.value })}
                   />
@@ -537,20 +593,22 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                 <Field label="Informação Extra (PT)" className="md:col-span-6">
                   <Textarea
                     className="min-h-[50px] resize-y text-xs"
+                    disabled={!isEditing}
                     value={formData.informacao_extra || ''}
                     onChange={(e) => setFormData({ ...formData, informacao_extra: e.target.value })}
                   />
                 </Field>
                 <Field label="Descrição Extra (PT)" className="md:col-span-6">
                   <Textarea
-                    className="min-h-[50px] resize-none text-xs"
+                    className="min-h-[50px] resize-y text-xs"
+                    disabled={!isEditing}
                     value={formData.descricao_extra || ''}
                     onChange={(e) => setFormData({ ...formData, descricao_extra: e.target.value })}
                   />
                 </Field>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 opacity-80 pointer-events-none">
                 <Field label="NCM" className="md:col-span-2">
                   <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.codigo || ''} />
                 </Field>
@@ -577,20 +635,12 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <Field label="Descrição Completa (PT)" className="md:col-span-6">
+                <Field label="Descrição Completa (PT) (Automática)" className="md:col-span-12">
                   <Textarea
-                    className="min-h-[50px] resize-y text-xs"
-                    value={formData.descr_pt || ''}
-                    onChange={(e) => setFormData({ ...formData, descr_pt: e.target.value })}
-                  />
-                </Field>
-                <Field label="Catálogo PT" className="md:col-span-6">
-                  <Textarea
-                    className="min-h-[50px] resize-y text-xs"
-                    value={formData.descricao_catalogo_pt || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, descricao_catalogo_pt: e.target.value })
-                    }
+                    className="min-h-[50px] resize-none text-xs bg-muted/50 font-medium text-muted-foreground"
+                    disabled
+                    value={autoDescCompletaPt}
+                    title="Esta descrição é gerada automaticamente baseada na Descrição Base, Tamanho e Acabamento."
                   />
                 </Field>
               </div>
@@ -605,17 +655,26 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                 <Field label="Base Description (EN)" className="md:col-span-9">
-                  <Input
-                    className="h-8 text-xs"
-                    value={formData.descricao_base_en || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, descricao_base_en: e.target.value })
-                    }
-                  />
+                  <div className="flex gap-2">
+                    <div className="flex-1 h-8 px-3 flex items-center bg-muted/30 rounded-md border text-xs text-muted-foreground truncate">
+                      {descricoesBase.find((d) => d.id === formData.descricao_base_id)?.nome_en ||
+                        '-'}
+                    </div>
+                    <Input
+                      className="h-8 text-xs w-[140px] shrink-0"
+                      placeholder="Override text..."
+                      disabled={!isEditing}
+                      value={formData.descricao_base_en || ''}
+                      onChange={(e) =>
+                        setFormData({ ...formData, descricao_base_en: e.target.value })
+                      }
+                    />
+                  </div>
                 </Field>
                 <Field label="Size" className="md:col-span-3">
                   <Input
                     className="h-8 text-xs"
+                    disabled={!isEditing}
                     value={formData.tamanho || ''}
                     onChange={(e) => setFormData({ ...formData, tamanho: e.target.value })}
                   />
@@ -633,6 +692,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                 <Field label="SKU" className="md:col-span-3">
                   <Input
                     className="h-8 text-xs"
+                    disabled={!isEditing}
                     value={formData.sku || ''}
                     onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                   />
@@ -640,6 +700,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                 <Field label="Grade/Material" className="md:col-span-3">
                   <Input
                     className="h-8 text-xs"
+                    disabled={!isEditing}
                     value={formData.classe_material || ''}
                     onChange={(e) => setFormData({ ...formData, classe_material: e.target.value })}
                   />
@@ -647,6 +708,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                 <Field label="Standard" className="md:col-span-3">
                   <Input
                     className="h-8 text-xs"
+                    disabled={!isEditing}
                     value={formData.norma || ''}
                     onChange={(e) => setFormData({ ...formData, norma: e.target.value })}
                   />
@@ -657,6 +719,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                 <Field label="Thread Type" className="md:col-span-2">
                   <Input
                     className="h-8 text-xs"
+                    disabled={!isEditing}
                     value={formData.tipo_rosca || ''}
                     onChange={(e) => setFormData({ ...formData, tipo_rosca: e.target.value })}
                   />
@@ -664,6 +727,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                 <Field label="Thread Length (EN)" className="md:col-span-2">
                   <Input
                     className="h-8 text-xs"
+                    disabled={!isEditing}
                     value={formData.comprimento_rosca_en || ''}
                     onChange={(e) =>
                       setFormData({ ...formData, comprimento_rosca_en: e.target.value })
@@ -688,6 +752,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                   <div className="flex items-center gap-2 h-8">
                     <Switch
                       checked={formData.ativo ?? true}
+                      disabled={!isEditing}
                       onCheckedChange={(c) => setFormData({ ...formData, ativo: c })}
                     />
                     <span className="text-xs font-medium">
@@ -698,9 +763,10 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <Field label="Unit of Measure" className="md:col-span-2">
+                <Field label="Unit of Measure" className="md:col-span-3">
                   <Select
                     value={formData.unidade_id || ''}
+                    disabled={!isEditing}
                     onValueChange={(v) => setFormData((f) => ({ ...f, unidade_id: v }))}
                   >
                     <SelectTrigger className="h-8 text-xs">
@@ -715,7 +781,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label="NCM" className="md:col-span-3">
+                <Field label="NCM" className="md:col-span-9">
                   <div className="h-8 px-3 flex items-center bg-muted/30 rounded-md border text-xs text-muted-foreground truncate">
                     {ncmObj?.codigo || '-'}
                   </div>
@@ -729,12 +795,14 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                 <Field label="Purchase Price" className="md:col-span-3">
                   <PriceInput
+                    disabled={!isEditing}
                     value={formData.preco_compra}
                     onChange={(val) => setFormData({ ...formData, preco_compra: val })}
                   />
                 </Field>
                 <Field label="Sale Price" className="md:col-span-3">
                   <PriceInput
+                    disabled={!isEditing}
                     value={formData.preco_venda}
                     onChange={(val) => setFormData({ ...formData, preco_venda: val })}
                   />
@@ -742,6 +810,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                 <Field label="Short Description (EN)" className="md:col-span-6">
                   <Input
                     className="h-8 text-xs"
+                    disabled={!isEditing}
                     value={formData.descricao_curta_en || ''}
                     onChange={(e) =>
                       setFormData({ ...formData, descricao_curta_en: e.target.value })
@@ -754,6 +823,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                 <Field label="Extra Information (EN)" className="md:col-span-6">
                   <Textarea
                     className="min-h-[50px] resize-y text-xs"
+                    disabled={!isEditing}
                     value={formData.informacao_extra_en || ''}
                     onChange={(e) =>
                       setFormData({ ...formData, informacao_extra_en: e.target.value })
@@ -762,7 +832,8 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                 </Field>
                 <Field label="Extra Description (EN)" className="md:col-span-6">
                   <Textarea
-                    className="min-h-[50px] resize-none text-xs"
+                    className="min-h-[50px] resize-y text-xs"
+                    disabled={!isEditing}
                     value={formData.descricao_extra_en || ''}
                     onChange={(e) =>
                       setFormData({ ...formData, descricao_extra_en: e.target.value })
@@ -771,7 +842,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                 </Field>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 opacity-80 pointer-events-none">
                 <Field label="NCM" className="md:col-span-2">
                   <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.codigo || ''} />
                 </Field>
@@ -798,20 +869,12 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <Field label="Full Description (EN)" className="md:col-span-6">
+                <Field label="Full Description (EN) (Auto)" className="md:col-span-12">
                   <Textarea
-                    className="min-h-[50px] resize-y text-xs"
-                    value={formData.descr_en || ''}
-                    onChange={(e) => setFormData({ ...formData, descr_en: e.target.value })}
-                  />
-                </Field>
-                <Field label="Catalog EN" className="md:col-span-6">
-                  <Textarea
-                    className="min-h-[50px] resize-y text-xs"
-                    value={formData.descricao_catalogo_en || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, descricao_catalogo_en: e.target.value })
-                    }
+                    className="min-h-[50px] resize-none text-xs bg-muted/50 font-medium text-muted-foreground"
+                    disabled
+                    value={autoDescCompletaEn}
+                    title="This description is auto-generated based on Base Description, Size and Finish."
                   />
                 </Field>
               </div>

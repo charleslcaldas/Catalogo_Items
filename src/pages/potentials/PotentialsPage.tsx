@@ -34,8 +34,23 @@ export default function PotentialsPage() {
       const filters = []
       if (search) {
         const t = search.replace(/"/g, '')
+
+        const pItens = await pb
+          .collection('potencial_itens')
+          .getFullList({
+            filter: `item_id.descr_pt ~ "${t}" || item_id.descr_en ~ "${t}" || item_id.acabamento_id.nome_pt ~ "${t}" || item_id.acabamento_id.nome_en ~ "${t}"`,
+            fields: 'potencial_id',
+          })
+          .catch(() => [])
+
+        const matchedPotIds = Array.from(new Set(pItens.map((p) => p.potencial_id)))
+        const extraFilter =
+          matchedPotIds.length > 0
+            ? ` || ${matchedPotIds.map((id) => `id="${id}"`).join(' || ')}`
+            : ''
+
         filters.push(
-          `(numero_potencial ~ "${t}" || cliente ~ "${t}" || nome_potencial ~ "${t}" || proprietario ~ "${t}")`,
+          `((numero_potencial ~ "${t}" || cliente ~ "${t}" || nome_potencial ~ "${t}" || proprietario ~ "${t}")${extraFilter})`,
         )
       }
       if (filterEstagio !== 'all') {
