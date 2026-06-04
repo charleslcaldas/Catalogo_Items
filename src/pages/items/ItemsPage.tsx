@@ -239,7 +239,7 @@ export default function ItemsPage() {
                 {!selectedItemId && (
                   <>
                     <TableHead className="px-2">Preço Venda</TableHead>
-                    <TableHead className="px-2">Validade Preço</TableHead>
+                    <TableHead className="px-2">Validade do Preço</TableHead>
                     <TableHead className="px-2">Status</TableHead>
                   </>
                 )}

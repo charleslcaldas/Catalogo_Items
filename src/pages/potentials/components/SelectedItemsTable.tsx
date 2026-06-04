@@ -82,7 +82,7 @@ export function SelectedItemsTable({
             <TableHead className="w-16 text-[11px] text-center">Unidade</TableHead>
             <TableHead className="w-24 text-[11px]">Quant.</TableHead>
             <TableHead className="w-28 text-[11px]">Preço Unit.</TableHead>
-            <TableHead className="w-24 text-[11px]">Validade</TableHead>
+            <TableHead className="w-24 text-[11px]">Data de Validade do Preço</TableHead>
             <TableHead className="w-24 text-[11px] text-right">Total</TableHead>
             <TableHead className="w-10 text-center text-[11px]">Ação</TableHead>
           </TableRow>
@@ -188,18 +188,22 @@ export function SelectedItemsTable({
                       $
                     </span>
                     <Input
-                      type="number"
-                      min="0"
-                      lang="en-US"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       className="h-7 w-24 pl-5 pr-2 text-right text-xs bg-white"
                       value={data.preco_unitario}
                       onChange={(e) => {
                         const val = e.target.value.replace(/,/g, '.')
-                        if (Number(val) < 0) return
-                        handleUpdateItem(id, 'preco_unitario', val)
+                        if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                          handleUpdateItem(id, 'preco_unitario', val)
+                        }
                       }}
-                      onBlur={() => handlePriceBlur(id, data.preco_unitario)}
+                      onBlur={(e) => {
+                        let parsed = parseFloat(String(data.preco_unitario))
+                        if (isNaN(parsed)) parsed = 0
+                        handleUpdateItem(id, 'preco_unitario', parsed.toFixed(2))
+                        handlePriceBlur(id, parsed)
+                      }}
                     />
                   </div>
                 </TableCell>

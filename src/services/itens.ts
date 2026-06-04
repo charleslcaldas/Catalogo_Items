@@ -16,7 +16,7 @@ export const getItensPaginated = (
     filter = terms
       .map(
         (term) =>
-          `(sku ~ "${term}" || descr_pt ~ "${term}" || descr_en ~ "${term}" || tamanho ~ "${term}")`,
+          `(sku ~ "${term}" || descr_pt ~ "${term}" || descr_en ~ "${term}" || tamanho ~ "${term}" || acabamento_id.codigo ~ "${term}" || acabamento_id.nome_pt ~ "${term}")`,
       )
       .join(' && ')
   }

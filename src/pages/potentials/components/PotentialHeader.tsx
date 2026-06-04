@@ -61,7 +61,7 @@ export function PotentialHeader({ selected, onSelect }: PotentialHeaderProps) {
         />
       </div>
       <div className="space-y-2">
-        <Label>Comprador</Label>
+        <Label>Nome do Comprador</Label>
         <Input
           readOnly
           value={selected?.nome_comprador || ''}

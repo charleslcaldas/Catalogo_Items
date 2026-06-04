@@ -352,6 +352,45 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
             <div className="bg-card border rounded-lg p-4 shadow-sm flex flex-col gap-3">
               <h4 className="font-semibold text-xs border-b pb-1 mb-1">Geral & Atributos</h4>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <Field
+                  label="Descrição Base (Auto/Manual)"
+                  className="col-span-2 sm:col-span-4 lg:col-span-2"
+                >
+                  <div className="flex gap-2">
+                    <SearchableSelect
+                      options={descBaseOptions}
+                      value={formData.descricao_base_id}
+                      onChange={(v) => {
+                        const desc = descricoesBase.find((d) => d.id === v)
+                        if (desc) {
+                          setFormData((f) => ({
+                            ...f,
+                            descricao_base_id: v,
+                            descricao_base_pt: desc.nome_pt,
+                            descricao_base_en: desc.nome_en,
+                            ...(desc.linha_id ? { linha_id: desc.linha_id } : {}),
+                            ...(desc.ncm_id ? { ncm_id: desc.ncm_id } : {}),
+                          }))
+                          if (desc.linha_id) {
+                            const linha = linhas.find((l) => l.id === desc.linha_id)
+                            if (linha) setSelectedCategoryId(linha.categoria_id)
+                          } else if (desc.categoria_id) {
+                            setSelectedCategoryId(desc.categoria_id)
+                          }
+                        }
+                      }}
+                      onAddNew={() => setNewDescBaseModalOpen(true)}
+                    />
+                    <Input
+                      className="h-8 text-xs flex-1"
+                      placeholder="Sobrescrever texto..."
+                      value={formData.descricao_base_pt || ''}
+                      onChange={(e) =>
+                        setFormData({ ...formData, descricao_base_pt: e.target.value })
+                      }
+                    />
+                  </div>
+                </Field>
                 <Field label="SKU">
                   <Input
                     className="h-8 text-xs"
@@ -475,42 +514,6 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
             <div className="bg-card border rounded-lg p-4 shadow-sm flex flex-col gap-3">
               <h4 className="font-semibold text-xs border-b pb-1 mb-1">Textos e Descrições (PT)</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Field label="Descrição Base (Auto/Manual)">
-                  <div className="flex gap-2">
-                    <SearchableSelect
-                      options={descBaseOptions}
-                      value={formData.descricao_base_id}
-                      onChange={(v) => {
-                        const desc = descricoesBase.find((d) => d.id === v)
-                        if (desc) {
-                          setFormData((f) => ({
-                            ...f,
-                            descricao_base_id: v,
-                            descricao_base_pt: desc.nome_pt,
-                            descricao_base_en: desc.nome_en,
-                            ...(desc.linha_id ? { linha_id: desc.linha_id } : {}),
-                            ...(desc.ncm_id ? { ncm_id: desc.ncm_id } : {}),
-                          }))
-                          if (desc.linha_id) {
-                            const linha = linhas.find((l) => l.id === desc.linha_id)
-                            if (linha) setSelectedCategoryId(linha.categoria_id)
-                          } else if (desc.categoria_id) {
-                            setSelectedCategoryId(desc.categoria_id)
-                          }
-                        }
-                      }}
-                      onAddNew={() => setNewDescBaseModalOpen(true)}
-                    />
-                    <Input
-                      className="h-8 text-xs flex-1"
-                      placeholder="Sobrescrever texto..."
-                      value={formData.descricao_base_pt || ''}
-                      onChange={(e) =>
-                        setFormData({ ...formData, descricao_base_pt: e.target.value })
-                      }
-                    />
-                  </div>
-                </Field>
                 <Field label="Descrição Curta (PT)">
                   <Input
                     className="h-8 text-xs"
@@ -556,15 +559,6 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
             <div className="bg-card border rounded-lg p-4 shadow-sm flex flex-col gap-3">
               <h4 className="font-semibold text-xs border-b pb-1 mb-1">Textos e Descrições (EN)</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Field label="Descrição Base (EN)">
-                  <Input
-                    className="h-8 text-xs"
-                    value={formData.descricao_base_en || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, descricao_base_en: e.target.value })
-                    }
-                  />
-                </Field>
                 <Field label="Descrição Curta (EN)">
                   <Input
                     className="h-8 text-xs"
@@ -612,8 +606,19 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
             </div>
 
             <div className="bg-card border rounded-lg p-4 shadow-sm flex flex-col gap-3">
-              <h4 className="font-semibold text-xs border-b pb-1 mb-1">Technical Attributes</h4>
+              <h4 className="font-semibold text-xs border-b pb-1 mb-1">
+                General & Technical Attributes (EN)
+              </h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Field label="Base Description (EN)" className="col-span-1 sm:col-span-3">
+                  <Input
+                    className="h-8 text-xs"
+                    value={formData.descricao_base_en || ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, descricao_base_en: e.target.value })
+                    }
+                  />
+                </Field>
                 <Field label="Thread Length (EN)">
                   <Input
                     className="h-8 text-xs"
