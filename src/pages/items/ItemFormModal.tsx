@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -45,60 +45,6 @@ export function ItemFormModal({
   const [unidadesMedida, setUnidadesMedida] = useState<UnidadeMedida[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
 
-  const lastTranslatedInfoExtra = useRef<string | undefined>()
-  const lastTranslatedDescExtra = useRef<string | undefined>()
-
-  useEffect(() => {
-    const translate = async (
-      text: string,
-      targetField: keyof Item,
-      ref: React.MutableRefObject<string | undefined>,
-    ) => {
-      if (!text) {
-        setFormData((prev) => ({ ...prev, [targetField]: '' }))
-        ref.current = text
-        return
-      }
-      try {
-        const textToTranslate = text
-          .replace(/Rosca Total/gi, 'Full Thread')
-          .replace(/Rosca Parcial/gi, 'Partial Thread')
-
-        const res = await pb.send('/backend/v1/translate', {
-          method: 'POST',
-          body: JSON.stringify({
-            text: textToTranslate,
-            source: 'pt',
-            target: 'en',
-          }),
-        })
-        if (res.text) {
-          setFormData((prev) => ({ ...prev, [targetField]: res.text }))
-          ref.current = text
-        }
-      } catch (err) {
-        console.error('Translation failed', err)
-      }
-    }
-
-    const timer = setTimeout(() => {
-      if (
-        formData.informacao_extra !== lastTranslatedInfoExtra.current &&
-        formData.informacao_extra !== undefined
-      ) {
-        translate(formData.informacao_extra, 'informacao_extra_en', lastTranslatedInfoExtra)
-      }
-      if (
-        formData.descricao_extra !== lastTranslatedDescExtra.current &&
-        formData.descricao_extra !== undefined
-      ) {
-        translate(formData.descricao_extra, 'descricao_extra_en', lastTranslatedDescExtra)
-      }
-    }, 800)
-
-    return () => clearTimeout(timer)
-  }, [formData.informacao_extra, formData.descricao_extra])
-
   useEffect(() => {
     pb.collection('unidades_medida')
       .getFullList<UnidadeMedida>()
@@ -111,11 +57,7 @@ export function ItemFormModal({
   useEffect(() => {
     if (item) {
       setFormData(item)
-      lastTranslatedInfoExtra.current = item.informacao_extra
-      lastTranslatedDescExtra.current = item.descricao_extra
     } else {
-      lastTranslatedInfoExtra.current = undefined
-      lastTranslatedDescExtra.current = undefined
       setFormData({
         ativo: true,
         sincronizado_com_zoho: false,
