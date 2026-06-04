@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -61,9 +61,67 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
   const [newDescBaseModalOpen, setNewDescBaseModalOpen] = useState(false)
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('')
 
+  const lastTranslatedInfoExtra = useRef<string | undefined>()
+  const lastTranslatedDescExtra = useRef<string | undefined>()
+
+  useEffect(() => {
+    if (!isEditing) return
+
+    const translate = async (
+      text: string,
+      targetField: keyof Item,
+      ref: React.MutableRefObject<string | undefined>,
+    ) => {
+      if (!text) {
+        setFormData((prev) => ({ ...prev, [targetField]: '' }))
+        ref.current = text
+        return
+      }
+      try {
+        const textToTranslate = text
+          .replace(/Rosca Total/gi, 'Full Thread')
+          .replace(/Rosca Parcial/gi, 'Partial Thread')
+
+        const res = await pb.send('/backend/v1/translate', {
+          method: 'POST',
+          body: JSON.stringify({
+            text: textToTranslate,
+            source: 'pt',
+            target: 'en',
+          }),
+        })
+        if (res.text) {
+          setFormData((prev) => ({ ...prev, [targetField]: res.text }))
+          ref.current = text
+        }
+      } catch (err) {
+        console.error('Translation failed', err)
+      }
+    }
+
+    const timer = setTimeout(() => {
+      if (
+        formData.informacao_extra !== lastTranslatedInfoExtra.current &&
+        formData.informacao_extra !== undefined
+      ) {
+        translate(formData.informacao_extra, 'informacao_extra_en', lastTranslatedInfoExtra)
+      }
+      if (
+        formData.descricao_extra !== lastTranslatedDescExtra.current &&
+        formData.descricao_extra !== undefined
+      ) {
+        translate(formData.descricao_extra, 'descricao_extra_en', lastTranslatedDescExtra)
+      }
+    }, 800)
+
+    return () => clearTimeout(timer)
+  }, [formData.informacao_extra, formData.descricao_extra, isEditing])
+
   useEffect(() => {
     if (item) {
       setFormData(item)
+      lastTranslatedInfoExtra.current = item.informacao_extra
+      lastTranslatedDescExtra.current = item.descricao_extra
       const linha = linhas.find((l) => l.id === item.linha_id)
       if (linha) setSelectedCategoryId(linha.categoria_id)
       setIsEditing(false)
@@ -194,8 +252,10 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
         ...dataToSave,
         descricao_curta: descricao_curta,
         descricao_curta_en: descricao_curta_en,
-        descr_pt: autoDescCompletaPt || 'Sem descrição',
-        descr_en: autoDescCompletaEn || '',
+        descr_pt: descricao_curta || 'Sem descrição',
+        descr_en: descricao_curta_en || '',
+        descricao_catalogo_pt: autoDescCompletaPt || 'Sem descrição',
+        descricao_catalogo_en: autoDescCompletaEn || '',
         data_atualizacao: new Date().toISOString(),
       } as Item)
 

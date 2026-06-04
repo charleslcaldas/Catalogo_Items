@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -45,6 +45,60 @@ export function ItemFormModal({
   const [unidadesMedida, setUnidadesMedida] = useState<UnidadeMedida[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
 
+  const lastTranslatedInfoExtra = useRef<string | undefined>()
+  const lastTranslatedDescExtra = useRef<string | undefined>()
+
+  useEffect(() => {
+    const translate = async (
+      text: string,
+      targetField: keyof Item,
+      ref: React.MutableRefObject<string | undefined>,
+    ) => {
+      if (!text) {
+        setFormData((prev) => ({ ...prev, [targetField]: '' }))
+        ref.current = text
+        return
+      }
+      try {
+        const textToTranslate = text
+          .replace(/Rosca Total/gi, 'Full Thread')
+          .replace(/Rosca Parcial/gi, 'Partial Thread')
+
+        const res = await pb.send('/backend/v1/translate', {
+          method: 'POST',
+          body: JSON.stringify({
+            text: textToTranslate,
+            source: 'pt',
+            target: 'en',
+          }),
+        })
+        if (res.text) {
+          setFormData((prev) => ({ ...prev, [targetField]: res.text }))
+          ref.current = text
+        }
+      } catch (err) {
+        console.error('Translation failed', err)
+      }
+    }
+
+    const timer = setTimeout(() => {
+      if (
+        formData.informacao_extra !== lastTranslatedInfoExtra.current &&
+        formData.informacao_extra !== undefined
+      ) {
+        translate(formData.informacao_extra, 'informacao_extra_en', lastTranslatedInfoExtra)
+      }
+      if (
+        formData.descricao_extra !== lastTranslatedDescExtra.current &&
+        formData.descricao_extra !== undefined
+      ) {
+        translate(formData.descricao_extra, 'descricao_extra_en', lastTranslatedDescExtra)
+      }
+    }, 800)
+
+    return () => clearTimeout(timer)
+  }, [formData.informacao_extra, formData.descricao_extra])
+
   useEffect(() => {
     pb.collection('unidades_medida')
       .getFullList<UnidadeMedida>()
@@ -55,24 +109,82 @@ export function ItemFormModal({
   }, [])
 
   useEffect(() => {
-    if (item) setFormData(item)
-    else
+    if (item) {
+      setFormData(item)
+      lastTranslatedInfoExtra.current = item.informacao_extra
+      lastTranslatedDescExtra.current = item.descricao_extra
+    } else {
+      lastTranslatedInfoExtra.current = undefined
+      lastTranslatedDescExtra.current = undefined
       setFormData({
         ativo: true,
         sincronizado_com_zoho: false,
         foto_url: 'https://img.usecurling.com/p/200/200?q=tools&color=gray',
       })
+    }
   }, [item, open])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.sku || !formData.linha_id || !formData.descr_pt)
-      return toast.error('Preencha todos os campos obrigatórios')
-    saveItem(formData as Item)
+    if (!formData.sku || !formData.linha_id)
+      return toast.error('Preencha todos os campos obrigatórios (SKU, Linha)')
+
+    saveItem({
+      ...formData,
+      descricao_curta: autoDescCurtaPt,
+      descricao_curta_en: autoDescCurtaEn,
+      descr_pt: autoDescCurtaPt || 'Sem descrição',
+      descr_en: autoDescCurtaEn || '',
+      descricao_catalogo_pt: autoDescCompletaPt || 'Sem descrição',
+      descricao_catalogo_en: autoDescCompletaEn || '',
+    } as Item)
     onOpenChange(false)
   }
 
   const selectedNcmObj = ncms.find((n) => n.id === formData.ncm_id)
+
+  const selAcabamento = acabamentos.find((a) => a.id === formData.acabamento_id)
+  const descBasePt =
+    descricoesBase.find((d) => d.id === formData.descricao_base_id)?.nome_pt ||
+    formData.descricao_base_pt ||
+    ''
+  const descBaseEn =
+    descricoesBase.find((d) => d.id === formData.descricao_base_id)?.nome_en ||
+    formData.descricao_base_en ||
+    ''
+
+  const autoDescCurtaPt = [
+    descBasePt,
+    formData.material,
+    formData.norma,
+    formData.tipo_rosca,
+    formData.comprimento_rosca,
+    formData.informacao_extra,
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  const autoDescCurtaEn = [
+    descBaseEn,
+    formData.material,
+    formData.norma,
+    formData.tipo_rosca,
+    formData.comprimento_rosca_en,
+    formData.informacao_extra_en,
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  const autoDescCompletaPt = [autoDescCurtaPt, formData.tamanho, selAcabamento?.nome_pt]
+    .filter(Boolean)
+    .join(' ')
+  const autoDescCompletaEn = [
+    autoDescCurtaEn,
+    formData.tamanho,
+    selAcabamento?.nome_en || selAcabamento?.nome_pt,
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   const renderTabContent = (lang: 'pt' | 'en') => {
     const isPt = lang === 'pt'
@@ -106,20 +218,22 @@ export function ItemFormModal({
             </div>
 
             <div className="col-span-12 space-y-2">
-              <Label>
-                {isPt ? 'Descrição' : 'Description'} <span className="text-destructive">*</span>
-              </Label>
+              <Label>{isPt ? 'Descrição Curta (Auto)' : 'Short Description (Auto)'}</Label>
               <Textarea
-                required={isPt}
-                className="min-h-[40px] resize-y text-sm"
-                value={(isPt ? formData.descr_pt : formData.descr_en) || ''}
-                onChange={(e) =>
-                  setFormData(
-                    isPt
-                      ? { ...formData, descr_pt: e.target.value }
-                      : { ...formData, descr_en: e.target.value },
-                  )
-                }
+                className="min-h-[40px] resize-none text-sm bg-muted text-muted-foreground font-medium"
+                disabled
+                value={isPt ? autoDescCurtaPt : autoDescCurtaEn}
+                title="This description is auto-generated based on selected attributes."
+              />
+            </div>
+
+            <div className="col-span-12 space-y-2">
+              <Label>{isPt ? 'Descrição Completa (Auto)' : 'Full Description (Auto)'}</Label>
+              <Textarea
+                className="min-h-[40px] resize-none text-sm bg-muted text-muted-foreground font-medium"
+                disabled
+                value={isPt ? autoDescCompletaPt : autoDescCompletaEn}
+                title="This description is auto-generated based on selected attributes."
               />
             </div>
 
@@ -447,16 +561,11 @@ export function ItemFormModal({
               />
             </div>
             <div className="col-span-12 sm:col-span-6 space-y-2">
-              <Label>{isPt ? 'Descrição Curta' : 'Short Description'}</Label>
+              <Label>{isPt ? 'Descrição Curta (Auto)' : 'Short Description (Auto)'}</Label>
               <Input
-                value={(isPt ? formData.descricao_curta : formData.descricao_curta_en) || ''}
-                onChange={(e) =>
-                  setFormData(
-                    isPt
-                      ? { ...formData, descricao_curta: e.target.value }
-                      : { ...formData, descricao_curta_en: e.target.value },
-                  )
-                }
+                className="bg-muted text-muted-foreground font-medium"
+                disabled
+                value={isPt ? autoDescCurtaPt : autoDescCurtaEn}
               />
             </div>
 
