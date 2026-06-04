@@ -160,9 +160,9 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
         descBasePt,
         dataToSave.tamanho,
         selAcabamento?.nome_pt,
-        dataToSave.material,
         dataToSave.norma,
         dataToSave.tipo_rosca,
+        dataToSave.material,
       ]
         .filter(Boolean)
         .join(' ')
@@ -170,9 +170,9 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
         descBaseEn,
         dataToSave.tamanho,
         selAcabamento?.nome_en || selAcabamento?.nome_pt,
-        dataToSave.material,
         dataToSave.norma,
         dataToSave.tipo_rosca,
+        dataToSave.material,
       ]
         .filter(Boolean)
         .join(' ')
@@ -235,9 +235,9 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
     descBasePt,
     formData.tamanho,
     selAcabamento?.nome_pt,
-    formData.material,
     formData.norma,
     formData.tipo_rosca,
+    formData.material,
   ]
     .filter(Boolean)
     .join(' ')
@@ -245,9 +245,9 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
     descBaseEn,
     formData.tamanho,
     selAcabamento?.nome_en || selAcabamento?.nome_pt,
-    formData.material,
     formData.norma,
     formData.tipo_rosca,
+    formData.material,
   ]
     .filter(Boolean)
     .join(' ')
@@ -315,10 +315,14 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
           </div>
           <div className="flex flex-col min-w-0 flex-1">
             <h2 className="font-bold text-sm text-foreground break-words whitespace-normal leading-tight">
-              {autoDescCompletaPt || 'Nova Descrição Completa'}
+              {[autoDescCurtaPt, formData.tamanho, selAcabamento?.nome_pt]
+                .filter(Boolean)
+                .join(' ') || 'Nova Descrição Completa'}
             </h2>
             <h3 className="text-[10px] text-muted-foreground break-words whitespace-normal leading-snug mt-0.5">
-              {autoDescCompletaEn || 'New Full Description'}
+              {[autoDescCurtaEn, formData.tamanho, selAcabamento?.nome_en || selAcabamento?.nome_pt]
+                .filter(Boolean)
+                .join(' ') || 'New Full Description'}
             </h3>
 
             <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -649,7 +653,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                 </Field>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 opacity-80 pointer-events-none">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 opacity-80 pointer-events-none select-none">
                 <Field label="NCM" className="md:col-span-2">
                   <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.codigo || ''} />
                 </Field>
@@ -695,9 +699,34 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                 <Field label="Base Description (EN)" className="md:col-span-9">
                   <div className="flex gap-2">
-                    <div className="flex-1 h-8 px-3 flex items-center bg-muted/30 rounded-md border text-xs text-muted-foreground truncate">
-                      {descricoesBase.find((d) => d.id === formData.descricao_base_id)?.nome_en ||
-                        '-'}
+                    <div className={cn('flex-1', !isEditing && 'pointer-events-none opacity-80')}>
+                      <SearchableSelect
+                        options={descBaseOptions.map((o) => {
+                          const desc = descricoesBase.find((d) => d.id === o.value)
+                          return { ...o, label: desc?.nome_en || desc?.nome_pt || '' }
+                        })}
+                        value={formData.descricao_base_id}
+                        onChange={(v) => {
+                          const desc = descricoesBase.find((d) => d.id === v)
+                          if (desc) {
+                            setFormData((f) => ({
+                              ...f,
+                              descricao_base_id: v,
+                              descricao_base_pt: desc.nome_pt,
+                              descricao_base_en: desc.nome_en,
+                              ...(desc.linha_id ? { linha_id: desc.linha_id } : {}),
+                              ...(desc.ncm_id ? { ncm_id: desc.ncm_id } : {}),
+                            }))
+                            if (desc.linha_id) {
+                              const linha = linhas.find((l) => l.id === desc.linha_id)
+                              if (linha) setSelectedCategoryId(linha.categoria_id)
+                            } else if (desc.categoria_id) {
+                              setSelectedCategoryId(desc.categoria_id)
+                            }
+                          }
+                        }}
+                        onAddNew={() => setNewDescBaseModalOpen(true)}
+                      />
                     </div>
                     <Input
                       className="h-8 text-xs w-[140px] shrink-0"
@@ -722,10 +751,15 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                 <Field label="Finish (EN)" className="md:col-span-3">
-                  <div className="h-8 px-3 flex items-center bg-muted/30 rounded-md border text-xs text-muted-foreground truncate">
-                    {acabamentos.find((a) => a.id === formData.acabamento_id)?.nome_en ||
-                      acabamentos.find((a) => a.id === formData.acabamento_id)?.nome_pt ||
-                      '-'}
+                  <div className={cn(!isEditing && 'pointer-events-none opacity-80')}>
+                    <SearchableSelect
+                      options={acabamentoOptions.map((o) => {
+                        const ac = acabamentos.find((a) => a.id === o.value)
+                        return { ...o, label: ac?.nome_en || ac?.nome_pt || '' }
+                      })}
+                      value={formData.acabamento_id}
+                      onChange={(v) => setFormData((f) => ({ ...f, acabamento_id: v }))}
+                    />
                   </div>
                 </Field>
                 <Field label="SKU" className="md:col-span-3">
@@ -774,17 +808,32 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                   />
                 </Field>
                 <Field label="Category (EN)" className="md:col-span-3">
-                  <div className="h-8 px-3 flex items-center bg-muted/30 rounded-md border text-xs text-muted-foreground truncate">
-                    {categorias.find((c) => c.id === selectedCategoryId)?.nome_en ||
-                      categorias.find((c) => c.id === selectedCategoryId)?.nome_pt ||
-                      '-'}
+                  <div className={cn(!isEditing && 'pointer-events-none opacity-80')}>
+                    <SearchableSelect
+                      options={categoryOptions.map((o) => {
+                        const cat = categorias.find((c) => c.id === o.value)
+                        return { ...o, label: cat?.nome_en || cat?.nome_pt || '' }
+                      })}
+                      value={selectedCategoryId}
+                      onChange={(v) => {
+                        setSelectedCategoryId(v)
+                        setFormData((f) => ({ ...f, linha_id: '' }))
+                      }}
+                      onAddNew={() => setCatModalOpen(true)}
+                    />
                   </div>
                 </Field>
                 <Field label="Line (EN)" className="md:col-span-3">
-                  <div className="h-8 px-3 flex items-center bg-muted/30 rounded-md border text-xs text-muted-foreground truncate">
-                    {linhas.find((l) => l.id === formData.linha_id)?.nome_en ||
-                      linhas.find((l) => l.id === formData.linha_id)?.nome_pt ||
-                      '-'}
+                  <div className={cn(!isEditing && 'pointer-events-none opacity-80')}>
+                    <SearchableSelect
+                      options={lineOptions.map((o) => {
+                        const l = linhas.find((line) => line.id === o.value)
+                        return { ...o, label: l?.nome_en || l?.nome_pt || '' }
+                      })}
+                      value={formData.linha_id}
+                      onChange={(v) => setFormData((f) => ({ ...f, linha_id: v }))}
+                      onAddNew={() => setLineModalOpen(true)}
+                    />
                   </div>
                 </Field>
                 <Field label="Status" className="md:col-span-2">
@@ -820,9 +869,13 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label="NCM" className="md:col-span-9">
-                  <div className="h-8 px-3 flex items-center bg-muted/30 rounded-md border text-xs text-muted-foreground truncate">
-                    {ncmObj?.codigo || '-'}
+                <Field label="NCM (Selector)" className="md:col-span-9">
+                  <div className={cn(!isEditing && 'pointer-events-none opacity-80')}>
+                    <SearchableSelect
+                      options={ncmOptions}
+                      value={formData.ncm_id}
+                      onChange={(v) => setFormData((f) => ({ ...f, ncm_id: v }))}
+                    />
                   </div>
                 </Field>
               </div>
@@ -878,7 +931,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                 </Field>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 opacity-80 pointer-events-none">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 opacity-80 pointer-events-none select-none">
                 <Field label="NCM" className="md:col-span-2">
                   <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.codigo || ''} />
                 </Field>
