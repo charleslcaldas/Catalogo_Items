@@ -137,10 +137,7 @@ export default function PotentialsPage() {
   })
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value)
+    return `$ ${value.toFixed(2)}`
   }
 
   const getStatusBadge = (p: Potencial) => {

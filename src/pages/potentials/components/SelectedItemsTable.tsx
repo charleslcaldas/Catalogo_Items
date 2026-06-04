@@ -45,10 +45,8 @@ export function SelectedItemsTable({
 
   const formatCurrency = (value: number | '') => {
     if (value === '') return '-'
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(Number(value))
+    const num = Number(value)
+    return isNaN(num) ? '-' : `$ ${num.toFixed(2)}`
   }
 
   const handleQuantityBlur = async (id: string, quantidade: string | number) => {
