@@ -81,18 +81,6 @@ export default function ItemsPage() {
   const getNcmCode = (id?: string) => ncms.find((n) => n.id === id)?.codigo || ''
   const getDescricaoBasePt = (id?: string) => descricoesBase.find((d) => d.id === id)?.nome_pt || ''
 
-  const getDescricaoCurta = (item: any) => {
-    if (item.descricao_curta) return item.descricao_curta
-    const descPt = item.descricao_base_id
-      ? getDescricaoBasePt(item.descricao_base_id)
-      : item.descricao_base_pt
-    return (
-      [descPt, item.norma, item.classe_material, item.tipo_rosca, item.tamanho]
-        .filter(Boolean)
-        .join(' ') || '-'
-    )
-  }
-
   const filteredItems = useMemo(() => {
     return itens.filter((item) => {
       if (filterStatus === 'Ativo' && !item.ativo) return false
@@ -302,16 +290,16 @@ export default function ItemsPage() {
                                   : 'whitespace-normal break-words leading-snug',
                               )}
                             >
-                              {getDescricaoCurta(item)}
+                              {item.descricao_curta || '-'}
                             </div>
                           </TooltipTrigger>
-                          {item.descricao_extra && (
+                          {item.descricao_curta && (
                             <TooltipContent
                               side="bottom"
                               align="start"
                               className="max-w-xs break-words text-xs"
                             >
-                              <p>{item.descricao_extra}</p>
+                              <p>{item.descricao_curta}</p>
                             </TooltipContent>
                           )}
                         </Tooltip>

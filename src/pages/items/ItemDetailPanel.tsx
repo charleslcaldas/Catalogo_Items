@@ -63,6 +63,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
 
   const lastTranslatedInfoExtra = useRef<string | undefined>()
   const lastTranslatedDescExtra = useRef<string | undefined>()
+  const lastTranslatedDescCurta = useRef<string | undefined>()
 
   useEffect(() => {
     if (!isEditing) return
@@ -112,16 +113,23 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
       ) {
         translate(formData.descricao_extra, 'descricao_extra_en', lastTranslatedDescExtra)
       }
+      if (
+        formData.descricao_curta !== lastTranslatedDescCurta.current &&
+        formData.descricao_curta !== undefined
+      ) {
+        translate(formData.descricao_curta, 'descricao_curta_en', lastTranslatedDescCurta)
+      }
     }, 800)
 
     return () => clearTimeout(timer)
-  }, [formData.informacao_extra, formData.descricao_extra, isEditing])
+  }, [formData.informacao_extra, formData.descricao_extra, formData.descricao_curta, isEditing])
 
   useEffect(() => {
     if (item) {
       setFormData(item)
       lastTranslatedInfoExtra.current = item.informacao_extra
       lastTranslatedDescExtra.current = item.descricao_extra
+      lastTranslatedDescCurta.current = item.descricao_curta
       const linha = linhas.find((l) => l.id === item.linha_id)
       if (linha) setSelectedCategoryId(linha.categoria_id)
       setIsEditing(false)
@@ -179,6 +187,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
         { pt: 'comprimento_rosca', en: 'comprimento_rosca_en', label: 'Comp. Rosca' },
         { pt: 'informacao_extra', en: 'informacao_extra_en', label: 'Info Extra' },
         { pt: 'descricao_extra', en: 'descricao_extra_en', label: 'Desc. Extra' },
+        { pt: 'descricao_curta', en: 'descricao_curta_en', label: 'Desc. Curta' },
       ] as const
 
       for (const field of fieldsToTranslate) {
@@ -214,27 +223,31 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
         ''
       const selAcabamento = acabamentos.find((a) => a.id === dataToSave.acabamento_id)
 
-      const descricao_curta = [
-        descBasePt,
-        dataToSave.material,
-        dataToSave.norma,
-        dataToSave.tipo_rosca,
-        dataToSave.comprimento_rosca,
-        dataToSave.informacao_extra,
-      ]
-        .filter(Boolean)
-        .join(' ')
+      const descricao_curta =
+        dataToSave.descricao_curta ||
+        [
+          descBasePt,
+          dataToSave.material,
+          dataToSave.norma,
+          dataToSave.tipo_rosca,
+          dataToSave.comprimento_rosca,
+          dataToSave.informacao_extra,
+        ]
+          .filter(Boolean)
+          .join(' ')
 
-      const descricao_curta_en = [
-        descBaseEn,
-        dataToSave.material,
-        dataToSave.norma,
-        dataToSave.tipo_rosca,
-        dataToSave.comprimento_rosca_en,
-        dataToSave.informacao_extra_en,
-      ]
-        .filter(Boolean)
-        .join(' ')
+      const descricao_curta_en =
+        dataToSave.descricao_curta_en ||
+        [
+          descBaseEn,
+          dataToSave.material,
+          dataToSave.norma,
+          dataToSave.tipo_rosca,
+          dataToSave.comprimento_rosca_en,
+          dataToSave.informacao_extra_en,
+        ]
+          .filter(Boolean)
+          .join(' ')
 
       const autoDescCompletaPt = [descricao_curta, dataToSave.tamanho, selAcabamento?.nome_pt]
         .filter(Boolean)
@@ -663,11 +676,13 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     onChange={(val) => setFormData({ ...formData, preco_venda: val })}
                   />
                 </Field>
-                <Field label="Descrição Curta (PT) (Auto)" className="md:col-span-6">
+                <Field label="Descrição Curta (PT)" className="md:col-span-6">
                   <Input
-                    className="h-8 text-xs bg-muted/50 font-medium"
-                    disabled
-                    value={autoDescCurtaPt}
+                    className="h-8 text-xs"
+                    disabled={!isEditing}
+                    placeholder={autoDescCurtaPt}
+                    value={formData.descricao_curta !== undefined ? formData.descricao_curta : ''}
+                    onChange={(e) => setFormData({ ...formData, descricao_curta: e.target.value })}
                   />
                 </Field>
               </div>
@@ -937,11 +952,17 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     onChange={(val) => setFormData({ ...formData, preco_venda: val })}
                   />
                 </Field>
-                <Field label="Short Description (EN) (Auto)" className="md:col-span-6">
+                <Field label="Short Description (EN)" className="md:col-span-6">
                   <Input
-                    className="h-8 text-xs bg-muted/50 font-medium"
-                    disabled
-                    value={autoDescCurtaEn}
+                    className="h-8 text-xs"
+                    disabled={!isEditing}
+                    placeholder={autoDescCurtaEn}
+                    value={
+                      formData.descricao_curta_en !== undefined ? formData.descricao_curta_en : ''
+                    }
+                    onChange={(e) =>
+                      setFormData({ ...formData, descricao_curta_en: e.target.value })
+                    }
                   />
                 </Field>
               </div>

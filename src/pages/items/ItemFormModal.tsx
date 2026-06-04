@@ -71,12 +71,15 @@ export function ItemFormModal({
     if (!formData.sku || !formData.linha_id)
       return toast.error('Preencha todos os campos obrigatórios (SKU, Linha)')
 
+    const descricao_curta = formData.descricao_curta || autoDescCurtaPt
+    const descricao_curta_en = formData.descricao_curta_en || autoDescCurtaEn
+
     saveItem({
       ...formData,
-      descricao_curta: autoDescCurtaPt,
-      descricao_curta_en: autoDescCurtaEn,
-      descr_pt: autoDescCurtaPt || 'Sem descrição',
-      descr_en: autoDescCurtaEn || '',
+      descricao_curta: descricao_curta,
+      descricao_curta_en: descricao_curta_en,
+      descr_pt: descricao_curta || 'Sem descrição',
+      descr_en: descricao_curta_en || '',
       descricao_catalogo_pt: autoDescCompletaPt || 'Sem descrição',
       descricao_catalogo_en: autoDescCompletaEn || '',
     } as Item)
@@ -160,12 +163,18 @@ export function ItemFormModal({
             </div>
 
             <div className="col-span-12 space-y-2">
-              <Label>{isPt ? 'Descrição Curta (Auto)' : 'Short Description (Auto)'}</Label>
+              <Label>{isPt ? 'Descrição Curta' : 'Short Description'}</Label>
               <Textarea
-                className="min-h-[40px] resize-none text-sm bg-muted text-muted-foreground font-medium"
-                disabled
-                value={isPt ? autoDescCurtaPt : autoDescCurtaEn}
-                title="This description is auto-generated based on selected attributes."
+                className="min-h-[40px] resize-y text-sm"
+                placeholder={isPt ? autoDescCurtaPt : autoDescCurtaEn}
+                value={(isPt ? formData.descricao_curta : formData.descricao_curta_en) || ''}
+                onChange={(e) =>
+                  setFormData(
+                    isPt
+                      ? { ...formData, descricao_curta: e.target.value }
+                      : { ...formData, descricao_curta_en: e.target.value },
+                  )
+                }
               />
             </div>
 
@@ -503,11 +512,17 @@ export function ItemFormModal({
               />
             </div>
             <div className="col-span-12 sm:col-span-6 space-y-2">
-              <Label>{isPt ? 'Descrição Curta (Auto)' : 'Short Description (Auto)'}</Label>
+              <Label>{isPt ? 'Descrição Curta' : 'Short Description'}</Label>
               <Input
-                className="bg-muted text-muted-foreground font-medium"
-                disabled
-                value={isPt ? autoDescCurtaPt : autoDescCurtaEn}
+                placeholder={isPt ? autoDescCurtaPt : autoDescCurtaEn}
+                value={(isPt ? formData.descricao_curta : formData.descricao_curta_en) || ''}
+                onChange={(e) =>
+                  setFormData(
+                    isPt
+                      ? { ...formData, descricao_curta: e.target.value }
+                      : { ...formData, descricao_curta_en: e.target.value },
+                  )
+                }
               />
             </div>
 
