@@ -35,7 +35,7 @@ const items = [
   { title: 'Acabamentos', url: '/acabamentos', icon: Paintbrush },
   { title: 'Configurações NCM', url: '/ncm', icon: Receipt },
   { title: 'Descrições Base', url: '/descricoes-base', icon: BookText },
-  { title: 'Potenciais', url: '/potenciais/adicionar', icon: Target },
+  { title: 'Potenciais', url: '/potenciais', icon: Target },
   { title: 'Importar do Airtable', url: '/importar', icon: UploadCloud },
 ]
 

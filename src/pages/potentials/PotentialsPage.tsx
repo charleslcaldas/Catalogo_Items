@@ -21,6 +21,7 @@ export default function PotentialsPage() {
   const [itemStatuses, setItemStatuses] = useState<
     Record<string, 'empty' | 'incomplete' | 'complete'>
   >({})
+  const [itemTotals, setItemTotals] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterEstagio, setFilterEstagio] = useState('all')
@@ -79,9 +80,11 @@ export default function PotentialsPage() {
           .getFullList({ filter: itemsFilter, fields: 'id,potencial_id,quantidade,preco_unitario' })
 
         const statuses: Record<string, 'empty' | 'incomplete' | 'complete'> = {}
+        const totals: Record<string, number> = {}
 
         ids.forEach((id) => {
           statuses[id] = 'empty'
+          totals[id] = 0
         })
 
         const itemsByPotential: Record<string, any[]> = {}
@@ -93,15 +96,22 @@ export default function PotentialsPage() {
         Object.entries(itemsByPotential).forEach(([pid, items]) => {
           if (items.length === 0) {
             statuses[pid] = 'empty'
+            totals[pid] = 0
           } else {
             const hasIncomplete = items.some((i) => !i.quantidade || !i.preco_unitario)
             statuses[pid] = hasIncomplete ? 'incomplete' : 'complete'
+            totals[pid] = items.reduce(
+              (acc, i) => acc + (i.quantidade || 0) * (i.preco_unitario || 0),
+              0,
+            )
           }
         })
 
         setItemStatuses(statuses)
+        setItemTotals(totals)
       } else {
         setItemStatuses({})
+        setItemTotals({})
       }
       setPotentials(res.items)
     } catch (error) {
@@ -125,6 +135,13 @@ export default function PotentialsPage() {
   useRealtime('potencial_itens', () => {
     loadPotentials()
   })
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value)
+  }
 
   const getStatusBadge = (p: Potencial) => {
     const status = p.status || 'Sem Itens'
@@ -238,19 +255,20 @@ export default function PotentialsPage() {
                 <TableHead className="text-[11px] py-1">Proprietário</TableHead>
                 <TableHead className="text-[11px] py-1">Estágio</TableHead>
                 <TableHead className="text-[11px] py-1">Status</TableHead>
+                <TableHead className="text-[11px] py-1 text-right">Valor Total</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading && potentials.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
                     <span className="text-sm">Carregando...</span>
                   </TableCell>
                 </TableRow>
               ) : potentials.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground text-sm">
+                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground text-sm">
                     Nenhuma cotação encontrada.
                   </TableCell>
                 </TableRow>
@@ -285,6 +303,9 @@ export default function PotentialsPage() {
                       {p.estagio || '-'}
                     </TableCell>
                     <TableCell className="py-1">{getStatusBadge(p)}</TableCell>
+                    <TableCell className="py-1 text-[11px] text-right font-medium">
+                      {itemTotals[p.id] ? formatCurrency(itemTotals[p.id]) : '-'}
+                    </TableCell>
                   </TableRow>
                 ))
               )}

@@ -45,7 +45,10 @@ export function SelectedItemsTable({
 
   const formatCurrency = (value: number | '') => {
     if (value === '') return '-'
-    return `$${Number(value).toFixed(2)}`
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(Number(value))
   }
 
   const handleQuantityBlur = async (id: string, quantidade: string | number) => {
@@ -68,6 +71,12 @@ export function SelectedItemsTable({
       }
     }
   }
+
+  const grandTotal = selectedItems.reduce((acc, record) => {
+    const q = Number(record.data.quantidade) || 0
+    const p = Number(record.data.preco_unitario) || 0
+    return acc + q * p
+  }, 0)
 
   return (
     <div className="flex-1 overflow-auto bg-white">
@@ -228,6 +237,18 @@ export function SelectedItemsTable({
               </TableRow>
             )
           })}
+          <TableRow className="bg-slate-50/80 hover:bg-slate-50/80 border-t-2">
+            <TableCell
+              colSpan={9}
+              className="py-2 text-xs font-bold text-right text-muted-foreground uppercase tracking-wider"
+            >
+              Valor Total Geral
+            </TableCell>
+            <TableCell className="py-2 text-sm font-bold text-right text-primary whitespace-nowrap">
+              {formatCurrency(grandTotal)}
+            </TableCell>
+            <TableCell />
+          </TableRow>
         </TableBody>
       </Table>
     </div>
