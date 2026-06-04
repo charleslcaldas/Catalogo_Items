@@ -191,7 +191,7 @@ export function SelectedItemsTable({
                       type="text"
                       inputMode="decimal"
                       className="h-7 w-24 pl-5 pr-2 text-right text-xs bg-white"
-                      value={data.preco_unitario}
+                      value={String(data.preco_unitario).replace(',', '.')}
                       onChange={(e) => {
                         const val = e.target.value.replace(/,/g, '.')
                         if (val === '' || /^\d*\.?\d*$/.test(val)) {
@@ -199,7 +199,7 @@ export function SelectedItemsTable({
                         }
                       }}
                       onBlur={(e) => {
-                        let parsed = parseFloat(String(data.preco_unitario))
+                        let parsed = parseFloat(String(data.preco_unitario).replace(',', '.'))
                         if (isNaN(parsed)) parsed = 0
                         handleUpdateItem(id, 'preco_unitario', parsed.toFixed(2))
                         handlePriceBlur(id, parsed)

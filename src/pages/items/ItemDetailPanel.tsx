@@ -245,6 +245,8 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
   }))
   const ncmOptions = ncms.map((n) => ({ value: n.id, label: n.codigo }))
 
+  const ncmObj = ncms.find((n) => n.id === formData.ncm_id)
+
   return (
     <div className="flex flex-col bg-background relative h-full rounded-xl">
       <div className="flex items-start justify-between p-3 border-b bg-card z-10 shrink-0 sticky top-0 rounded-t-xl">
@@ -351,11 +353,9 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
           <TabsContent value="pt" className="m-0 space-y-4 animate-fade-in-up">
             <div className="bg-card border rounded-lg p-4 shadow-sm flex flex-col gap-3">
               <h4 className="font-semibold text-xs border-b pb-1 mb-1">Geral & Atributos</h4>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Field
-                  label="Descrição Base (Auto/Manual)"
-                  className="col-span-2 sm:col-span-4 lg:col-span-2"
-                >
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                <Field label="Descrição Base (Auto/Manual)" className="md:col-span-9">
                   <div className="flex gap-2">
                     <SearchableSelect
                       options={descBaseOptions}
@@ -391,14 +391,64 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     />
                   </div>
                 </Field>
-                <Field label="SKU">
+                <Field label="Tamanho" className="md:col-span-3">
+                  <Input
+                    className="h-8 text-xs"
+                    value={formData.tamanho || ''}
+                    onChange={(e) => setFormData({ ...formData, tamanho: e.target.value })}
+                  />
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                <Field label="Acabamento" className="md:col-span-3">
+                  <SearchableSelect
+                    options={acabamentoOptions}
+                    value={formData.acabamento_id}
+                    onChange={(v) => setFormData((f) => ({ ...f, acabamento_id: v }))}
+                  />
+                </Field>
+                <Field label="SKU" className="md:col-span-3">
                   <Input
                     className="h-8 text-xs"
                     value={formData.sku || ''}
                     onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                   />
                 </Field>
-                <Field label="Categoria">
+                <Field label="Grau/Material" className="md:col-span-3">
+                  <Input
+                    className="h-8 text-xs"
+                    value={formData.classe_material || ''}
+                    onChange={(e) => setFormData({ ...formData, classe_material: e.target.value })}
+                  />
+                </Field>
+                <Field label="Norma" className="md:col-span-3">
+                  <Input
+                    className="h-8 text-xs"
+                    value={formData.norma || ''}
+                    onChange={(e) => setFormData({ ...formData, norma: e.target.value })}
+                  />
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                <Field label="Tipo Rosca" className="md:col-span-2">
+                  <Input
+                    className="h-8 text-xs"
+                    value={formData.tipo_rosca || ''}
+                    onChange={(e) => setFormData({ ...formData, tipo_rosca: e.target.value })}
+                  />
+                </Field>
+                <Field label="Comp. Rosca" className="md:col-span-2">
+                  <Input
+                    className="h-8 text-xs"
+                    value={formData.comprimento_rosca || ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, comprimento_rosca: e.target.value })
+                    }
+                  />
+                </Field>
+                <Field label="Categoria" className="md:col-span-3">
                   <SearchableSelect
                     options={categoryOptions}
                     value={selectedCategoryId}
@@ -409,7 +459,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     onAddNew={() => setCatModalOpen(true)}
                   />
                 </Field>
-                <Field label="Linha">
+                <Field label="Linha" className="md:col-span-3">
                   <SearchableSelect
                     options={lineOptions}
                     value={formData.linha_id}
@@ -417,81 +467,21 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     onAddNew={() => setLineModalOpen(true)}
                   />
                 </Field>
-                <Field label="Status">
+                <Field label="Status" className="md:col-span-2">
                   <div className="flex items-center gap-2 h-8">
                     <Switch
-                      checked={formData.ativo}
+                      checked={formData.ativo ?? true}
                       onCheckedChange={(c) => setFormData({ ...formData, ativo: c })}
                     />
                     <span className="text-xs font-medium">
-                      {formData.ativo ? 'Ativo' : 'Inativo'}
+                      {formData.ativo !== false ? 'Ativo' : 'Inativo'}
                     </span>
                   </div>
                 </Field>
-                <Field label="Preço Compra">
-                  <PriceInput
-                    value={formData.preco_compra}
-                    onChange={(val) => setFormData({ ...formData, preco_compra: val })}
-                  />
-                </Field>
-                <Field label="Preço Venda">
-                  <PriceInput
-                    value={formData.preco_venda}
-                    onChange={(val) => setFormData({ ...formData, preco_venda: val })}
-                  />
-                </Field>
-                <Field label="NCM">
-                  <SearchableSelect
-                    options={ncmOptions}
-                    value={formData.ncm_id}
-                    onChange={(v) => setFormData((f) => ({ ...f, ncm_id: v }))}
-                  />
-                </Field>
-                <Field label="Acabamento">
-                  <SearchableSelect
-                    options={acabamentoOptions}
-                    value={formData.acabamento_id}
-                    onChange={(v) => setFormData((f) => ({ ...f, acabamento_id: v }))}
-                  />
-                </Field>
-                <Field label="Tamanho">
-                  <Input
-                    className="h-8 text-xs"
-                    value={formData.tamanho || ''}
-                    onChange={(e) => setFormData({ ...formData, tamanho: e.target.value })}
-                  />
-                </Field>
-                <Field label="Grau/Material">
-                  <Input
-                    className="h-8 text-xs"
-                    value={formData.classe_material || ''}
-                    onChange={(e) => setFormData({ ...formData, classe_material: e.target.value })}
-                  />
-                </Field>
-                <Field label="Norma">
-                  <Input
-                    className="h-8 text-xs"
-                    value={formData.norma || ''}
-                    onChange={(e) => setFormData({ ...formData, norma: e.target.value })}
-                  />
-                </Field>
-                <Field label="Tipo Rosca">
-                  <Input
-                    className="h-8 text-xs"
-                    value={formData.tipo_rosca || ''}
-                    onChange={(e) => setFormData({ ...formData, tipo_rosca: e.target.value })}
-                  />
-                </Field>
-                <Field label="Comp. Rosca">
-                  <Input
-                    className="h-8 text-xs"
-                    value={formData.comprimento_rosca || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, comprimento_rosca: e.target.value })
-                    }
-                  />
-                </Field>
-                <Field label="Unid. Medida">
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                <Field label="Unid. Medida" className="md:col-span-2">
                   <Select
                     value={formData.unidade_id || ''}
                     onValueChange={(v) => setFormData((f) => ({ ...f, unidade_id: v }))}
@@ -508,27 +498,93 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     </SelectContent>
                   </Select>
                 </Field>
+                <Field label="NCM (Seletor)" className="md:col-span-3">
+                  <SearchableSelect
+                    options={ncmOptions}
+                    value={formData.ncm_id}
+                    onChange={(v) => setFormData((f) => ({ ...f, ncm_id: v }))}
+                  />
+                </Field>
               </div>
             </div>
 
             <div className="bg-card border rounded-lg p-4 shadow-sm flex flex-col gap-3">
-              <h4 className="font-semibold text-xs border-b pb-1 mb-1">Textos e Descrições (PT)</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Field label="Descrição Curta (PT)">
+              <h4 className="font-semibold text-xs border-b pb-1 mb-1">Preço e Texto</h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                <Field label="Preço Compra" className="md:col-span-3">
+                  <PriceInput
+                    value={formData.preco_compra}
+                    onChange={(val) => setFormData({ ...formData, preco_compra: val })}
+                  />
+                </Field>
+                <Field label="Preço Venda" className="md:col-span-3">
+                  <PriceInput
+                    value={formData.preco_venda}
+                    onChange={(val) => setFormData({ ...formData, preco_venda: val })}
+                  />
+                </Field>
+                <Field label="Descrição Curta (PT)" className="md:col-span-6">
                   <Input
                     className="h-8 text-xs"
                     value={formData.descricao_curta || ''}
                     onChange={(e) => setFormData({ ...formData, descricao_curta: e.target.value })}
                   />
                 </Field>
-                <Field label="Descrição Completa (PT)">
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                <Field label="Informação Extra (PT)" className="md:col-span-6">
+                  <Textarea
+                    className="min-h-[50px] resize-y text-xs"
+                    value={formData.informacao_extra || ''}
+                    onChange={(e) => setFormData({ ...formData, informacao_extra: e.target.value })}
+                  />
+                </Field>
+                <Field label="Descrição Extra (PT)" className="md:col-span-6">
+                  <Textarea
+                    className="min-h-[50px] resize-none text-xs"
+                    value={formData.descricao_extra || ''}
+                    onChange={(e) => setFormData({ ...formData, descricao_extra: e.target.value })}
+                  />
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                <Field label="NCM" className="md:col-span-2">
+                  <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.codigo || ''} />
+                </Field>
+                <Field label="II" className="md:col-span-2">
+                  <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.ii ?? ''} />
+                </Field>
+                <Field label="IPI" className="md:col-span-2">
+                  <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.ipi ?? ''} />
+                </Field>
+                <Field label="PIS" className="md:col-span-2">
+                  <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.pis ?? ''} />
+                </Field>
+                <Field label="COFINS" className="md:col-span-2">
+                  <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.cofins ?? ''} />
+                </Field>
+                <Field label="Observações" className="md:col-span-2">
+                  <Input
+                    className="h-8 text-xs bg-muted"
+                    disabled
+                    value={ncmObj?.observacoes || ''}
+                    title={ncmObj?.observacoes || ''}
+                  />
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                <Field label="Descrição Completa (PT)" className="md:col-span-6">
                   <Textarea
                     className="min-h-[50px] resize-y text-xs"
                     value={formData.descr_pt || ''}
                     onChange={(e) => setFormData({ ...formData, descr_pt: e.target.value })}
                   />
                 </Field>
-                <Field label="Catálogo PT">
+                <Field label="Catálogo PT" className="md:col-span-6">
                   <Textarea
                     className="min-h-[50px] resize-y text-xs"
                     value={formData.descricao_catalogo_pt || ''}
@@ -537,29 +593,153 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     }
                   />
                 </Field>
-                <Field label="Informação Extra (PT)">
-                  <Textarea
-                    className="min-h-[50px] resize-y text-xs"
-                    value={formData.informacao_extra || ''}
-                    onChange={(e) => setFormData({ ...formData, informacao_extra: e.target.value })}
-                  />
-                </Field>
-                <Field label="Descrição Extra (PT)">
-                  <Textarea
-                    className="min-h-[50px] resize-none text-xs"
-                    value={formData.descricao_extra || ''}
-                    onChange={(e) => setFormData({ ...formData, descricao_extra: e.target.value })}
-                  />
-                </Field>
               </div>
             </div>
           </TabsContent>
 
           <TabsContent value="en" className="m-0 space-y-4 animate-fade-in-up">
             <div className="bg-card border rounded-lg p-4 shadow-sm flex flex-col gap-3">
-              <h4 className="font-semibold text-xs border-b pb-1 mb-1">Textos e Descrições (EN)</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Field label="Descrição Curta (EN)">
+              <h4 className="font-semibold text-xs border-b pb-1 mb-1">
+                General & Attributes (EN)
+              </h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                <Field label="Base Description (EN)" className="md:col-span-9">
+                  <Input
+                    className="h-8 text-xs"
+                    value={formData.descricao_base_en || ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, descricao_base_en: e.target.value })
+                    }
+                  />
+                </Field>
+                <Field label="Size" className="md:col-span-3">
+                  <Input
+                    className="h-8 text-xs"
+                    value={formData.tamanho || ''}
+                    onChange={(e) => setFormData({ ...formData, tamanho: e.target.value })}
+                  />
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                <Field label="Finish (EN)" className="md:col-span-3">
+                  <div className="h-8 px-3 flex items-center bg-muted/30 rounded-md border text-xs text-muted-foreground truncate">
+                    {acabamentos.find((a) => a.id === formData.acabamento_id)?.nome_en ||
+                      acabamentos.find((a) => a.id === formData.acabamento_id)?.nome_pt ||
+                      '-'}
+                  </div>
+                </Field>
+                <Field label="SKU" className="md:col-span-3">
+                  <Input
+                    className="h-8 text-xs"
+                    value={formData.sku || ''}
+                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                  />
+                </Field>
+                <Field label="Grade/Material" className="md:col-span-3">
+                  <Input
+                    className="h-8 text-xs"
+                    value={formData.classe_material || ''}
+                    onChange={(e) => setFormData({ ...formData, classe_material: e.target.value })}
+                  />
+                </Field>
+                <Field label="Standard" className="md:col-span-3">
+                  <Input
+                    className="h-8 text-xs"
+                    value={formData.norma || ''}
+                    onChange={(e) => setFormData({ ...formData, norma: e.target.value })}
+                  />
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                <Field label="Thread Type" className="md:col-span-2">
+                  <Input
+                    className="h-8 text-xs"
+                    value={formData.tipo_rosca || ''}
+                    onChange={(e) => setFormData({ ...formData, tipo_rosca: e.target.value })}
+                  />
+                </Field>
+                <Field label="Thread Length (EN)" className="md:col-span-2">
+                  <Input
+                    className="h-8 text-xs"
+                    value={formData.comprimento_rosca_en || ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, comprimento_rosca_en: e.target.value })
+                    }
+                  />
+                </Field>
+                <Field label="Category (EN)" className="md:col-span-3">
+                  <div className="h-8 px-3 flex items-center bg-muted/30 rounded-md border text-xs text-muted-foreground truncate">
+                    {categorias.find((c) => c.id === selectedCategoryId)?.nome_en ||
+                      categorias.find((c) => c.id === selectedCategoryId)?.nome_pt ||
+                      '-'}
+                  </div>
+                </Field>
+                <Field label="Line (EN)" className="md:col-span-3">
+                  <div className="h-8 px-3 flex items-center bg-muted/30 rounded-md border text-xs text-muted-foreground truncate">
+                    {linhas.find((l) => l.id === formData.linha_id)?.nome_en ||
+                      linhas.find((l) => l.id === formData.linha_id)?.nome_pt ||
+                      '-'}
+                  </div>
+                </Field>
+                <Field label="Status" className="md:col-span-2">
+                  <div className="flex items-center gap-2 h-8">
+                    <Switch
+                      checked={formData.ativo ?? true}
+                      onCheckedChange={(c) => setFormData({ ...formData, ativo: c })}
+                    />
+                    <span className="text-xs font-medium">
+                      {formData.ativo !== false ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                <Field label="Unit of Measure" className="md:col-span-2">
+                  <Select
+                    value={formData.unidade_id || ''}
+                    onValueChange={(v) => setFormData((f) => ({ ...f, unidade_id: v }))}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Select..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {unidadesMedida.map((u) => (
+                        <SelectItem key={u.id} value={u.id} className="text-xs">
+                          {u.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="NCM" className="md:col-span-3">
+                  <div className="h-8 px-3 flex items-center bg-muted/30 rounded-md border text-xs text-muted-foreground truncate">
+                    {ncmObj?.codigo || '-'}
+                  </div>
+                </Field>
+              </div>
+            </div>
+
+            <div className="bg-card border rounded-lg p-4 shadow-sm flex flex-col gap-3">
+              <h4 className="font-semibold text-xs border-b pb-1 mb-1">Price & Text (EN)</h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                <Field label="Purchase Price" className="md:col-span-3">
+                  <PriceInput
+                    value={formData.preco_compra}
+                    onChange={(val) => setFormData({ ...formData, preco_compra: val })}
+                  />
+                </Field>
+                <Field label="Sale Price" className="md:col-span-3">
+                  <PriceInput
+                    value={formData.preco_venda}
+                    onChange={(val) => setFormData({ ...formData, preco_venda: val })}
+                  />
+                </Field>
+                <Field label="Short Description (EN)" className="md:col-span-6">
                   <Input
                     className="h-8 text-xs"
                     value={formData.descricao_curta_en || ''}
@@ -568,23 +748,10 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     }
                   />
                 </Field>
-                <Field label="Descrição Completa (EN)">
-                  <Textarea
-                    className="min-h-[50px] resize-y text-xs"
-                    value={formData.descr_en || ''}
-                    onChange={(e) => setFormData({ ...formData, descr_en: e.target.value })}
-                  />
-                </Field>
-                <Field label="Catálogo EN">
-                  <Textarea
-                    className="min-h-[50px] resize-y text-xs"
-                    value={formData.descricao_catalogo_en || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, descricao_catalogo_en: e.target.value })
-                    }
-                  />
-                </Field>
-                <Field label="Informação Extra (EN)">
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                <Field label="Extra Information (EN)" className="md:col-span-6">
                   <Textarea
                     className="min-h-[50px] resize-y text-xs"
                     value={formData.informacao_extra_en || ''}
@@ -593,7 +760,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     }
                   />
                 </Field>
-                <Field label="Descrição Extra (EN)">
+                <Field label="Extra Description (EN)" className="md:col-span-6">
                   <Textarea
                     className="min-h-[50px] resize-none text-xs"
                     value={formData.descricao_extra_en || ''}
@@ -603,44 +770,49 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                   />
                 </Field>
               </div>
-            </div>
 
-            <div className="bg-card border rounded-lg p-4 shadow-sm flex flex-col gap-3">
-              <h4 className="font-semibold text-xs border-b pb-1 mb-1">
-                General & Technical Attributes (EN)
-              </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <Field label="Base Description (EN)" className="col-span-1 sm:col-span-3">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                <Field label="NCM" className="md:col-span-2">
+                  <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.codigo || ''} />
+                </Field>
+                <Field label="II" className="md:col-span-2">
+                  <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.ii ?? ''} />
+                </Field>
+                <Field label="IPI" className="md:col-span-2">
+                  <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.ipi ?? ''} />
+                </Field>
+                <Field label="PIS" className="md:col-span-2">
+                  <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.pis ?? ''} />
+                </Field>
+                <Field label="COFINS" className="md:col-span-2">
+                  <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.cofins ?? ''} />
+                </Field>
+                <Field label="Observations" className="md:col-span-2">
                   <Input
-                    className="h-8 text-xs"
-                    value={formData.descricao_base_en || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, descricao_base_en: e.target.value })
-                    }
+                    className="h-8 text-xs bg-muted"
+                    disabled
+                    value={ncmObj?.observacoes || ''}
+                    title={ncmObj?.observacoes || ''}
                   />
                 </Field>
-                <Field label="Thread Length (EN)">
-                  <Input
-                    className="h-8 text-xs"
-                    value={formData.comprimento_rosca_en || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, comprimento_rosca_en: e.target.value })
-                    }
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                <Field label="Full Description (EN)" className="md:col-span-6">
+                  <Textarea
+                    className="min-h-[50px] resize-y text-xs"
+                    value={formData.descr_en || ''}
+                    onChange={(e) => setFormData({ ...formData, descr_en: e.target.value })}
                   />
                 </Field>
-                <Field label="Category (EN)">
-                  <div className="h-8 px-3 flex items-center bg-muted/30 rounded-md border text-xs text-muted-foreground truncate">
-                    {categorias.find((c) => c.id === selectedCategoryId)?.nome_en ||
-                      categorias.find((c) => c.id === selectedCategoryId)?.nome_pt ||
-                      '-'}
-                  </div>
-                </Field>
-                <Field label="Line (EN)">
-                  <div className="h-8 px-3 flex items-center bg-muted/30 rounded-md border text-xs text-muted-foreground truncate">
-                    {linhas.find((l) => l.id === formData.linha_id)?.nome_en ||
-                      linhas.find((l) => l.id === formData.linha_id)?.nome_pt ||
-                      '-'}
-                  </div>
+                <Field label="Catalog EN" className="md:col-span-6">
+                  <Textarea
+                    className="min-h-[50px] resize-y text-xs"
+                    value={formData.descricao_catalogo_en || ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, descricao_catalogo_en: e.target.value })
+                    }
+                  />
                 </Field>
               </div>
             </div>
