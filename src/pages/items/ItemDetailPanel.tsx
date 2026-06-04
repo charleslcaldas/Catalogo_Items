@@ -156,27 +156,6 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
         ''
       const selAcabamento = acabamentos.find((a) => a.id === dataToSave.acabamento_id)
 
-      const autoDescCompletaPt = [
-        descBasePt,
-        dataToSave.tamanho,
-        selAcabamento?.nome_pt,
-        dataToSave.norma,
-        dataToSave.tipo_rosca,
-        dataToSave.material,
-      ]
-        .filter(Boolean)
-        .join(' ')
-      const autoDescCompletaEn = [
-        descBaseEn,
-        dataToSave.tamanho,
-        selAcabamento?.nome_en || selAcabamento?.nome_pt,
-        dataToSave.norma,
-        dataToSave.tipo_rosca,
-        dataToSave.material,
-      ]
-        .filter(Boolean)
-        .join(' ')
-
       const descricao_curta = [
         descBasePt,
         dataToSave.material,
@@ -195,6 +174,18 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
         dataToSave.tipo_rosca,
         dataToSave.comprimento_rosca_en,
         dataToSave.informacao_extra_en,
+      ]
+        .filter(Boolean)
+        .join(' ')
+
+      const autoDescCompletaPt = [descricao_curta, dataToSave.tamanho, selAcabamento?.nome_pt]
+        .filter(Boolean)
+        .join(' ')
+
+      const autoDescCompletaEn = [
+        descricao_curta_en,
+        dataToSave.tamanho,
+        selAcabamento?.nome_en || selAcabamento?.nome_pt,
       ]
         .filter(Boolean)
         .join(' ')
@@ -231,27 +222,6 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
     formData.descricao_base_en ||
     ''
 
-  const autoDescCompletaPt = [
-    descBasePt,
-    formData.tamanho,
-    selAcabamento?.nome_pt,
-    formData.norma,
-    formData.tipo_rosca,
-    formData.material,
-  ]
-    .filter(Boolean)
-    .join(' ')
-  const autoDescCompletaEn = [
-    descBaseEn,
-    formData.tamanho,
-    selAcabamento?.nome_en || selAcabamento?.nome_pt,
-    formData.norma,
-    formData.tipo_rosca,
-    formData.material,
-  ]
-    .filter(Boolean)
-    .join(' ')
-
   const autoDescCurtaPt = [
     descBasePt,
     formData.material,
@@ -270,6 +240,18 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
     formData.tipo_rosca,
     formData.comprimento_rosca_en,
     formData.informacao_extra_en,
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  const autoDescCompletaPt = [autoDescCurtaPt, formData.tamanho, selAcabamento?.nome_pt]
+    .filter(Boolean)
+    .join(' ')
+
+  const autoDescCompletaEn = [
+    autoDescCurtaEn,
+    formData.tamanho,
+    selAcabamento?.nome_en || selAcabamento?.nome_pt,
   ]
     .filter(Boolean)
     .join(' ')
@@ -315,14 +297,10 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
           </div>
           <div className="flex flex-col min-w-0 flex-1">
             <h2 className="font-bold text-sm text-foreground break-words whitespace-normal leading-tight">
-              {[autoDescCurtaPt, formData.tamanho, selAcabamento?.nome_pt]
-                .filter(Boolean)
-                .join(' ') || 'Nova Descrição Completa'}
+              {autoDescCompletaPt || 'Nova Descrição Completa'}
             </h2>
             <h3 className="text-[10px] text-muted-foreground break-words whitespace-normal leading-snug mt-0.5">
-              {[autoDescCurtaEn, formData.tamanho, selAcabamento?.nome_en || selAcabamento?.nome_pt]
-                .filter(Boolean)
-                .join(' ') || 'New Full Description'}
+              {autoDescCompletaEn || 'New Full Description'}
             </h3>
 
             <div className="mt-1 flex flex-wrap items-center gap-2">
