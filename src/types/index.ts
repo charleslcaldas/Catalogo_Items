@@ -95,6 +95,7 @@ export type Potencial = {
   proprietario?: string
   estagio?: string
   observacoes?: string
+  nome_comprador?: string
   created: string
   updated: string
 }
@@ -157,6 +158,8 @@ export type Item = {
   fornecedor_ultima_atualizacao?: string
   unidade?: string
   unidade_id?: string
+  descricao_base_id?: string
+  validade_preco?: string
   created: string
   updated: string
   expand?: {

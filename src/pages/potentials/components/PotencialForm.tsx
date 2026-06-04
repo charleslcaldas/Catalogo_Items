@@ -42,6 +42,14 @@ export function PotencialForm({
         />
       </div>
       <div className="flex items-center gap-2">
+        <Label className="w-20 text-right shrink-0 text-xs text-muted-foreground">Comprador:</Label>
+        <Input
+          className="h-7 text-xs"
+          value={formData.nome_comprador || ''}
+          onChange={(e) => setFormData({ ...formData, nome_comprador: e.target.value })}
+        />
+      </div>
+      <div className="flex items-center gap-2">
         <Label className="w-20 text-right shrink-0 text-xs text-muted-foreground">Propriet.:</Label>
         <Input
           className="h-7 text-xs"

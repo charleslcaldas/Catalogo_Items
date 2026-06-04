@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-01T06:47:30.581Z",
+  "generatedAt": "2026-06-01T07:10:40.383Z",
   "collections": [
     {
       "name": "users",
@@ -744,6 +744,12 @@
         },
         {
           "name": "estagio",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "nome_comprador",
           "type": "text",
           "required": false,
           "system": false

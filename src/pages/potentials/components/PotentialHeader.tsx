@@ -28,7 +28,7 @@ export function PotentialHeader({ selected, onSelect }: PotentialHeaderProps) {
   }, [])
 
   return (
-    <div className="bg-white p-4 rounded-lg shadow-sm border mb-4 grid grid-cols-1 md:grid-cols-3 gap-4 items-end shrink-0">
+    <div className="bg-white p-4 rounded-lg shadow-sm border mb-4 grid grid-cols-1 md:grid-cols-4 gap-4 items-end shrink-0">
       <div className="space-y-2">
         <Label>Número do Potencial</Label>
         {loading ? (
@@ -57,6 +57,15 @@ export function PotentialHeader({ selected, onSelect }: PotentialHeaderProps) {
           readOnly
           value={selected?.cliente || ''}
           placeholder="Nome do cliente"
+          className="bg-muted"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label>Comprador</Label>
+        <Input
+          readOnly
+          value={selected?.nome_comprador || ''}
+          placeholder="Nome do comprador"
           className="bg-muted"
         />
       </div>

@@ -9,7 +9,7 @@ export const searchPotenciais = (term: string) => {
   let filter = ''
   if (term) {
     const t = term.replace(/"/g, '')
-    filter = `numero_potencial ~ "${t}" || cliente ~ "${t}" || nome_potencial ~ "${t}" || proprietario ~ "${t}"`
+    filter = `numero_potencial ~ "${t}" || cliente ~ "${t}" || nome_potencial ~ "${t}" || proprietario ~ "${t}" || nome_comprador ~ "${t}"`
   }
   return pb.collection<Potencial>('potenciais').getList(1, 50, {
     filter,

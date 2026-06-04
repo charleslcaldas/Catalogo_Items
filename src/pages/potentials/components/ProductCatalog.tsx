@@ -33,7 +33,7 @@ export function ProductCatalog({
   onAddNew,
   onUpdateItem,
 }: ProductCatalogProps) {
-  const { itens, acabamentos } = useData()
+  const { itens, linhas, categorias, ncms, descricoesBase, acabamentos } = useData()
   const [searchTerm, setSearchTerm] = useState('')
   const [unidades, setUnidades] = useState<UnidadeMedida[]>([])
 
@@ -53,22 +53,40 @@ export function ProductCatalog({
       .replace(/[\u0300-\u036f]/g, '')
     const tokens = term.split(/\s+/).filter(Boolean)
 
+    const getLinhaName = (id: string) => linhas.find((l) => l.id === id)?.nome_pt || ''
+    const getCategoriaName = (linhaId: string) => {
+      const linha = linhas.find((l) => l.id === linhaId)
+      if (!linha) return ''
+      return categorias.find((c) => c.id === linha.categoria_id)?.nome_pt || ''
+    }
+    const getNcmCode = (id?: string) => ncms.find((n) => n.id === id)?.codigo || ''
+    const getDescricaoBasePt = (id?: string) =>
+      descricoesBase.find((d) => d.id === id)?.nome_pt || ''
+
     return itens
       .filter((item) => {
         if (!item.ativo) return false
 
         const aca = acabamentos.find((a) => a.id === item.acabamento_id)
+        const acaInfo = aca ? `${aca.nome_pt} ${aca.nome_en || ''} ${aca.codigo}` : ''
 
         const text = [
           item.sku,
           item.descr_pt,
           item.descr_en,
+          getDescricaoBasePt(item.descricao_base_id),
           item.descricao_curta,
           item.descricao_curta_en,
+          item.descricao_base_pt,
+          item.classe_material,
+          item.tipo_rosca,
+          item.norma,
+          item.informacao_extra,
           item.tamanho,
-          aca?.nome_pt,
-          aca?.nome_en,
-          aca?.codigo,
+          getLinhaName(item.linha_id),
+          getCategoriaName(item.linha_id),
+          getNcmCode(item.ncm_id),
+          acaInfo,
         ]
           .filter(Boolean)
           .join(' ')
