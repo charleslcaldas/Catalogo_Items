@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils'
 import { SearchableSelect } from '@/components/SearchableSelect'
 import { NewDescBaseModal } from '@/components/NewDescBaseModal'
 import { PriceInput } from '@/components/PriceInput'
+import { useAtributosLinha } from '@/hooks/use-atributos-linha'
 
 function Field({
   label,
@@ -50,6 +51,7 @@ function Field({
 export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () => void }) {
   const { linhas, categorias, acabamentos, ncms, unidadesMedida, descricoesBase, saveItem } =
     useData()
+  const realTimeAtributos = useAtributosLinha()
 
   const [formData, setFormData] = useState<Partial<Item>>({})
   const [galleryOpen, setGalleryOpen] = useState(false)
@@ -345,6 +347,27 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
 
   const ncmObj = ncms.find((n) => n.id === formData.ncm_id)
 
+  const getFieldConfig = (field: string, defaultLabelPt: string, defaultLabelEn: string) => {
+    const config = realTimeAtributos.find(
+      (a) =>
+        a.linha_id === formData.linha_id &&
+        (a.campo_sistema === field || a.tipo_atributo === field),
+    )
+    const isVisible = config ? config.ativo !== false : true
+    const customName = config?.nome_customizado || config?.nome_campo_customizado
+    return {
+      isVisible,
+      labelPt: customName || defaultLabelPt,
+      labelEn: customName || defaultLabelEn,
+    }
+  }
+
+  const confTamanho = getFieldConfig('tamanho', 'Tamanho', 'Size')
+  const confTipoRosca = getFieldConfig('tipo_rosca', 'Tipo Rosca', 'Thread Type')
+  const confCompRosca = getFieldConfig('comprimento_rosca', 'Comp. Rosca', 'Thread Length')
+  const confClasse = getFieldConfig('classe_material', 'Grau/Material', 'Grade/Material')
+  const confNorma = getFieldConfig('norma', 'Norma', 'Standard')
+
   return (
     <div className="flex flex-col bg-background relative h-full rounded-xl">
       <div className="flex items-start justify-between p-3 border-b bg-card z-10 shrink-0 sticky top-0 rounded-t-xl">
@@ -521,14 +544,16 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     />
                   </div>
                 </Field>
-                <Field label="Tamanho" className="md:col-span-3">
-                  <Input
-                    className="h-8 text-xs"
-                    disabled={!isEditing}
-                    value={formData.tamanho || ''}
-                    onChange={(e) => setFormData({ ...formData, tamanho: e.target.value })}
-                  />
-                </Field>
+                {confTamanho.isVisible && (
+                  <Field label={confTamanho.labelPt} className="md:col-span-3">
+                    <Input
+                      className="h-8 text-xs"
+                      disabled={!isEditing}
+                      value={formData.tamanho || ''}
+                      onChange={(e) => setFormData({ ...formData, tamanho: e.target.value })}
+                    />
+                  </Field>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
@@ -549,43 +574,57 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                   />
                 </Field>
-                <Field label="Grau/Material" className="md:col-span-3">
-                  <Input
-                    className="h-8 text-xs"
-                    disabled={!isEditing}
-                    value={formData.material || ''}
-                    onChange={(e) => setFormData({ ...formData, material: e.target.value })}
-                  />
-                </Field>
-                <Field label="Norma" className="md:col-span-3">
-                  <Input
-                    className="h-8 text-xs"
-                    disabled={!isEditing}
-                    value={formData.norma || ''}
-                    onChange={(e) => setFormData({ ...formData, norma: e.target.value })}
-                  />
-                </Field>
+                {confClasse.isVisible && (
+                  <Field label={confClasse.labelPt} className="md:col-span-3">
+                    <Input
+                      className="h-8 text-xs"
+                      disabled={!isEditing}
+                      value={formData.classe_material || formData.material || ''}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          classe_material: e.target.value,
+                          material: e.target.value,
+                        })
+                      }
+                    />
+                  </Field>
+                )}
+                {confNorma.isVisible && (
+                  <Field label={confNorma.labelPt} className="md:col-span-3">
+                    <Input
+                      className="h-8 text-xs"
+                      disabled={!isEditing}
+                      value={formData.norma || ''}
+                      onChange={(e) => setFormData({ ...formData, norma: e.target.value })}
+                    />
+                  </Field>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <Field label="Tipo Rosca" className="md:col-span-2">
-                  <Input
-                    className="h-8 text-xs"
-                    disabled={!isEditing}
-                    value={formData.tipo_rosca || ''}
-                    onChange={(e) => setFormData({ ...formData, tipo_rosca: e.target.value })}
-                  />
-                </Field>
-                <Field label="Comp. Rosca" className="md:col-span-2">
-                  <Input
-                    className="h-8 text-xs"
-                    disabled={!isEditing}
-                    value={formData.comprimento_rosca || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, comprimento_rosca: e.target.value })
-                    }
-                  />
-                </Field>
+                {confTipoRosca.isVisible && (
+                  <Field label={confTipoRosca.labelPt} className="md:col-span-2">
+                    <Input
+                      className="h-8 text-xs"
+                      disabled={!isEditing}
+                      value={formData.tipo_rosca || ''}
+                      onChange={(e) => setFormData({ ...formData, tipo_rosca: e.target.value })}
+                    />
+                  </Field>
+                )}
+                {confCompRosca.isVisible && (
+                  <Field label={confCompRosca.labelPt} className="md:col-span-2">
+                    <Input
+                      className="h-8 text-xs"
+                      disabled={!isEditing}
+                      value={formData.comprimento_rosca || ''}
+                      onChange={(e) =>
+                        setFormData({ ...formData, comprimento_rosca: e.target.value })
+                      }
+                    />
+                  </Field>
+                )}
                 <Field label="Categoria" className="md:col-span-3">
                   <div className={cn(!isEditing && 'pointer-events-none opacity-80')}>
                     <SearchableSelect
@@ -788,14 +827,16 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     />
                   </div>
                 </Field>
-                <Field label="Size" className="md:col-span-3">
-                  <Input
-                    className="h-8 text-xs"
-                    disabled={!isEditing}
-                    value={formData.tamanho || ''}
-                    onChange={(e) => setFormData({ ...formData, tamanho: e.target.value })}
-                  />
-                </Field>
+                {confTamanho.isVisible && (
+                  <Field label={confTamanho.labelEn} className="md:col-span-3">
+                    <Input
+                      className="h-8 text-xs"
+                      disabled={!isEditing}
+                      value={formData.tamanho || ''}
+                      onChange={(e) => setFormData({ ...formData, tamanho: e.target.value })}
+                    />
+                  </Field>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
@@ -819,43 +860,57 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                   />
                 </Field>
-                <Field label="Grade/Material" className="md:col-span-3">
-                  <Input
-                    className="h-8 text-xs"
-                    disabled={!isEditing}
-                    value={formData.material || ''}
-                    onChange={(e) => setFormData({ ...formData, material: e.target.value })}
-                  />
-                </Field>
-                <Field label="Standard" className="md:col-span-3">
-                  <Input
-                    className="h-8 text-xs"
-                    disabled={!isEditing}
-                    value={formData.norma || ''}
-                    onChange={(e) => setFormData({ ...formData, norma: e.target.value })}
-                  />
-                </Field>
+                {confClasse.isVisible && (
+                  <Field label={confClasse.labelEn} className="md:col-span-3">
+                    <Input
+                      className="h-8 text-xs"
+                      disabled={!isEditing}
+                      value={formData.classe_material || formData.material || ''}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          classe_material: e.target.value,
+                          material: e.target.value,
+                        })
+                      }
+                    />
+                  </Field>
+                )}
+                {confNorma.isVisible && (
+                  <Field label={confNorma.labelEn} className="md:col-span-3">
+                    <Input
+                      className="h-8 text-xs"
+                      disabled={!isEditing}
+                      value={formData.norma || ''}
+                      onChange={(e) => setFormData({ ...formData, norma: e.target.value })}
+                    />
+                  </Field>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <Field label="Thread Type" className="md:col-span-2">
-                  <Input
-                    className="h-8 text-xs"
-                    disabled={!isEditing}
-                    value={formData.tipo_rosca || ''}
-                    onChange={(e) => setFormData({ ...formData, tipo_rosca: e.target.value })}
-                  />
-                </Field>
-                <Field label="Thread Length (EN)" className="md:col-span-2">
-                  <Input
-                    className="h-8 text-xs"
-                    disabled={!isEditing}
-                    value={formData.comprimento_rosca_en || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, comprimento_rosca_en: e.target.value })
-                    }
-                  />
-                </Field>
+                {confTipoRosca.isVisible && (
+                  <Field label={confTipoRosca.labelEn} className="md:col-span-2">
+                    <Input
+                      className="h-8 text-xs"
+                      disabled={!isEditing}
+                      value={formData.tipo_rosca || ''}
+                      onChange={(e) => setFormData({ ...formData, tipo_rosca: e.target.value })}
+                    />
+                  </Field>
+                )}
+                {confCompRosca.isVisible && (
+                  <Field label={confCompRosca.labelEn} className="md:col-span-2">
+                    <Input
+                      className="h-8 text-xs"
+                      disabled={!isEditing}
+                      value={formData.comprimento_rosca_en || ''}
+                      onChange={(e) =>
+                        setFormData({ ...formData, comprimento_rosca_en: e.target.value })
+                      }
+                    />
+                  </Field>
+                )}
                 <Field label="Category (EN)" className="md:col-span-3">
                   <div className={cn(!isEditing && 'pointer-events-none opacity-80')}>
                     <SearchableSelect

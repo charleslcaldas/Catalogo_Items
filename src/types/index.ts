@@ -69,8 +69,11 @@ export type Acabamento = {
 export type AtributoLinha = {
   id: string
   linha_id: string
-  tipo_atributo: string
-  nome_campo_customizado: string
+  tipo_atributo?: string
+  nome_campo_customizado?: string
+  campo_sistema: string
+  nome_customizado: string
+  ativo: boolean
   created: string
   updated: string
 }

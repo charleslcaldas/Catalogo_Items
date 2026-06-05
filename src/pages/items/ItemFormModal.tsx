@@ -21,7 +21,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { useData } from '@/contexts/data-context'
-import { Categoria, Item, UnidadeMedida } from '@/types'
+import { Categoria, Item, UnidadeMedida, AtributoLinha } from '@/types'
+import { useAtributosLinha } from '@/hooks/use-atributos-linha'
 import { Plus } from 'lucide-react'
 import { LineModal, FinishModal, NcmModal } from '@/components/MetadataModals'
 import { toast } from 'sonner'
@@ -37,7 +38,8 @@ export function ItemFormModal({
   onOpenChange: (open: boolean) => void
   item?: Item
 }) {
-  const { linhas, acabamentos, ncms, atributosLinha, descricoesBase, saveItem } = useData()
+  const { linhas, acabamentos, ncms, descricoesBase, saveItem } = useData()
+  const realTimeAtributos = useAtributosLinha()
   const [formData, setFormData] = useState<Partial<Item>>({})
   const [lineModalOpen, setLineModalOpen] = useState(false)
   const [finishModalOpen, setFinishModalOpen] = useState(false)
@@ -134,9 +136,23 @@ export function ItemFormModal({
   const renderTabContent = (lang: 'pt' | 'en') => {
     const isPt = lang === 'pt'
 
-    const customTamanhoLabel =
-      atributosLinha.find((a) => a.linha_id === formData.linha_id && a.tipo_atributo === 'tamanho')
-        ?.nome_campo_customizado || (isPt ? 'Tamanho' : 'Size')
+    const getFieldConfig = (field: string, defaultLabelPt: string, defaultLabelEn: string) => {
+      const config = realTimeAtributos.find(
+        (a) =>
+          a.linha_id === formData.linha_id &&
+          (a.campo_sistema === field || a.tipo_atributo === field),
+      )
+      const isVisible = config ? config.ativo !== false : true
+      const customName = config?.nome_customizado || config?.nome_campo_customizado
+      const label = customName ? customName : isPt ? defaultLabelPt : defaultLabelEn
+      return { isVisible, label }
+    }
+
+    const confTamanho = getFieldConfig('tamanho', 'Tamanho', 'Size')
+    const confTipoRosca = getFieldConfig('tipo_rosca', 'Tipo de Rosca', 'Thread Type')
+    const confCompRosca = getFieldConfig('comprimento_rosca', 'Comp. Rosca', 'Thread Length')
+    const confClasse = getFieldConfig('classe_material', 'Grau/Material', 'Grade/Material')
+    const confNorma = getFieldConfig('norma', 'Norma', 'Standard')
 
     const selectedLinha = linhas.find((l) => l.id === formData.linha_id)
     const derivedCategoria = categorias.find((c) => c.id === selectedLinha?.categoria_id)
@@ -188,48 +204,64 @@ export function ItemFormModal({
               />
             </div>
 
-            <div className="col-span-12 sm:col-span-3 space-y-2">
-              <Label>{isPt ? 'Grau/Material' : 'Grade/Material'}</Label>
-              <Input
-                value={formData.classe || ''}
-                onChange={(e) => setFormData({ ...formData, classe: e.target.value })}
-              />
-            </div>
-            <div className="col-span-12 sm:col-span-3 space-y-2">
-              <Label>{isPt ? 'Norma' : 'Standard'}</Label>
-              <Input
-                value={formData.norma || ''}
-                onChange={(e) => setFormData({ ...formData, norma: e.target.value })}
-              />
-            </div>
-            <div className="col-span-12 sm:col-span-3 space-y-2">
-              <Label>{isPt ? 'Tipo de Rosca' : 'Thread Type'}</Label>
-              <Input
-                value={formData.tipo_rosca || ''}
-                onChange={(e) => setFormData({ ...formData, tipo_rosca: e.target.value })}
-              />
-            </div>
-            <div className="col-span-12 sm:col-span-3 space-y-2">
-              <Label>{isPt ? 'Comp. Rosca' : 'Thread Length'}</Label>
-              <Input
-                value={(isPt ? formData.comprimento_rosca : formData.comprimento_rosca_en) || ''}
-                onChange={(e) =>
-                  setFormData(
-                    isPt
-                      ? { ...formData, comprimento_rosca: e.target.value }
-                      : { ...formData, comprimento_rosca_en: e.target.value },
-                  )
-                }
-              />
-            </div>
+            {confClasse.isVisible && (
+              <div className="col-span-12 sm:col-span-3 space-y-2">
+                <Label>{confClasse.label}</Label>
+                <Input
+                  value={formData.classe_material || formData.classe || ''}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      classe_material: e.target.value,
+                      classe: e.target.value,
+                    })
+                  }
+                />
+              </div>
+            )}
+            {confNorma.isVisible && (
+              <div className="col-span-12 sm:col-span-3 space-y-2">
+                <Label>{confNorma.label}</Label>
+                <Input
+                  value={formData.norma || ''}
+                  onChange={(e) => setFormData({ ...formData, norma: e.target.value })}
+                />
+              </div>
+            )}
+            {confTipoRosca.isVisible && (
+              <div className="col-span-12 sm:col-span-3 space-y-2">
+                <Label>{confTipoRosca.label}</Label>
+                <Input
+                  value={formData.tipo_rosca || ''}
+                  onChange={(e) => setFormData({ ...formData, tipo_rosca: e.target.value })}
+                />
+              </div>
+            )}
+            {confCompRosca.isVisible && (
+              <div className="col-span-12 sm:col-span-3 space-y-2">
+                <Label>{confCompRosca.label}</Label>
+                <Input
+                  value={(isPt ? formData.comprimento_rosca : formData.comprimento_rosca_en) || ''}
+                  onChange={(e) =>
+                    setFormData(
+                      isPt
+                        ? { ...formData, comprimento_rosca: e.target.value }
+                        : { ...formData, comprimento_rosca_en: e.target.value },
+                    )
+                  }
+                />
+              </div>
+            )}
 
-            <div className="col-span-12 sm:col-span-4 space-y-2">
-              <Label>{customTamanhoLabel}</Label>
-              <Input
-                value={formData.tamanho || ''}
-                onChange={(e) => setFormData({ ...formData, tamanho: e.target.value })}
-              />
-            </div>
+            {confTamanho.isVisible && (
+              <div className="col-span-12 sm:col-span-4 space-y-2">
+                <Label>{confTamanho.label}</Label>
+                <Input
+                  value={formData.tamanho || ''}
+                  onChange={(e) => setFormData({ ...formData, tamanho: e.target.value })}
+                />
+              </div>
+            )}
             <div className="col-span-12 sm:col-span-4 space-y-2">
               <Label>{isPt ? 'Acabamento' : 'Finish'}</Label>
               <div className="flex gap-2">

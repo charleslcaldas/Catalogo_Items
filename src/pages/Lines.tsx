@@ -11,7 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useData } from '@/contexts/data-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, Pencil, ArrowRight, FilterX, Search } from 'lucide-react'
+import { Plus, Pencil, ArrowRight, FilterX, Search, Settings } from 'lucide-react'
+import { LineAttributesModal } from '@/components/LineAttributesModal'
 import { LineModal } from '@/components/MetadataModals'
 import { getContrastColor } from '@/lib/utils'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -20,6 +21,8 @@ export default function Lines() {
   const { linhas, categorias } = useData()
   const [modalOpen, setModalOpen] = useState(false)
   const [editData, setEditData] = useState<any>(null)
+  const [attrModalOpen, setAttrModalOpen] = useState(false)
+  const [attrData, setAttrData] = useState<any>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -161,6 +164,18 @@ export default function Lines() {
                         size="icon"
                         onClick={(e) => {
                           e.stopPropagation()
+                          setAttrData(lin)
+                          setAttrModalOpen(true)
+                        }}
+                        title="Configurar Campos Técnicos"
+                      >
+                        <Settings className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation()
                           setEditData(lin)
                           setModalOpen(true)
                         }}
@@ -188,6 +203,7 @@ export default function Lines() {
       </Card>
 
       <LineModal open={modalOpen} onOpenChange={setModalOpen} initialData={editData} />
+      <LineAttributesModal open={attrModalOpen} onOpenChange={setAttrModalOpen} linha={attrData} />
     </div>
   )
 }
