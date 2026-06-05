@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-05T06:06:57.753Z",
+  "generatedAt": "2026-06-05T06:11:20.121Z",
   "collections": [
     {
       "name": "users",
@@ -855,13 +855,13 @@
         {
           "name": "tipo_atributo",
           "type": "text",
-          "required": true,
+          "required": false,
           "system": false
         },
         {
           "name": "nome_campo_customizado",
           "type": "text",
-          "required": true,
+          "required": false,
           "system": false
         },
         {
@@ -877,6 +877,24 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "campo_sistema",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "nome_customizado",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ativo",
+          "type": "bool",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": []

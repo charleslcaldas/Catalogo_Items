@@ -143,7 +143,9 @@ export function ItemFormModal({
           (a.campo_sistema === field || a.tipo_atributo === field),
       )
       const isVisible = config ? config.ativo !== false : true
-      const customName = config?.nome_customizado || config?.nome_campo_customizado
+      const customName =
+        config?.nome_customizado ||
+        (config?.nome_campo_customizado === '-' ? '' : config?.nome_campo_customizado)
       const label = customName ? customName : isPt ? defaultLabelPt : defaultLabelEn
       return { isVisible, label }
     }

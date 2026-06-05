@@ -354,7 +354,9 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
         (a.campo_sistema === field || a.tipo_atributo === field),
     )
     const isVisible = config ? config.ativo !== false : true
-    const customName = config?.nome_customizado || config?.nome_campo_customizado
+    const customName =
+      config?.nome_customizado ||
+      (config?.nome_campo_customizado === '-' ? '' : config?.nome_campo_customizado)
     return {
       isVisible,
       labelPt: customName || defaultLabelPt,

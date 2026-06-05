@@ -126,7 +126,13 @@ export function LineAttributesModal({
                     <TableCell>
                       <Input
                         placeholder="Ex: Dimensão"
-                        value={attr.nome_customizado || attr.nome_campo_customizado || ''}
+                        value={
+                          attr.nome_customizado ||
+                          (attr.nome_campo_customizado === '-'
+                            ? ''
+                            : attr.nome_campo_customizado) ||
+                          ''
+                        }
                         onChange={(e) => {
                           const newAttrs = [...atributos]
                           newAttrs[idx] = { ...newAttrs[idx], nome_customizado: e.target.value }
