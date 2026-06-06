@@ -266,38 +266,7 @@ export function LineModal({
                   </Button>
                 </div>
               </div>
-              <div className="space-y-2 col-span-2">
-                <Label>
-                  NCM <span className="text-destructive">*</span>
-                </Label>
-                <div className="flex gap-2">
-                  <Select
-                    required
-                    value={data.ncm_id}
-                    onValueChange={(v) => setData({ ...data, ncm_id: v })}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Selecione o NCM..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ncms.map((n) => (
-                        <SelectItem key={n.id} value={n.id}>
-                          {n.codigo}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="text-green-600 shrink-0"
-                    onClick={() => setNcmModalOpen(true)}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
+
               <div className="space-y-2">
                 <Label>
                   Nome (PT) <span className="text-destructive">*</span>
@@ -318,26 +287,7 @@ export function LineModal({
                   onChange={(e) => setData({ ...data, nome_en: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label>
-                  Superlinha (PT) <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  required
-                  value={data.superlinha_pt}
-                  onChange={(e) => setData({ ...data, superlinha_pt: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>
-                  Superlinha (EN) <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  required
-                  value={data.superlinha_en}
-                  onChange={(e) => setData({ ...data, superlinha_en: e.target.value })}
-                />
-              </div>
+
               <div className="space-y-2 col-span-2">
                 <Label>Cor (Opcional)</Label>
                 <div className="flex gap-2 items-center">
