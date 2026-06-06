@@ -11,18 +11,32 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useData } from '@/contexts/data-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, Pencil, ArrowRight, FilterX, Search, Settings } from 'lucide-react'
+import { Plus, Trash2, ArrowRight, FilterX, Search, Settings } from 'lucide-react'
 import { LineAttributesModal } from '@/components/LineAttributesModal'
 import { LineModal } from '@/components/MetadataModals'
 import { getContrastColor } from '@/lib/utils'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import pb from '@/lib/pocketbase/client'
+import { toast } from 'sonner'
+import { Linha } from '@/types'
 
 export default function Lines() {
   const { linhas, categorias } = useData()
   const [modalOpen, setModalOpen] = useState(false)
-  const [editData, setEditData] = useState<any>(null)
+  const [editData, setEditData] = useState<Linha | null>(null)
   const [attrModalOpen, setAttrModalOpen] = useState(false)
-  const [attrData, setAttrData] = useState<any>(null)
+  const [attrData, setAttrData] = useState<Linha | null>(null)
+  const [lineToDelete, setLineToDelete] = useState<Linha | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -46,7 +60,7 @@ export default function Lines() {
     return (
       l.nome_pt.toLowerCase().includes(term) ||
       (l.nome_en && l.nome_en.toLowerCase().includes(term)) ||
-      l.superlinha_pt.toLowerCase().includes(term) ||
+      (l.superlinha_pt && l.superlinha_pt.toLowerCase().includes(term)) ||
       (l.superlinha_en && l.superlinha_en.toLowerCase().includes(term)) ||
       getCatName(l.categoria_id).toLowerCase().includes(term)
     )
@@ -102,8 +116,8 @@ export default function Lines() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Linha</TableHead>
-                <TableHead>Superlinha</TableHead>
+                <TableHead>Nome (PT)</TableHead>
+                <TableHead>Nome (EN)</TableHead>
                 <TableHead>Categoria</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -120,27 +134,16 @@ export default function Lines() {
                 <TableRow
                   key={lin.id}
                   className="cursor-pointer hover:bg-muted/50 transition-colors"
-                  onClick={() => navigate(`/itens?linha_id=${lin.id}`)}
+                  onClick={() => {
+                    setEditData(lin)
+                    setModalOpen(true)
+                  }}
                 >
                   <TableCell>
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-sm">{lin.nome_pt}</span>
-                      {lin.nome_en && (
-                        <span className="text-[12px] text-muted-foreground mt-0.5">
-                          EN: {lin.nome_en}
-                        </span>
-                      )}
-                    </div>
+                    <span className="font-semibold text-sm">{lin.nome_pt}</span>
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-col">
-                      <span className="text-sm">{lin.superlinha_pt || '-'}</span>
-                      {lin.superlinha_en && (
-                        <span className="text-[12px] text-muted-foreground mt-0.5">
-                          EN: {lin.superlinha_en}
-                        </span>
-                      )}
-                    </div>
+                    <span className="text-sm text-muted-foreground">{lin.nome_en || '-'}</span>
                   </TableCell>
                   <TableCell>
                     <span
@@ -172,18 +175,6 @@ export default function Lines() {
                         <Settings className="h-4 w-4" />
                       </Button>
                       <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setEditData(lin)
-                          setModalOpen(true)
-                        }}
-                        title="Editar Linha"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
                         variant="outline"
                         size="sm"
                         onClick={(e) => {
@@ -192,6 +183,18 @@ export default function Lines() {
                         }}
                       >
                         Itens <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setLineToDelete(lin)
+                        }}
+                        title="Excluir Linha"
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </TableCell>
@@ -204,6 +207,40 @@ export default function Lines() {
 
       <LineModal open={modalOpen} onOpenChange={setModalOpen} initialData={editData} />
       <LineAttributesModal open={attrModalOpen} onOpenChange={setAttrModalOpen} linha={attrData} />
+
+      <AlertDialog
+        open={!!lineToDelete}
+        onOpenChange={(open) => {
+          if (!open) setLineToDelete(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja realmente excluir a linha <strong>{lineToDelete?.nome_pt}</strong>? Esta ação
+              não pode ser desfeita e pode afetar itens vinculados a ela.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (!lineToDelete) return
+                try {
+                  await pb.collection('linhas').delete(lineToDelete.id)
+                  toast.success('Linha excluída com sucesso')
+                } catch (error: any) {
+                  toast.error('Erro ao excluir linha', { description: error.message })
+                }
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
