@@ -410,6 +410,23 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                   Inativo
                 </Badge>
               )}
+              {formData.sincronizado_com_zoho ? (
+                <Badge
+                  variant="outline"
+                  className="border-blue-200 bg-blue-50 text-blue-700 text-[10px] px-1.5 py-0 shadow-none"
+                  title="Sincronizado com Zoho Books"
+                >
+                  Zoho Sync
+                </Badge>
+              ) : (
+                <Badge
+                  variant="outline"
+                  className="border-orange-200 bg-orange-50 text-orange-700 text-[10px] px-1.5 py-0 shadow-none"
+                  title="Pendente sincronização"
+                >
+                  Zoho Pendente
+                </Badge>
+              )}
             </div>
           </div>
         </div>

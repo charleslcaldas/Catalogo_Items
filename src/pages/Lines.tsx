@@ -117,7 +117,7 @@ export default function Lines() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nome (PT)</TableHead>
-                <TableHead>Nome (EN)</TableHead>
+                <TableHead>Name (EN)</TableHead>
                 <TableHead>Categoria</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>

@@ -323,18 +323,31 @@ export default function ItemsPage() {
                               : '-'}
                           </TableCell>
                           <TableCell className="py-1 px-2">
-                            {item.ativo ? (
-                              <Badge
-                                variant="outline"
-                                className="bg-emerald-50 text-emerald-700 border-emerald-200"
-                              >
-                                Ativo
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="bg-muted text-muted-foreground">
-                                Inativo
-                              </Badge>
-                            )}
+                            <div className="flex items-center gap-1.5">
+                              {item.ativo ? (
+                                <Badge
+                                  variant="outline"
+                                  className="bg-emerald-50 text-emerald-700 border-emerald-200"
+                                >
+                                  Ativo
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="bg-muted text-muted-foreground">
+                                  Inativo
+                                </Badge>
+                              )}
+                              {item.sincronizado_com_zoho ? (
+                                <div
+                                  className="w-2 h-2 rounded-full bg-blue-500 shrink-0"
+                                  title="Sincronizado com Zoho"
+                                />
+                              ) : (
+                                <div
+                                  className="w-2 h-2 rounded-full bg-orange-400 shrink-0"
+                                  title="Pendente sincronização"
+                                />
+                              )}
+                            </div>
                           </TableCell>
                         </>
                       )}
