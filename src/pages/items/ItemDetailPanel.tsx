@@ -238,20 +238,16 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
         .filter(Boolean)
         .join(' ')
 
-      const autoDescCompletaPt = [previewCurtaPt, dataToSave.tamanho, selAcabamento?.nome_pt]
-        .filter(Boolean)
-        .join(' ')
+      const descCurtaSavePt = dataToSave.descricao_curta || previewCurtaPt
+      const autoDescCompletaPt = `${descCurtaSavePt}${dataToSave.tamanho ? ` - ${dataToSave.tamanho}` : ''}${selAcabamento?.nome_pt ? ` /${selAcabamento.nome_pt}` : ''}`
 
-      const autoDescCompletaEn = [
-        previewCurtaEn,
-        dataToSave.tamanho,
-        selAcabamento?.nome_en || selAcabamento?.nome_pt,
-      ]
-        .filter(Boolean)
-        .join(' ')
+      const descCurtaSaveEn = dataToSave.descricao_curta_en || previewCurtaEn
+      const autoDescCompletaEn = `${descCurtaSaveEn}${dataToSave.tamanho ? ` - ${dataToSave.tamanho}` : ''}${selAcabamento?.nome_en || selAcabamento?.nome_pt ? ` /${selAcabamento.nome_en || selAcabamento.nome_pt}` : ''}`
 
       await saveItem({
         ...dataToSave,
+        descr_pt: autoDescCompletaPt || 'Sem descrição',
+        descr_en: autoDescCompletaEn || '',
         descricao_catalogo_pt: autoDescCompletaPt || 'Sem descrição',
         descricao_catalogo_en: autoDescCompletaEn || '',
         data_atualizacao: new Date().toISOString(),
@@ -315,17 +311,11 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
     .filter(Boolean)
     .join(' ')
 
-  const autoDescCompletaPt = [autoDescCurtaPt, formData.tamanho, selAcabamento?.nome_pt]
-    .filter(Boolean)
-    .join(' ')
+  const descCurtaToUsePt = formData.descricao_curta || autoDescCurtaPt
+  const autoDescCompletaPt = `${descCurtaToUsePt}${formData.tamanho ? ` - ${formData.tamanho}` : ''}${selAcabamento?.nome_pt ? ` /${selAcabamento.nome_pt}` : ''}`
 
-  const autoDescCompletaEn = [
-    autoDescCurtaEn,
-    formData.tamanho,
-    selAcabamento?.nome_en || selAcabamento?.nome_pt,
-  ]
-    .filter(Boolean)
-    .join(' ')
+  const descCurtaToUseEn = formData.descricao_curta_en || autoDescCurtaEn
+  const autoDescCompletaEn = `${descCurtaToUseEn}${formData.tamanho ? ` - ${formData.tamanho}` : ''}${selAcabamento?.nome_en || selAcabamento?.nome_pt ? ` /${selAcabamento.nome_en || selAcabamento.nome_pt}` : ''}`
 
   const imageUrl =
     formData.foto_arquivo && item?.id

@@ -80,8 +80,8 @@ export function ItemFormModal({
       ...formData,
       descricao_curta: descricao_curta,
       descricao_curta_en: descricao_curta_en,
-      descr_pt: descricao_curta || 'Sem descrição',
-      descr_en: descricao_curta_en || '',
+      descr_pt: autoDescCompletaPt || 'Sem descrição',
+      descr_en: autoDescCompletaEn || '',
       descricao_catalogo_pt: autoDescCompletaPt || 'Sem descrição',
       descricao_catalogo_en: autoDescCompletaEn || '',
     } as Item)
@@ -122,16 +122,11 @@ export function ItemFormModal({
     .filter(Boolean)
     .join(' ')
 
-  const autoDescCompletaPt = [autoDescCurtaPt, formData.tamanho, selAcabamento?.nome_pt]
-    .filter(Boolean)
-    .join(' ')
-  const autoDescCompletaEn = [
-    autoDescCurtaEn,
-    formData.tamanho,
-    selAcabamento?.nome_en || selAcabamento?.nome_pt,
-  ]
-    .filter(Boolean)
-    .join(' ')
+  const descCurtaToUsePt = formData.descricao_curta || autoDescCurtaPt
+  const autoDescCompletaPt = `${descCurtaToUsePt}${formData.tamanho ? ` - ${formData.tamanho}` : ''}${selAcabamento?.nome_pt ? ` /${selAcabamento.nome_pt}` : ''}`
+
+  const descCurtaToUseEn = formData.descricao_curta_en || autoDescCurtaEn
+  const autoDescCompletaEn = `${descCurtaToUseEn}${formData.tamanho ? ` - ${formData.tamanho}` : ''}${selAcabamento?.nome_en || selAcabamento?.nome_pt ? ` /${selAcabamento.nome_en || selAcabamento.nome_pt}` : ''}`
 
   const renderTabContent = (lang: 'pt' | 'en') => {
     const isPt = lang === 'pt'

@@ -52,7 +52,6 @@ Return ONLY the generated string, without quotes or extra comments.`
     const desc = res.choices[0].message.content.trim()
     if (desc) {
       e.record.set('descricao_curta', desc)
-      e.record.set('descr_pt', desc)
     }
   } catch (err) {
     $app.logger().error('Failed to generate descricao_curta', 'error', err.message)
