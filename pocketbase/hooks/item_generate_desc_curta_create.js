@@ -9,16 +9,6 @@ onRecordCreate((e) => {
       } catch (_) {}
     }
 
-    const acabamentoId = e.record.getString('acabamento_id')
-    let acabamentoNome = ''
-    if (acabamentoId) {
-      try {
-        const a = $app.findRecordById('acabamentos', acabamentoId)
-        acabamentoNome = a.getString('nome_pt')
-      } catch (_) {}
-    }
-
-    const tamanho = e.record.getString('tamanho')
     const material = e.record.getString('material')
     const classe = e.record.getString('classe')
     const norma = e.record.getString('norma')
@@ -28,16 +18,15 @@ onRecordCreate((e) => {
     const inputData = {
       'Base Description': descBaseNome,
       Norm: norma,
-      Size: tamanho,
       'Thread Type': tipoRosca,
       'Thread Length': comprimentoRosca,
       'Material/Class': material || classe ? `${material} ${classe}`.trim() : '',
-      Finish: acabamentoNome,
     }
 
     const prompt = `You are a technical assistant for an industrial/commercial catalog.
 Given the following attributes, generate a concise, professional "Short Description" in Portuguese (PT-BR).
-Formatting standard: [Base Description] [Norm] [Size] [Thread Type] [Material/Class] [Finish].
+Formatting standard: [Base Description] [Norm] [Thread Type] [Thread Length] [Material/Class].
+DO NOT include Size or Finish details in this short description.
 Ignore any attributes that are empty or not provided.
 Return ONLY the generated string, without quotes or extra comments.`
 

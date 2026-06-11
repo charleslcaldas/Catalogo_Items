@@ -381,10 +381,10 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
           </div>
           <div className="flex flex-col min-w-0 flex-1">
             <h2 className="font-bold text-sm text-foreground break-words whitespace-normal leading-tight">
-              {autoDescCompletaPt || 'Nova Descrição Completa'}
+              {descCurtaToUsePt || 'Nova Descrição Curta'}
             </h2>
             <h3 className="text-[10px] text-muted-foreground break-words whitespace-normal leading-snug mt-0.5">
-              {autoDescCompletaEn || 'New Full Description'}
+              {descCurtaToUseEn || 'New Short Description'}
             </h3>
 
             <div className="mt-1 flex flex-wrap items-center gap-2">
