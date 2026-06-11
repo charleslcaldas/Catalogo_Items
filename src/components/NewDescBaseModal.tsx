@@ -51,7 +51,6 @@ export function NewDescBaseModal({
   const { categorias, linhas, ncms } = useData()
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState({
-    codigo: '',
     nome_pt: '',
     nome_en: '',
     categoria_id: '',
@@ -60,12 +59,13 @@ export function NewDescBaseModal({
   })
 
   const handleSave = async () => {
-    if (!data.codigo || !data.nome_pt || !data.categoria_id || !data.linha_id) {
+    if (!data.nome_pt || !data.categoria_id || !data.linha_id) {
       return toast.error('Preencha os campos obrigatórios')
     }
     try {
       setLoading(true)
-      const record = await pb.collection('descricoes_base').create({ ...data, ativo: true })
+      const codigo = `DESC-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
+      const record = await pb.collection('descricoes_base').create({ ...data, codigo, ativo: true })
       toast.success('Descrição Base criada')
       onSaved(record.id)
       onOpenChange(false)
@@ -83,12 +83,6 @@ export function NewDescBaseModal({
           <DialogTitle>Nova Descrição Base</DialogTitle>
         </DialogHeader>
         <div className="grid grid-cols-2 gap-4 py-4">
-          <Field label="Código *" className="col-span-2">
-            <Input
-              value={data.codigo}
-              onChange={(e) => setData({ ...data, codigo: e.target.value })}
-            />
-          </Field>
           <Field label="Nome (PT) *" className="col-span-2">
             <Input
               value={data.nome_pt}

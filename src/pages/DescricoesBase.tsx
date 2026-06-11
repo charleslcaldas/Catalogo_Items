@@ -137,7 +137,8 @@ export default function DescricoesBasePage() {
               <TableRow>
                 <TableHead>Descrição (PT)</TableHead>
                 <TableHead>Descrição (EN)</TableHead>
-                <TableHead>Categoria / Linha</TableHead>
+                <TableHead>Categoria</TableHead>
+                <TableHead>Linha</TableHead>
                 <TableHead>Impostos NCM</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="w-[120px] text-right">Ações</TableHead>
@@ -149,13 +150,9 @@ export default function DescricoesBasePage() {
                   <TableCell className="font-medium">{d.nome_pt}</TableCell>
                   <TableCell>{d.nome_en || '-'}</TableCell>
                   <TableCell>
-                    <span className="block text-xs text-muted-foreground">
-                      {categorias.find((c) => c.id === d.categoria_id)?.nome_pt}
-                    </span>
-                    <span className="font-medium text-sm">
-                      {linhas.find((l) => l.id === d.linha_id)?.nome_pt}
-                    </span>
+                    {categorias.find((c) => c.id === d.categoria_id)?.nome_pt || '-'}
                   </TableCell>
+                  <TableCell>{linhas.find((l) => l.id === d.linha_id)?.nome_pt || '-'}</TableCell>
                   <TableCell>
                     {(() => {
                       const n = ncms.find((x) => x.id === d.ncm_id)
@@ -205,7 +202,7 @@ export default function DescricoesBasePage() {
               ))}
               {filteredDesc.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     Nenhuma descrição base encontrada.
                   </TableCell>
                 </TableRow>
