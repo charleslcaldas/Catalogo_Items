@@ -60,8 +60,6 @@ export default function Lines() {
     return (
       l.nome_pt.toLowerCase().includes(term) ||
       (l.nome_en && l.nome_en.toLowerCase().includes(term)) ||
-      (l.superlinha_pt && l.superlinha_pt.toLowerCase().includes(term)) ||
-      (l.superlinha_en && l.superlinha_en.toLowerCase().includes(term)) ||
       getCatName(l.categoria_id).toLowerCase().includes(term)
     )
   })

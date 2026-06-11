@@ -158,15 +158,11 @@ export function LineModal({
     categoria_id: '',
     nome_pt: '',
     nome_en: '',
-    superlinha_pt: '',
-    superlinha_en: '',
-    ncm_id: '',
     color: '#000000',
   })
   const [saving, setSaving] = useState(false)
-  const { categorias, ncms, reloadMetadata } = useData()
+  const { categorias, reloadMetadata } = useData()
   const [catModalOpen, setCatModalOpen] = useState(false)
-  const [ncmModalOpen, setNcmModalOpen] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -175,9 +171,6 @@ export function LineModal({
           categoria_id: initialData.categoria_id || '',
           nome_pt: initialData.nome_pt || '',
           nome_en: initialData.nome_en || '',
-          superlinha_pt: initialData.superlinha_pt || '',
-          superlinha_en: initialData.superlinha_en || '',
-          ncm_id: initialData.ncm_id || '',
           color: initialData.color || '#000000',
         })
       } else {
@@ -185,9 +178,6 @@ export function LineModal({
           categoria_id: '',
           nome_pt: '',
           nome_en: '',
-          superlinha_pt: '',
-          superlinha_en: '',
-          ncm_id: '',
           color: '#000000',
         })
       }
@@ -196,14 +186,7 @@ export function LineModal({
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (
-      !data.categoria_id ||
-      !data.nome_pt ||
-      !data.nome_en ||
-      !data.superlinha_pt ||
-      !data.superlinha_en ||
-      !data.ncm_id
-    )
+    if (!data.categoria_id || !data.nome_pt)
       return toast.error('Preencha todos os campos obrigatórios')
     setSaving(true)
     try {
@@ -278,11 +261,8 @@ export function LineModal({
                 />
               </div>
               <div className="space-y-2">
-                <Label>
-                  Nome (EN) <span className="text-destructive">*</span>
-                </Label>
+                <Label>Nome (EN)</Label>
                 <Input
-                  required
                   value={data.nome_en}
                   onChange={(e) => setData({ ...data, nome_en: e.target.value })}
                 />
@@ -321,11 +301,6 @@ export function LineModal({
         open={catModalOpen}
         onOpenChange={setCatModalOpen}
         onSaved={(c) => setData({ ...data, categoria_id: c.id })}
-      />
-      <NcmModal
-        open={ncmModalOpen}
-        onOpenChange={setNcmModalOpen}
-        onSaved={(n) => setData({ ...data, ncm_id: n.id })}
       />
     </>
   )
