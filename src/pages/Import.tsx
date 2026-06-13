@@ -151,12 +151,16 @@ export default function ImportPage() {
             ? linhaNome
             : cache.linhas.get(linhaNome.toLowerCase())
           if (!linhaId) {
-            const newLinha = await pb
-              .collection('linhas')
-              .create({ nome_pt: linhaNome, categoria_id: categoryId })
-            linhaId = newLinha.id
-            cache.linhas.set(linhaNome.toLowerCase(), linhaId)
-            cache.linhasById.add(linhaId)
+            try {
+              const newLinha = await pb
+                .collection('linhas')
+                .create({ nome_pt: linhaNome, categoria_id: categoryId })
+              linhaId = newLinha.id
+              cache.linhas.set(linhaNome.toLowerCase(), linhaId)
+              cache.linhasById.add(linhaId)
+            } catch (err) {
+              console.warn('Failed to create Linha:', linhaNome, err)
+            }
           }
 
           const acabCodigo = String(
@@ -168,12 +172,16 @@ export default function ImportPage() {
               : cache.acabamentos.get(acabCodigo.toLowerCase())
             : undefined
           if (acabCodigo && !acabId) {
-            const newAcab = await pb
-              .collection('acabamentos')
-              .create({ codigo: acabCodigo, nome_pt: acabCodigo })
-            acabId = newAcab.id
-            cache.acabamentos.set(acabCodigo.toLowerCase(), acabId)
-            cache.acabamentosById.add(acabId)
+            try {
+              const newAcab = await pb
+                .collection('acabamentos')
+                .create({ codigo: acabCodigo, nome_pt: acabCodigo })
+              acabId = newAcab.id
+              cache.acabamentos.set(acabCodigo.toLowerCase(), acabId)
+              cache.acabamentosById.add(acabId)
+            } catch (err) {
+              console.warn('Failed to create Acabamento:', acabCodigo, err)
+            }
           }
 
           const ncmCodigo = String(
@@ -189,10 +197,14 @@ export default function ImportPage() {
               : cache.ncm.get(ncmCodigo.toLowerCase())
             : undefined
           if (ncmCodigo && !ncmId) {
-            const newNcm = await pb.collection('ncm').create({ codigo: ncmCodigo })
-            ncmId = newNcm.id
-            cache.ncm.set(ncmCodigo.toLowerCase(), ncmId)
-            cache.ncmById.add(ncmId)
+            try {
+              const newNcm = await pb.collection('ncm').create({ codigo: ncmCodigo })
+              ncmId = newNcm.id
+              cache.ncm.set(ncmCodigo.toLowerCase(), ncmId)
+              cache.ncmById.add(ncmId)
+            } catch (err) {
+              console.warn('Failed to create NCM:', ncmCodigo, err)
+            }
           }
 
           const rawUnidade = String(
@@ -210,10 +222,14 @@ export default function ImportPage() {
           }
 
           if (rawUnidade && !unidadeId && !cache.unidadesById.has(rawUnidade)) {
-            const newUnidade = await pb.collection('unidades_medida').create({ nome: rawUnidade })
-            unidadeId = newUnidade.id
-            cache.unidades.set(rawUnidade.toLowerCase(), unidadeId)
-            cache.unidadesById.add(unidadeId)
+            try {
+              const newUnidade = await pb.collection('unidades_medida').create({ nome: rawUnidade })
+              unidadeId = newUnidade.id
+              cache.unidades.set(rawUnidade.toLowerCase(), unidadeId)
+              cache.unidadesById.add(unidadeId)
+            } catch (err) {
+              console.warn('Failed to create Unidade:', rawUnidade, err)
+            }
           }
 
           const comprimento_rosca = String(

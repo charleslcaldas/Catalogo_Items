@@ -7,7 +7,7 @@ onRecordUpdate((e) => {
       if (text) {
         try {
           const prompt =
-            'You are a technical translator. Translate the following text from Portuguese to English. Return ONLY the translated text, without quotes. Do not append (EN). Technical fasteners context.'
+            'You are a technical translator. Translate the following text from Portuguese to English. Return ONLY the translated text, without quotes. Do not append (EN). Technical fasteners context. IMPORTANT: Do not translate technical grades or codes (e.g., "Gr8" must remain "Gr8", not "great").'
           const res = $ai.chat({
             model: 'fast',
             messages: [
@@ -56,7 +56,7 @@ onRecordUpdate((e) => {
     e.record.getString('informacao_extra'),
   ].filter(Boolean)
 
-  e.record.set('descricao_curta', ptParts.join(' '))
+  e.record.set('descricao_curta', ptParts.join(' ').replace(/\s+/g, ' ').trim())
 
   const enParts = [
     descBaseEn,
@@ -67,7 +67,7 @@ onRecordUpdate((e) => {
     e.record.getString('informacao_extra_en'),
   ].filter(Boolean)
 
-  e.record.set('descricao_curta_en', enParts.join(' '))
+  e.record.set('descricao_curta_en', enParts.join(' ').replace(/\s+/g, ' ').trim())
 
   return e.next()
 }, 'itens')
