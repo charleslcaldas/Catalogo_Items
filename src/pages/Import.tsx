@@ -96,9 +96,13 @@ export default function ImportPage() {
 
       const cache = {
         linhas: new Map(linhasList.map((l) => [l.nome_pt?.toLowerCase(), l.id])),
+        linhasById: new Set(linhasList.map((l) => l.id)),
         acabamentos: new Map(acabamentosList.map((a) => [a.codigo?.toLowerCase(), a.id])),
+        acabamentosById: new Set(acabamentosList.map((a) => a.id)),
         ncm: new Map(ncmList.map((n) => [n.codigo?.toLowerCase(), n.id])),
+        ncmById: new Set(ncmList.map((n) => n.id)),
         unidades: new Map(unidadesList.map((u) => [u.nome?.toLowerCase(), u.id])),
+        unidadesById: new Set(unidadesList.map((u) => u.id)),
         skus: new Map(itensList.map((i) => [i.sku, i.id])),
       }
 
@@ -129,56 +133,87 @@ export default function ImportPage() {
         ).trim()
         const linhaNome = String(
           row['cf_linha_from_desc_geral_portugues_'] ||
+            row['linha_id'] ||
             row['cf_linha'] ||
             row['linha'] ||
             row['Linha'] ||
             '',
         ).trim()
 
-        if (!descrPt || !linhaNome) {
+        if (!linhaNome) {
           errors++
-          errorDetails.push(`Linha ${i + 2} (${sku}): Descrição e Linha são obrigatórios.`)
+          errorDetails.push(`Linha ${i + 2} (${sku}): Linha é obrigatória.`)
           continue
         }
 
         try {
-          let linhaId = cache.linhas.get(linhaNome.toLowerCase())
+          let linhaId = cache.linhasById.has(linhaNome)
+            ? linhaNome
+            : cache.linhas.get(linhaNome.toLowerCase())
           if (!linhaId) {
             const newLinha = await pb
               .collection('linhas')
               .create({ nome_pt: linhaNome, categoria_id: categoryId })
             linhaId = newLinha.id
             cache.linhas.set(linhaNome.toLowerCase(), linhaId)
+            cache.linhasById.add(linhaId)
           }
 
           const acabCodigo = String(
-            row['acab_'] || row['acabamento'] || row['Acabamento'] || '',
+            row['acabamento_id'] || row['acab_'] || row['acabamento'] || row['Acabamento'] || '',
           ).trim()
-          let acabId = acabCodigo ? cache.acabamentos.get(acabCodigo.toLowerCase()) : undefined
+          let acabId = acabCodigo
+            ? cache.acabamentosById.has(acabCodigo)
+              ? acabCodigo
+              : cache.acabamentos.get(acabCodigo.toLowerCase())
+            : undefined
           if (acabCodigo && !acabId) {
             const newAcab = await pb
               .collection('acabamentos')
               .create({ codigo: acabCodigo, nome_pt: acabCodigo })
             acabId = newAcab.id
             cache.acabamentos.set(acabCodigo.toLowerCase(), acabId)
+            cache.acabamentosById.add(acabId)
           }
 
           const ncmCodigo = String(
-            row['cf_ncm_from_desc_geral_portugues_'] || row['cf_ncm'] || row['NCM'] || '',
+            row['ncm_id'] ||
+              row['cf_ncm_from_desc_geral_portugues_'] ||
+              row['cf_ncm'] ||
+              row['NCM'] ||
+              '',
           ).trim()
-          let ncmId = ncmCodigo ? cache.ncm.get(ncmCodigo.toLowerCase()) : undefined
+          let ncmId = ncmCodigo
+            ? cache.ncmById.has(ncmCodigo)
+              ? ncmCodigo
+              : cache.ncm.get(ncmCodigo.toLowerCase())
+            : undefined
           if (ncmCodigo && !ncmId) {
             const newNcm = await pb.collection('ncm').create({ codigo: ncmCodigo })
             ncmId = newNcm.id
             cache.ncm.set(ncmCodigo.toLowerCase(), ncmId)
+            cache.ncmById.add(ncmId)
           }
 
-          const unidadeStr = String(row['unidade'] || row['Unidade'] || 'Pcs').trim()
-          let unidadeId = unidadeStr ? cache.unidades.get(unidadeStr.toLowerCase()) : undefined
-          if (unidadeStr && !unidadeId) {
-            const newUnidade = await pb.collection('unidades_medida').create({ nome: unidadeStr })
+          const rawUnidade = String(
+            row['unidade_id'] || row['unidade'] || row['Unidade'] || 'Pcs',
+          ).trim()
+          let unidadeId = rawUnidade
+            ? cache.unidadesById.has(rawUnidade)
+              ? rawUnidade
+              : cache.unidades.get(rawUnidade.toLowerCase())
+            : undefined
+          let finalUnidadeName = rawUnidade
+          if (cache.unidadesById.has(rawUnidade)) {
+            const found = unidadesList.find((u) => u.id === rawUnidade)
+            finalUnidadeName = found ? found.nome : 'Pcs'
+          }
+
+          if (rawUnidade && !unidadeId && !cache.unidadesById.has(rawUnidade)) {
+            const newUnidade = await pb.collection('unidades_medida').create({ nome: rawUnidade })
             unidadeId = newUnidade.id
-            cache.unidades.set(unidadeStr.toLowerCase(), unidadeId)
+            cache.unidades.set(rawUnidade.toLowerCase(), unidadeId)
+            cache.unidadesById.add(unidadeId)
           }
 
           const comprimento_rosca = String(
@@ -211,7 +246,7 @@ export default function ImportPage() {
             acabamento_id: acabId,
             ncm_id: ncmId,
             unidade_id: unidadeId,
-            unidade: unidadeStr,
+            unidade: finalUnidadeName,
             comprimento_rosca,
             informacao_extra,
             descricao_extra,

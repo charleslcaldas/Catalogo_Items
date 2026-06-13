@@ -115,8 +115,8 @@ export function ItemFormModal({
 
   const autoDescCurtaPt = [
     descBasePt,
-    formData.material,
     formData.norma,
+    formData.classe_material,
     formData.tipo_rosca,
     formData.comprimento_rosca,
     formData.informacao_extra,
@@ -126,9 +126,9 @@ export function ItemFormModal({
 
   const autoDescCurtaEn = [
     descBaseEn,
-    formData.material,
     formData.norma,
-    formData.tipo_rosca,
+    formData.classe_material_en,
+    formData.tipo_rosca_en,
     formData.comprimento_rosca_en,
     formData.informacao_extra_en,
   ]

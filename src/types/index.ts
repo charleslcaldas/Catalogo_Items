@@ -141,7 +141,9 @@ export type Item = {
   descricao_base_pt?: string
   descricao_base_en?: string
   classe_material?: string
+  classe_material_en?: string
   tipo_rosca?: string
+  tipo_rosca_en?: string
   comprimento_rosca?: string
   informacao_extra?: string
   informacao_extra_en?: string
@@ -151,12 +153,6 @@ export type Item = {
   descricao_curta_en?: string
   tipo?: string
   subtipo?: string
-  voltagem?: string
-  potencia?: string
-  marca?: string
-  espessura?: string
-  dimensao?: string
-  tipo_vidro?: string
   foto_arquivo?: string
   fornecedor_ultima_atualizacao?: string
   unidade?: string

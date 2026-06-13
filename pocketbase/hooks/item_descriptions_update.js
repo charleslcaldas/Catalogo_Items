@@ -1,0 +1,73 @@
+onRecordUpdate((e) => {
+  function translateIfChanged(field, fieldEn) {
+    const text = e.record.getString(field)
+    const origText = e.record.original().getString(field)
+
+    if (text !== origText) {
+      if (text) {
+        try {
+          const prompt =
+            'You are a technical translator. Translate the following text from Portuguese to English. Return ONLY the translated text, without quotes. Do not append (EN). Technical fasteners context.'
+          const res = $ai.chat({
+            model: 'fast',
+            messages: [
+              { role: 'system', content: prompt },
+              { role: 'user', content: text },
+            ],
+          })
+          const translated = res.choices[0].message.content.trim()
+          e.record.set(fieldEn, translated)
+        } catch (err) {
+          $app.logger().error('Translation failed for ' + field, 'error', err.message)
+        }
+      } else {
+        e.record.set(fieldEn, '')
+      }
+    }
+  }
+
+  // 1. Translate if source fields changed
+  translateIfChanged('classe_material', 'classe_material_en')
+  translateIfChanged('tipo_rosca', 'tipo_rosca_en')
+  translateIfChanged('comprimento_rosca', 'comprimento_rosca_en')
+  translateIfChanged('informacao_extra', 'informacao_extra_en')
+  translateIfChanged('descricao_extra', 'descricao_extra_en')
+
+  // 2. We unconditionally regenerate the short description to ensure it stays in sync
+  // with any changes (e.g. if norma changed, or translation changed).
+  let descBasePt = e.record.getString('descricao_base_pt') || ''
+  let descBaseEn = e.record.getString('descricao_base_en') || ''
+  const descBaseId = e.record.getString('descricao_base_id')
+
+  if (descBaseId) {
+    try {
+      const d = $app.findRecordById('descricoes_base', descBaseId)
+      descBasePt = d.getString('nome_pt') || descBasePt
+      descBaseEn = d.getString('nome_en') || descBaseEn
+    } catch (_) {}
+  }
+
+  const ptParts = [
+    descBasePt,
+    e.record.getString('norma'),
+    e.record.getString('classe_material'),
+    e.record.getString('tipo_rosca'),
+    e.record.getString('comprimento_rosca'),
+    e.record.getString('informacao_extra'),
+  ].filter(Boolean)
+
+  e.record.set('descricao_curta', ptParts.join(' '))
+
+  const enParts = [
+    descBaseEn,
+    e.record.getString('norma'),
+    e.record.getString('classe_material_en'),
+    e.record.getString('tipo_rosca_en'),
+    e.record.getString('comprimento_rosca_en'),
+    e.record.getString('informacao_extra_en'),
+  ].filter(Boolean)
+
+  e.record.set('descricao_curta_en', enParts.join(' '))
+
+  return e.next()
+}, 'itens')

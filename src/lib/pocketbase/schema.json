@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-13T11:47:45.633Z",
+  "generatedAt": "2026-06-13T12:07:58.500Z",
   "collections": [
     {
       "name": "users",
@@ -444,42 +444,6 @@
           "system": false
         },
         {
-          "name": "voltagem",
-          "type": "text",
-          "required": false,
-          "system": false
-        },
-        {
-          "name": "potencia",
-          "type": "text",
-          "required": false,
-          "system": false
-        },
-        {
-          "name": "marca",
-          "type": "text",
-          "required": false,
-          "system": false
-        },
-        {
-          "name": "espessura",
-          "type": "text",
-          "required": false,
-          "system": false
-        },
-        {
-          "name": "dimensao",
-          "type": "text",
-          "required": false,
-          "system": false
-        },
-        {
-          "name": "tipo_vidro",
-          "type": "text",
-          "required": false,
-          "system": false
-        },
-        {
           "name": "foto_arquivo",
           "type": "file",
           "required": false,
@@ -586,6 +550,18 @@
         },
         {
           "name": "descricao_extra_en",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "classe_material_en",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tipo_rosca_en",
           "type": "text",
           "required": false,
           "system": false
