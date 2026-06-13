@@ -19,6 +19,7 @@ import { Label } from '@/components/ui/label'
 import { useData } from '@/contexts/data-context'
 import { toast } from 'sonner'
 import pb from '@/lib/pocketbase/client'
+import { extractFieldErrors, getErrorMessage } from '@/lib/pocketbase/errors'
 
 function Field({
   label,
@@ -70,7 +71,12 @@ export function NewDescBaseModal({
       onSaved(record.id)
       onOpenChange(false)
     } catch (err: any) {
-      toast.error('Erro ao salvar Descrição Base: ' + err.message)
+      const fieldErrors = extractFieldErrors(err)
+      if (fieldErrors.nome_pt) {
+        toast.error('Esta descrição já está cadastrada.')
+      } else {
+        toast.error('Erro ao salvar Descrição Base: ' + getErrorMessage(err))
+      }
     } finally {
       setLoading(false)
     }

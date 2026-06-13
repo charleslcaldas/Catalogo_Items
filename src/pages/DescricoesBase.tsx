@@ -28,9 +28,10 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { useData, DescricaoBase } from '@/contexts/data-context'
-import { Plus, Edit, Copy, Search } from 'lucide-react'
+import { Plus, Copy, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { toast } from 'sonner'
 import pb from '@/lib/pocketbase/client'
+import { extractFieldErrors, getErrorMessage } from '@/lib/pocketbase/errors'
 
 export default function DescricoesBasePage() {
   const { descricoesBase, categorias, linhas, ncms, reloadMetadata } = useData()
@@ -38,6 +39,10 @@ export default function DescricoesBasePage() {
   const [editingItem, setEditingItem] = useState<Partial<DescricaoBase> | null>(null)
   const [saving, setSaving] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [sortField, setSortField] = useState<'nome_pt' | 'nome_en' | 'categoria' | 'linha' | null>(
+    null,
+  )
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null)
 
   const filteredDesc = descricoesBase.filter((d) => {
     const term = searchTerm.toLowerCase()
@@ -62,6 +67,57 @@ export default function DescricoesBasePage() {
     setModalOpen(true)
   }
 
+  const handleSort = (field: 'nome_pt' | 'nome_en' | 'categoria' | 'linha') => {
+    if (sortField === field) {
+      if (sortOrder === 'asc') setSortOrder('desc')
+      else if (sortOrder === 'desc') {
+        setSortField(null)
+        setSortOrder(null)
+      }
+    } else {
+      setSortField(field)
+      setSortOrder('asc')
+    }
+  }
+
+  const SortIcon = ({ field }: { field: 'nome_pt' | 'nome_en' | 'categoria' | 'linha' }) => {
+    if (sortField !== field) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-50 inline-block" />
+    return sortOrder === 'asc' ? (
+      <ArrowUp className="ml-2 h-4 w-4 inline-block" />
+    ) : (
+      <ArrowDown className="ml-2 h-4 w-4 inline-block" />
+    )
+  }
+
+  let sortedDesc = [...filteredDesc]
+  if (sortField && sortOrder) {
+    sortedDesc.sort((a, b) => {
+      let valA = ''
+      let valB = ''
+
+      if (sortField === 'nome_pt') {
+        valA = a.nome_pt
+        valB = b.nome_pt
+      } else if (sortField === 'nome_en') {
+        valA = a.nome_en || ''
+        valB = b.nome_en || ''
+      } else if (sortField === 'categoria') {
+        valA = categorias.find((c) => c.id === a.categoria_id)?.nome_pt || ''
+        valB = categorias.find((c) => c.id === b.categoria_id)?.nome_pt || ''
+      } else if (sortField === 'linha') {
+        valA = linhas.find((l) => l.id === a.linha_id)?.nome_pt || ''
+        valB = linhas.find((l) => l.id === b.linha_id)?.nome_pt || ''
+      }
+
+      valA = valA.toLowerCase()
+      valB = valB.toLowerCase()
+
+      if (valA < valB) return sortOrder === 'asc' ? -1 : 1
+      if (valA > valB) return sortOrder === 'asc' ? 1 : -1
+      return 0
+    })
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingItem?.nome_pt || !editingItem?.categoria_id || !editingItem?.linha_id) {
@@ -82,7 +138,12 @@ export default function DescricoesBasePage() {
       await reloadMetadata()
       setModalOpen(false)
     } catch (err: any) {
-      toast.error('Erro ao salvar: ' + err.message)
+      const fieldErrors = extractFieldErrors(err)
+      if (fieldErrors.nome_pt) {
+        toast.error('Esta descrição já está cadastrada.')
+      } else {
+        toast.error('Erro ao salvar: ' + getErrorMessage(err))
+      }
     } finally {
       setSaving(false)
     }
@@ -135,20 +196,50 @@ export default function DescricoesBasePage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Descrição (PT)</TableHead>
-                <TableHead>Descrição (EN)</TableHead>
-                <TableHead>Categoria</TableHead>
-                <TableHead>Linha</TableHead>
+                <TableHead
+                  className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                  onClick={() => handleSort('nome_pt')}
+                >
+                  Descrição (PT) <SortIcon field="nome_pt" />
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                  onClick={() => handleSort('nome_en')}
+                >
+                  Descrição (EN) <SortIcon field="nome_en" />
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                  onClick={() => handleSort('categoria')}
+                >
+                  Categoria <SortIcon field="categoria" />
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                  onClick={() => handleSort('linha')}
+                >
+                  Linha <SortIcon field="linha" />
+                </TableHead>
                 <TableHead>Impostos NCM</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="w-[120px] text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredDesc.map((d) => (
+              {sortedDesc.map((d) => (
                 <TableRow key={d.id}>
-                  <TableCell className="font-medium">{d.nome_pt}</TableCell>
-                  <TableCell>{d.nome_en || '-'}</TableCell>
+                  <TableCell
+                    className="font-medium cursor-pointer hover:text-primary hover:underline transition-colors"
+                    onClick={() => handleEdit(d)}
+                  >
+                    {d.nome_pt}
+                  </TableCell>
+                  <TableCell
+                    className="cursor-pointer hover:text-primary hover:underline transition-colors"
+                    onClick={() => handleEdit(d)}
+                  >
+                    {d.nome_en || '-'}
+                  </TableCell>
                   <TableCell>
                     {categorias.find((c) => c.id === d.categoria_id)?.nome_pt || '-'}
                   </TableCell>
@@ -184,14 +275,6 @@ export default function DescricoesBasePage() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => handleEdit(d)}
-                      title="Editar"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
                       onClick={() => handleDuplicate(d)}
                       title="Duplicar"
                     >
@@ -200,7 +283,7 @@ export default function DescricoesBasePage() {
                   </TableCell>
                 </TableRow>
               ))}
-              {filteredDesc.length === 0 && (
+              {sortedDesc.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     Nenhuma descrição base encontrada.

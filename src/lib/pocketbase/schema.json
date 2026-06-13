@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-12T01:56:11.220Z",
+  "generatedAt": "2026-06-13T03:10:58.872Z",
   "collections": [
     {
       "name": "users",
@@ -1058,7 +1058,10 @@
           "autodateTriggers": ["onCreate", "onUpdate"]
         }
       ],
-      "indexes": ["CREATE UNIQUE INDEX idx_descricoes_base_codigo ON descricoes_base (codigo)"]
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_descricoes_base_codigo ON descricoes_base (codigo)",
+        "CREATE UNIQUE INDEX `idx_descricoes_base_nome_pt` ON `descricoes_base` (nome_pt)"
+      ]
     }
   ]
 }
