@@ -25,6 +25,7 @@ import { SearchableSelect } from '@/components/SearchableSelect'
 import { NewDescBaseModal } from '@/components/NewDescBaseModal'
 import { PriceInput } from '@/components/PriceInput'
 import { useAtributosLinha } from '@/hooks/use-atributos-linha'
+import { extractFieldErrors, getErrorMessage } from '@/lib/pocketbase/errors'
 
 function Field({
   label,
@@ -275,7 +276,15 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
 
       if (!item) onClose()
     } catch (err: any) {
-      toast.error('Erro ao salvar: ' + err.message, { id: toastId })
+      const fieldErrors = extractFieldErrors(err)
+      if (Object.keys(fieldErrors).length > 0) {
+        const msgs = Object.entries(fieldErrors)
+          .map(([f, m]) => `${f}: ${m}`)
+          .join(', ')
+        toast.error(`Erro de validação: ${msgs}`, { id: toastId })
+      } else {
+        toast.error('Erro ao salvar: ' + (getErrorMessage(err) || err.message), { id: toastId })
+      }
     }
   }
 

@@ -28,6 +28,7 @@ import { LineModal, FinishModal, NcmModal } from '@/components/MetadataModals'
 import { toast } from 'sonner'
 import { PriceInput } from '@/components/PriceInput'
 import pb from '@/lib/pocketbase/client'
+import { extractFieldErrors, getErrorMessage } from '@/lib/pocketbase/errors'
 
 export function ItemFormModal({
   open,
@@ -68,7 +69,7 @@ export function ItemFormModal({
     }
   }, [item, open])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formData.sku || !formData.linha_id)
       return toast.error('Preencha todos os campos obrigatórios (SKU, Linha)')
@@ -76,16 +77,28 @@ export function ItemFormModal({
     const descricao_curta = formData.descricao_curta || autoDescCurtaPt
     const descricao_curta_en = formData.descricao_curta_en || autoDescCurtaEn
 
-    saveItem({
-      ...formData,
-      descricao_curta: descricao_curta,
-      descricao_curta_en: descricao_curta_en,
-      descr_pt: autoDescCompletaPt || 'Sem descrição',
-      descr_en: autoDescCompletaEn || '',
-      descricao_catalogo_pt: autoDescCompletaPt || 'Sem descrição',
-      descricao_catalogo_en: autoDescCompletaEn || '',
-    } as Item)
-    onOpenChange(false)
+    try {
+      await saveItem({
+        ...formData,
+        descricao_curta: descricao_curta,
+        descricao_curta_en: descricao_curta_en,
+        descr_pt: autoDescCompletaPt || 'Sem descrição',
+        descr_en: autoDescCompletaEn || '',
+        descricao_catalogo_pt: autoDescCompletaPt || 'Sem descrição',
+        descricao_catalogo_en: autoDescCompletaEn || '',
+      } as Item)
+      onOpenChange(false)
+    } catch (err: any) {
+      const fieldErrors = extractFieldErrors(err)
+      if (Object.keys(fieldErrors).length > 0) {
+        const msgs = Object.entries(fieldErrors)
+          .map(([f, m]) => `${f}: ${m}`)
+          .join(', ')
+        toast.error(`Erro de validação: ${msgs}`)
+      } else {
+        toast.error('Erro ao salvar: ' + (getErrorMessage(err) || err.message))
+      }
+    }
   }
 
   const selectedNcmObj = ncms.find((n) => n.id === formData.ncm_id)

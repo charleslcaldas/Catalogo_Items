@@ -8,6 +8,10 @@ onRecordUpdate((e) => {
       'norma',
       'tipo_rosca',
       'comprimento_rosca',
+      'tamanho',
+      'acabamento_id',
+      'informacao_extra',
+      'classe_material',
     ]
     const hasChanges = fields.some(
       (f) => e.record.getString(f) !== e.record.original().getString(f),

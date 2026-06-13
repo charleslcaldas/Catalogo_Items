@@ -71,7 +71,7 @@ onRecordAfterUpdateSuccess((e) => {
       timeout: 10,
     })
   } catch (err) {
-    console.log('Zoho sync update failed: ', err.message)
+    $app.logger().error('Zoho sync update failed', 'error', err.message)
   }
   return e.next()
 }, 'itens')

@@ -80,13 +80,15 @@ export default function ImportPage() {
 
       setStats((s) => ({ ...s, total: rows.length }))
 
-      const [categoriasList, linhasList, acabamentosList, ncmList, itensList] = await Promise.all([
-        pb.collection('categorias').getFullList(),
-        pb.collection('linhas').getFullList(),
-        pb.collection('acabamentos').getFullList(),
-        pb.collection('ncm').getFullList(),
-        pb.collection('itens').getFullList({ fields: 'id,sku' }),
-      ])
+      const [categoriasList, linhasList, acabamentosList, ncmList, unidadesList, itensList] =
+        await Promise.all([
+          pb.collection('categorias').getFullList(),
+          pb.collection('linhas').getFullList(),
+          pb.collection('acabamentos').getFullList(),
+          pb.collection('ncm').getFullList(),
+          pb.collection('unidades_medida').getFullList(),
+          pb.collection('itens').getFullList({ fields: 'id,sku' }),
+        ])
 
       let categoryId = categoriasList.find((c) => c.nome_pt === 'Importado')?.id
       if (!categoryId)
@@ -96,6 +98,7 @@ export default function ImportPage() {
         linhas: new Map(linhasList.map((l) => [l.nome_pt?.toLowerCase(), l.id])),
         acabamentos: new Map(acabamentosList.map((a) => [a.codigo?.toLowerCase(), a.id])),
         ncm: new Map(ncmList.map((n) => [n.codigo?.toLowerCase(), n.id])),
+        unidades: new Map(unidadesList.map((u) => [u.nome?.toLowerCase(), u.id])),
         skus: new Map(itensList.map((i) => [i.sku, i.id])),
       }
 
@@ -170,6 +173,30 @@ export default function ImportPage() {
             cache.ncm.set(ncmCodigo.toLowerCase(), ncmId)
           }
 
+          const unidadeStr = String(row['unidade'] || row['Unidade'] || 'Pcs').trim()
+          let unidadeId = unidadeStr ? cache.unidades.get(unidadeStr.toLowerCase()) : undefined
+          if (unidadeStr && !unidadeId) {
+            const newUnidade = await pb.collection('unidades_medida').create({ nome: unidadeStr })
+            unidadeId = newUnidade.id
+            cache.unidades.set(unidadeStr.toLowerCase(), unidadeId)
+          }
+
+          const comprimento_rosca = String(
+            row['comprimento_rosca'] || row['Comprimento Rosca'] || '',
+          ).trim()
+          const informacao_extra = String(
+            row['informacao_extra'] || row['Informação Extra'] || '',
+          ).trim()
+          const descricao_extra = String(
+            row['descricao_extra'] || row['Descrição Extra'] || '',
+          ).trim()
+          const classe = String(row['classe'] || row['Classe'] || '').trim()
+          const norma = String(row['norma'] || row['Norma'] || '').trim()
+          const classe_material = String(
+            row['classe_material'] || row['Classe Material'] || '',
+          ).trim()
+          const tipo_rosca = String(row['tipo_rosca'] || row['Tipo Rosca'] || '').trim()
+
           const itemData = {
             sku,
             linha_id: linhaId,
@@ -183,6 +210,15 @@ export default function ImportPage() {
             foto_url: String(row['photo'] || row['foto_url'] || ''),
             acabamento_id: acabId,
             ncm_id: ncmId,
+            unidade_id: unidadeId,
+            unidade: unidadeStr,
+            comprimento_rosca,
+            informacao_extra,
+            descricao_extra,
+            classe,
+            norma,
+            classe_material,
+            tipo_rosca,
             sincronizado_com_zoho: true,
             data_sincronizacao: new Date().toISOString(),
             ativo: true,

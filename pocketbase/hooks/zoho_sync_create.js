@@ -32,7 +32,7 @@ onRecordAfterCreateSuccess((e) => {
       timeout: 10,
     })
   } catch (err) {
-    console.log('Zoho sync create failed: ', err.message)
+    $app.logger().error('Zoho sync create failed', 'error', err.message)
   }
   return e.next()
 }, 'itens')

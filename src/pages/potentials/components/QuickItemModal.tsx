@@ -20,6 +20,7 @@ import { useData } from '@/contexts/data-context'
 import type { Item } from '@/types'
 import pb from '@/lib/pocketbase/client'
 import { toast } from 'sonner'
+import { extractFieldErrors, getErrorMessage } from '@/lib/pocketbase/errors'
 import { Plus } from 'lucide-react'
 import { LineModal, FinishModal } from '@/components/MetadataModals'
 import { getContrastColor } from '@/lib/utils'
@@ -69,8 +70,7 @@ export function QuickItemModal({ open, onOpenChange, initialData, onSaved }: Qui
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.sku || !formData.linha_id || !formData.descr_pt)
-      return toast.error('Preencha todos os campos obrigatórios')
+    if (!formData.sku || !formData.linha_id) return toast.error('Preencha os campos obrigatórios')
     setIsSaving(true)
     try {
       const record = await pb.collection('itens').create(formData)
@@ -85,8 +85,16 @@ export function QuickItemModal({ open, onOpenChange, initialData, onSaved }: Qui
       onSaved(expandedRecord as Item)
       toast.success('Item salvo com sucesso!')
       onOpenChange(false)
-    } catch (error) {
-      toast.error('Erro ao salvar o item.')
+    } catch (error: any) {
+      const fieldErrors = extractFieldErrors(error)
+      if (Object.keys(fieldErrors).length > 0) {
+        const msgs = Object.entries(fieldErrors)
+          .map(([f, m]) => `${f}: ${m}`)
+          .join(', ')
+        toast.error(`Erro de validação: ${msgs}`)
+      } else {
+        toast.error('Erro ao salvar: ' + (getErrorMessage(error) || error.message))
+      }
     } finally {
       setIsSaving(false)
     }
@@ -144,11 +152,8 @@ export function QuickItemModal({ open, onOpenChange, initialData, onSaved }: Qui
                 </div>
               </div>
               <div className="space-y-2 col-span-2">
-                <Label>
-                  Descrição Completa (PT) <span className="text-destructive">*</span>
-                </Label>
+                <Label>Descrição Completa (PT)</Label>
                 <Input
-                  required
                   value={formData.descr_pt || ''}
                   onChange={(e) => setFormData({ ...formData, descr_pt: e.target.value })}
                 />
