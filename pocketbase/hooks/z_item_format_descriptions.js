@@ -34,7 +34,6 @@ onRecordCreate((e) => {
   } catch (err) {
     $app.logger().error('Failed to format descriptions', 'error', err.message)
   }
-  e.next()
 }, 'itens')
 
 onRecordUpdate((e) => {
@@ -72,5 +71,4 @@ onRecordUpdate((e) => {
   } catch (err) {
     $app.logger().error('Failed to format descriptions', 'error', err.message)
   }
-  e.next()
 }, 'itens')

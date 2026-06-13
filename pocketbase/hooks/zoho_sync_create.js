@@ -34,6 +34,4 @@ onRecordAfterCreateSuccess((e) => {
   } catch (err) {
     console.log('Zoho sync create failed: ', err.message)
   }
-
-  e.next()
 }, 'itens')

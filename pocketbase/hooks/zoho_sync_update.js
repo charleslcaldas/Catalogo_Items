@@ -38,7 +38,7 @@ onRecordAfterUpdateSuccess((e) => {
   }
 
   if (!changed) {
-    return e.next()
+    return
   }
 
   const pbUrl =
@@ -73,6 +73,4 @@ onRecordAfterUpdateSuccess((e) => {
   } catch (err) {
     console.log('Zoho sync update failed: ', err.message)
   }
-
-  e.next()
 }, 'itens')

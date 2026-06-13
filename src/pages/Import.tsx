@@ -23,6 +23,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import * as XLSX from 'xlsx'
+import { getErrorMessage } from '@/lib/pocketbase/errors'
 
 const parseNumber = (val: any) => {
   if (typeof val === 'number') return val
@@ -196,7 +197,10 @@ export default function ImportPage() {
           successes++
         } catch (err: any) {
           errors++
-          errorDetails.push(`Linha ${i + 2} (${sku}): ${err.message || 'Erro desconhecido'}`)
+          const detailedError = getErrorMessage(err)
+          errorDetails.push(
+            `Linha ${i + 2} (${sku}): ${detailedError || err.message || 'Erro desconhecido'}`,
+          )
         }
       }
 
@@ -222,7 +226,7 @@ export default function ImportPage() {
       toast({
         variant: 'destructive',
         title: 'Erro na importação',
-        description: err.message || 'Falha ao processar o arquivo.',
+        description: getErrorMessage(err) || err.message || 'Falha ao processar o arquivo.',
       })
     }
   }
