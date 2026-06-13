@@ -14,7 +14,7 @@ onRecordUpdate((e) => {
     )
 
     if (!hasChanges && e.record.getString('descricao_curta')) {
-      return
+      return e.next()
     }
 
     const descBaseId = e.record.getString('descricao_base_id')
@@ -62,4 +62,5 @@ Return ONLY the generated string, without quotes or extra comments.`
   } catch (err) {
     $app.logger().error('Failed to generate descricao_curta', 'error', err.message)
   }
+  return e.next()
 }, 'itens')

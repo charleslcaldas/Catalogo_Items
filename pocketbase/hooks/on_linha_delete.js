@@ -9,4 +9,5 @@ onRecordDeleteRequest((e) => {
       throw err
     }
   }
+  return e.next()
 }, 'linhas')

@@ -28,4 +28,5 @@ onRecordCreate((e) => {
   translateField('informacao_extra', 'informacao_extra_en')
   translateField('descricao_extra', 'descricao_extra_en')
   translateField('descricao_curta', 'descricao_curta_en')
+  return e.next()
 }, 'itens')

@@ -45,4 +45,5 @@ Return ONLY the generated string, without quotes or extra comments.`
   } catch (err) {
     $app.logger().error('Failed to generate descricao_curta', 'error', err.message)
   }
+  return e.next()
 }, 'itens')

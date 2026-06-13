@@ -34,4 +34,5 @@ onRecordUpdate((e) => {
   translateIfChanged('informacao_extra', 'informacao_extra_en')
   translateIfChanged('descricao_extra', 'descricao_extra_en')
   translateIfChanged('descricao_curta', 'descricao_curta_en')
+  return e.next()
 }, 'itens')
