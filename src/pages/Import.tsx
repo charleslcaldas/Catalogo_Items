@@ -22,64 +22,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import * as XLSX from 'xlsx'
 
-function parseCSV(text: string): Record<string, string>[] {
-  const rows: Record<string, string>[] = []
-  let currentHeader: string[] = []
-  let currentObj: Record<string, string> = {}
-  let currentCell = ''
-  let inQuotes = false
-  let rowIdx = 0
-  let colIdx = 0
-
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i]
-    const nextChar = text[i + 1]
-
-    if (char === '"') {
-      if (inQuotes && nextChar === '"') {
-        currentCell += '"'
-        i++
-      } else {
-        inQuotes = !inQuotes
-      }
-    } else if (char === ',' && !inQuotes) {
-      if (rowIdx === 0) currentHeader.push(currentCell.trim())
-      else currentObj[currentHeader[colIdx]] = currentCell.trim()
-      currentCell = ''
-      colIdx++
-    } else if ((char === '\n' || (char === '\r' && nextChar === '\n')) && !inQuotes) {
-      if (char === '\r') i++
-
-      if (rowIdx === 0) {
-        currentHeader.push(currentCell.trim())
-      } else {
-        currentObj[currentHeader[colIdx]] = currentCell.trim()
-        if (Object.keys(currentObj).some((k) => currentObj[k])) {
-          rows.push({ ...currentObj })
-        }
-      }
-      currentObj = {}
-      currentCell = ''
-      colIdx = 0
-      rowIdx++
-    } else {
-      currentCell += char
-    }
-  }
-
-  if (currentCell || colIdx > 0) {
-    if (rowIdx === 0) {
-      currentHeader.push(currentCell.trim())
-    } else {
-      currentObj[currentHeader[colIdx]] = currentCell.trim()
-      if (Object.keys(currentObj).some((k) => currentObj[k])) {
-        rows.push({ ...currentObj })
-      }
-    }
-  }
-
-  return rows
+const parseNumber = (val: any) => {
+  if (typeof val === 'number') return val
+  if (!val) return 0
+  let cleanVal = String(val).trim()
+  if (cleanVal.includes('.') && cleanVal.includes(','))
+    cleanVal = cleanVal.replace(/\./g, '').replace(',', '.')
+  else if (cleanVal.includes(',')) cleanVal = cleanVal.replace(',', '.')
+  const parsed = parseFloat(cleanVal)
+  return isNaN(parsed) ? 0 : parsed
 }
 
 export default function ImportPage() {
@@ -112,28 +65,17 @@ export default function ImportPage() {
     }
   }
 
-  const parseNumber = (val: string) => {
-    if (!val) return 0
-    let cleanVal = val.trim()
-    if (cleanVal.includes('.') && cleanVal.includes(',')) {
-      cleanVal = cleanVal.replace(/\./g, '').replace(',', '.')
-    } else if (cleanVal.includes(',')) {
-      cleanVal = cleanVal.replace(',', '.')
-    }
-    const parsed = parseFloat(cleanVal)
-    return isNaN(parsed) ? 0 : parsed
-  }
-
   const processImport = async () => {
     if (!file) return
-
     setStatus('loading')
     setStats({ total: 0, processed: 0, successes: 0, duplicates: 0, errors: 0 })
     setSummary(null)
 
     try {
-      const text = await file.text()
-      const rows = parseCSV(text)
+      const data = await file.arrayBuffer()
+      const workbook = XLSX.read(data, { type: 'array' })
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]]
+      const rows = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet)
 
       setStats((s) => ({ ...s, total: rows.length }))
 
@@ -142,121 +84,115 @@ export default function ImportPage() {
         pb.collection('linhas').getFullList(),
         pb.collection('acabamentos').getFullList(),
         pb.collection('ncm').getFullList(),
-        pb.collection('itens').getFullList({ fields: 'sku,item_id_books' }),
+        pb.collection('itens').getFullList({ fields: 'id,sku' }),
       ])
 
       let categoryId = categoriasList.find((c) => c.nome_pt === 'Importado')?.id
-      if (!categoryId) {
-        const newCat = await pb.collection('categorias').create({ nome_pt: 'Importado' })
-        categoryId = newCat.id
-      }
+      if (!categoryId)
+        categoryId = (await pb.collection('categorias').create({ nome_pt: 'Importado' })).id
 
       const cache = {
         linhas: new Map(linhasList.map((l) => [l.nome_pt?.toLowerCase(), l.id])),
         acabamentos: new Map(acabamentosList.map((a) => [a.codigo?.toLowerCase(), a.id])),
         ncm: new Map(ncmList.map((n) => [n.codigo?.toLowerCase(), n.id])),
-        skus: new Set(itensList.map((i) => i.sku)),
-        itemIds: new Set(itensList.map((i) => i.item_id_books).filter(Boolean)),
+        skus: new Map(itensList.map((i) => [i.sku, i.id])),
       }
 
-      let successes = 0
-      let duplicates = 0
-      let errors = 0
+      let successes = 0,
+        duplicates = 0,
+        errors = 0
       const errorDetails: string[] = []
+      const processedSkusThisRun = new Set<string>()
 
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i]
-        const sku = row['sku'] || row['SKU'] || ''
-        const itemId = row['item_id_books'] || ''
+        if (i % 10 === 0 || i === rows.length - 1) setStats((s) => ({ ...s, processed: i + 1 }))
 
-        if (i % 5 === 0 || i === rows.length - 1) {
-          setStats((s) => ({ ...s, processed: i + 1 }))
-        }
-
-        if (!sku || !itemId) {
+        const sku = String(row['sku'] || row['SKU'] || '').trim()
+        if (!sku) {
           errors++
-          errorDetails.push(`Linha ${i + 2}: SKU e item_id_books são obrigatórios`)
+          errorDetails.push(`Linha ${i + 2}: SKU é obrigatório.`)
           continue
         }
-
-        if (cache.skus.has(sku)) {
+        if (processedSkusThisRun.has(sku)) {
           duplicates++
           continue
         }
+        processedSkusThisRun.add(sku)
 
-        if (cache.itemIds.has(itemId)) {
-          duplicates++
+        const descrPt = String(
+          row['desc_geral_portugues'] || row['descr_pt'] || row['Descrição'] || '',
+        ).trim()
+        const linhaNome = String(
+          row['cf_linha_from_desc_geral_portugues_'] ||
+            row['cf_linha'] ||
+            row['linha'] ||
+            row['Linha'] ||
+            '',
+        ).trim()
+
+        if (!descrPt || !linhaNome) {
+          errors++
+          errorDetails.push(`Linha ${i + 2} (${sku}): Descrição e Linha são obrigatórios.`)
           continue
         }
 
         try {
-          const linhaNome = row['cf_linha_from_desc_geral_portugues_'] || row['cf_linha'] || ''
-          let linhaId = ''
-          if (linhaNome) {
-            const lKey = linhaNome.toLowerCase()
-            if (cache.linhas.has(lKey)) {
-              linhaId = cache.linhas.get(lKey)!
-            } else {
-              const newLinha = await pb.collection('linhas').create({
-                nome_pt: linhaNome,
-                categoria_id: categoryId,
-              })
-              linhaId = newLinha.id
-              cache.linhas.set(lKey, linhaId)
-            }
+          let linhaId = cache.linhas.get(linhaNome.toLowerCase())
+          if (!linhaId) {
+            const newLinha = await pb
+              .collection('linhas')
+              .create({ nome_pt: linhaNome, categoria_id: categoryId })
+            linhaId = newLinha.id
+            cache.linhas.set(linhaNome.toLowerCase(), linhaId)
           }
 
-          const acabCodigo = row['acab_'] || row['acabamento'] || ''
-          let acabId = ''
-          if (acabCodigo) {
-            const aKey = acabCodigo.toLowerCase()
-            if (cache.acabamentos.has(aKey)) {
-              acabId = cache.acabamentos.get(aKey)!
-            } else {
-              const newAcab = await pb.collection('acabamentos').create({
-                codigo: acabCodigo,
-                nome_pt: acabCodigo,
-              })
-              acabId = newAcab.id
-              cache.acabamentos.set(aKey, acabId)
-            }
+          const acabCodigo = String(
+            row['acab_'] || row['acabamento'] || row['Acabamento'] || '',
+          ).trim()
+          let acabId = acabCodigo ? cache.acabamentos.get(acabCodigo.toLowerCase()) : undefined
+          if (acabCodigo && !acabId) {
+            const newAcab = await pb
+              .collection('acabamentos')
+              .create({ codigo: acabCodigo, nome_pt: acabCodigo })
+            acabId = newAcab.id
+            cache.acabamentos.set(acabCodigo.toLowerCase(), acabId)
           }
 
-          const ncmCodigo = row['cf_ncm_from_desc_geral_portugues_'] || row['cf_ncm'] || ''
-          let ncmId = ''
-          if (ncmCodigo) {
-            const nKey = ncmCodigo.toLowerCase()
-            if (cache.ncm.has(nKey)) {
-              ncmId = cache.ncm.get(nKey)!
-            } else {
-              const newNcm = await pb.collection('ncm').create({
-                codigo: ncmCodigo,
-              })
-              ncmId = newNcm.id
-              cache.ncm.set(nKey, ncmId)
-            }
+          const ncmCodigo = String(
+            row['cf_ncm_from_desc_geral_portugues_'] || row['cf_ncm'] || row['NCM'] || '',
+          ).trim()
+          let ncmId = ncmCodigo ? cache.ncm.get(ncmCodigo.toLowerCase()) : undefined
+          if (ncmCodigo && !ncmId) {
+            const newNcm = await pb.collection('ncm').create({ codigo: ncmCodigo })
+            ncmId = newNcm.id
+            cache.ncm.set(ncmCodigo.toLowerCase(), ncmId)
           }
 
-          await pb.collection('itens').create({
+          const itemData = {
             sku,
-            descr_pt: row['desc_geral_portugues'] || '',
-            descr_en: row['descr_geral_ingles'] || '',
-            tamanho: row['tamanho'] || '',
-            material: row['material_from_desc_geral_portugues_'] || '',
-            preco_venda: parseNumber(row['rate']),
-            preco_compra: parseNumber(row['purchase_rate']),
-            item_id_books: itemId,
-            foto_url: row['photo'] || '',
-            linha_id: linhaId || undefined,
-            acabamento_id: acabId || undefined,
-            ncm_id: ncmId || undefined,
+            linha_id: linhaId,
+            descr_pt: descrPt,
+            descr_en: String(row['descr_geral_ingles'] || row['descr_en'] || ''),
+            tamanho: String(row['tamanho'] || row['Tamanho'] || ''),
+            material: String(row['material_from_desc_geral_portugues_'] || row['material'] || ''),
+            preco_venda: parseNumber(row['rate'] || row['preco_venda'] || row['Preço']),
+            preco_compra: parseNumber(row['purchase_rate'] || row['preco_compra'] || row['Custo']),
+            item_id_books: String(row['item_id_books'] || ''),
+            foto_url: String(row['photo'] || row['foto_url'] || ''),
+            acabamento_id: acabId,
+            ncm_id: ncmId,
             sincronizado_com_zoho: true,
             data_sincronizacao: new Date().toISOString(),
             ativo: true,
-          })
+          }
 
-          cache.skus.add(sku)
-          cache.itemIds.add(itemId)
+          if (cache.skus.has(sku)) {
+            await pb.collection('itens').update(cache.skus.get(sku)!, itemData)
+          } else {
+            const created = await pb.collection('itens').create(itemData)
+            cache.skus.set(sku, created.id)
+          }
           successes++
         } catch (err: any) {
           errors++
@@ -270,7 +206,7 @@ export default function ImportPage() {
         sucessos: successes,
         duplicados: duplicates,
         erros: errors,
-        detalhes_erros: errorDetails.length > 0 ? errorDetails.slice(0, 100) : null,
+        detalhes_erros: errorDetails.length > 0 ? errorDetails : null,
       })
 
       setStats({ total: rows.length, processed: rows.length, successes, duplicates, errors })
@@ -281,6 +217,7 @@ export default function ImportPage() {
         description: 'O processamento do arquivo foi finalizado.',
       })
     } catch (err: any) {
+      console.error(err)
       setStatus('error')
       toast({
         variant: 'destructive',
@@ -295,23 +232,23 @@ export default function ImportPage() {
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold tracking-tight">Importar Produtos do Airtable</h2>
+        <h2 className="text-3xl font-bold tracking-tight">Importar Produtos</h2>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card className="col-span-full md:col-span-2">
           <CardHeader>
-            <CardTitle>Upload de CSV</CardTitle>
+            <CardTitle>Upload de Planilha</CardTitle>
             <CardDescription>
-              Selecione o arquivo CSV exportado do Airtable. Os produtos serão importados e
-              sincronizados com as tabelas de referência.
+              Selecione o arquivo Excel (.xlsx, .xls) ou CSV. Os produtos serão importados ou
+              atualizados e sincronizados.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <Input
                 type="file"
-                accept=".csv"
+                accept=".xlsx, .xls, .csv"
                 ref={fileInputRef}
                 onChange={handleFileChange}
                 disabled={status === 'loading'}
@@ -350,7 +287,7 @@ export default function ImportPage() {
               <div className="flex items-center gap-2 text-destructive bg-destructive/10 p-4 rounded-lg border border-destructive/20 mt-4">
                 <AlertCircle className="h-5 w-5" />
                 <span className="font-medium">
-                  Erro - tente novamente. Verifique se o formato do CSV está correto.
+                  Erro - tente novamente. Verifique se o formato do arquivo está correto.
                 </span>
               </div>
             )}
@@ -378,7 +315,7 @@ export default function ImportPage() {
                 <TableBody>
                   <TableRow>
                     <TableCell className="font-medium text-emerald-600 flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4" /> Importados com Sucesso
+                      <CheckCircle2 className="h-4 w-4" /> Criados / Atualizados
                     </TableCell>
                     <TableCell className="text-right font-bold text-emerald-600">
                       {summary.successes}
@@ -386,7 +323,7 @@ export default function ImportPage() {
                   </TableRow>
                   <TableRow>
                     <TableCell className="font-medium text-amber-600 flex items-center gap-2">
-                      <FileType2 className="h-4 w-4" /> Ignorados (Duplicados)
+                      <FileType2 className="h-4 w-4" /> Duplicados Ignorados (na planilha)
                     </TableCell>
                     <TableCell className="text-right font-bold text-amber-600">
                       {summary.duplicates}
