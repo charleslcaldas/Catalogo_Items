@@ -176,7 +176,7 @@ export default function ItemsPage() {
         item.descricao_curta,
         item.descricao_curta_en,
         item.descricao_base_pt,
-        item.classe_material,
+        item.grau,
         item.tipo_rosca,
         item.norma,
         item.informacao_extra,
@@ -388,11 +388,7 @@ export default function ItemsPage() {
                       </TableCell>
                       <TableCell className="py-1 px-2">
                         <img
-                          src={
-                            item.foto_arquivo
-                              ? pb.files.getURL(item, item.foto_arquivo, { thumb: '100x100' })
-                              : item.foto_url || 'https://img.usecurling.com/p/100/100?q=tools'
-                          }
+                          src={item.foto_url || 'https://img.usecurling.com/p/100/100?q=tools'}
                           alt={item.sku}
                           className="w-6 h-6 rounded object-cover border bg-muted mx-auto"
                         />

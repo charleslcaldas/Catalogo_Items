@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-14T07:13:02.016Z",
+  "generatedAt": "2026-06-14T07:36:37.014Z",
   "collections": [
     {
       "name": "users",
@@ -316,12 +316,6 @@
           "collectionRef": "ncm"
         },
         {
-          "name": "material",
-          "type": "text",
-          "required": false,
-          "system": false
-        },
-        {
           "name": "preco_compra",
           "type": "number",
           "required": false,
@@ -378,12 +372,6 @@
           "autodateTriggers": ["onCreate", "onUpdate"]
         },
         {
-          "name": "classe",
-          "type": "text",
-          "required": false,
-          "system": false
-        },
-        {
           "name": "norma",
           "type": "text",
           "required": false,
@@ -397,12 +385,6 @@
         },
         {
           "name": "descricao_base_en",
-          "type": "text",
-          "required": false,
-          "system": false
-        },
-        {
-          "name": "classe_material",
           "type": "text",
           "required": false,
           "system": false
@@ -432,35 +414,10 @@
           "system": false
         },
         {
-          "name": "tipo",
-          "type": "text",
-          "required": false,
-          "system": false
-        },
-        {
-          "name": "subtipo",
-          "type": "text",
-          "required": false,
-          "system": false
-        },
-        {
-          "name": "foto_arquivo",
-          "type": "file",
-          "required": false,
-          "system": false
-        },
-        {
           "name": "fornecedor_ultima_atualizacao",
           "type": "text",
           "required": false,
           "system": false
-        },
-        {
-          "name": "unidade",
-          "type": "select",
-          "required": false,
-          "system": false,
-          "selectValues": ["Pcs", "MPC", "kg", "m"]
         },
         {
           "name": "descricao_base_id",
@@ -555,13 +512,13 @@
           "system": false
         },
         {
-          "name": "classe_material_en",
+          "name": "grau",
           "type": "text",
           "required": false,
           "system": false
         },
         {
-          "name": "tipo_rosca_en",
+          "name": "unidade",
           "type": "text",
           "required": false,
           "system": false

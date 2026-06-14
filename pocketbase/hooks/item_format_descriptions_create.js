@@ -1,22 +1,5 @@
 onRecordCreate((e) => {
   try {
-    const descBaseId = e.record.getString('descricao_base_id')
-    let descBasePt = e.record.getString('descricao_base_pt') || ''
-    let descBaseEn = e.record.getString('descricao_base_en') || ''
-
-    if (descBaseId) {
-      try {
-        const d = $app.findRecordById('descricoes_base', descBaseId)
-        descBasePt = d.getString('nome_pt') || descBasePt
-        descBaseEn = d.getString('nome_en') || descBaseEn
-      } catch (_) {}
-    }
-
-    const norma = e.record.getString('norma')
-    const classeMaterial =
-      e.record.getString('classe_material') ||
-      e.record.getString('classe') ||
-      e.record.getString('material')
     const tamanho = e.record.getString('tamanho')
     const acabamentoId = e.record.getString('acabamento_id')
 
@@ -30,20 +13,25 @@ onRecordCreate((e) => {
       } catch (_) {}
     }
 
-    const buildDesc = (base, nrm, mat, tam, aca) => {
-      return [base, nrm, mat, tam, aca].filter(Boolean).join(' ').trim()
-    }
+    const descCurtaPt = e.record.getString('descricao_curta') || ''
+    const descCurtaEn = e.record.getString('descricao_curta_en') || ''
 
-    const descrPt = buildDesc(descBasePt, norma, classeMaterial, tamanho, acabamentoPt)
+    let descrPt = descCurtaPt
+    if (tamanho) descrPt += ` - ${tamanho}`
+    if (acabamentoPt) descrPt += ` /${acabamentoPt}`
+
     if (descrPt) {
-      e.record.set('descr_pt', descrPt)
-      e.record.set('descricao_catalogo_pt', descrPt)
+      e.record.set('descr_pt', descrPt.trim())
+      e.record.set('descricao_catalogo_pt', descrPt.trim())
     }
 
-    const descrEn = buildDesc(descBaseEn, norma, classeMaterial, tamanho, acabamentoEn)
+    let descrEn = descCurtaEn
+    if (tamanho) descrEn += ` - ${tamanho}`
+    if (acabamentoEn) descrEn += ` /${acabamentoEn}`
+
     if (descrEn) {
-      e.record.set('descr_en', descrEn)
-      e.record.set('descricao_catalogo_en', descrEn)
+      e.record.set('descr_en', descrEn.trim())
+      e.record.set('descricao_catalogo_en', descrEn.trim())
     }
   } catch (err) {
     $app.logger().error('Failed to format descriptions', 'error', err.message)

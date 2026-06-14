@@ -21,7 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { useData } from '@/contexts/data-context'
-import { Categoria, Item, UnidadeMedida, AtributoLinha } from '@/types'
+import { Categoria, Item, UnidadeMedida } from '@/types'
 import { useAtributosLinha } from '@/hooks/use-atributos-linha'
 import { Plus } from 'lucide-react'
 import { LineModal, FinishModal, NcmModal } from '@/components/MetadataModals'
@@ -117,7 +117,7 @@ export function ItemFormModal({
   const autoDescCurtaPt = [
     descBasePt,
     formData.norma,
-    formData.classe_material,
+    formData.grau,
     formData.tipo_rosca,
     formData.comprimento_rosca,
     formData.informacao_extra,
@@ -128,8 +128,8 @@ export function ItemFormModal({
   const autoDescCurtaEn = [
     descBaseEn,
     formData.norma,
-    formData.classe_material_en,
-    formData.tipo_rosca_en,
+    formData.grau,
+    formData.tipo_rosca,
     formData.comprimento_rosca_en,
     formData.informacao_extra_en,
   ]
@@ -162,7 +162,7 @@ export function ItemFormModal({
     const confTamanho = getFieldConfig('tamanho', 'Tamanho', 'Size')
     const confTipoRosca = getFieldConfig('tipo_rosca', 'Tipo de Rosca', 'Thread Type')
     const confCompRosca = getFieldConfig('comprimento_rosca', 'Comp. Rosca', 'Thread Length')
-    const confClasse = getFieldConfig('classe_material', 'Grau/Material', 'Grade/Material')
+    const confGrau = getFieldConfig('grau', 'Grau', 'Grade')
     const confNorma = getFieldConfig('norma', 'Norma', 'Standard')
 
     const selectedLinha = linhas.find((l) => l.id === formData.linha_id)
@@ -215,18 +215,12 @@ export function ItemFormModal({
               />
             </div>
 
-            {confClasse.isVisible && (
+            {confGrau.isVisible && (
               <div className="col-span-12 sm:col-span-3 space-y-2">
-                <Label>{confClasse.label}</Label>
+                <Label>{confGrau.label}</Label>
                 <Input
-                  value={formData.classe_material || formData.classe || ''}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      classe_material: e.target.value,
-                      classe: e.target.value,
-                    })
-                  }
+                  value={formData.grau || ''}
+                  onChange={(e) => setFormData({ ...formData, grau: e.target.value })}
                 />
               </div>
             )}
@@ -303,13 +297,6 @@ export function ItemFormModal({
                   </Button>
                 )}
               </div>
-            </div>
-            <div className="col-span-12 sm:col-span-4 space-y-2">
-              <Label>{isPt ? 'Material (Detalhe)' : 'Material (Detail)'}</Label>
-              <Input
-                value={formData.material || ''}
-                onChange={(e) => setFormData({ ...formData, material: e.target.value })}
-              />
             </div>
           </CardContent>
         </Card>

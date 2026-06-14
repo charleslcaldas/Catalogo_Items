@@ -7,7 +7,7 @@ onRecordUpdate((e) => {
       if (text) {
         try {
           const prompt =
-            'You are a technical translator. Translate the following text from Portuguese to English. Return ONLY the translated text, without quotes. Do not append (EN). Technical fasteners context. IMPORTANT: Do not translate technical grades or codes (e.g., "Gr8" must remain "Gr8", not "great").'
+            'You are a technical translator. Translate the following text from Portuguese to English. Return ONLY the translated text, without quotes. Do not append (EN). Technical fasteners context. IMPORTANT: Do not translate technical grades or codes.'
           const res = $ai.chat({
             model: 'fast',
             messages: [
@@ -26,15 +26,10 @@ onRecordUpdate((e) => {
     }
   }
 
-  // 1. Translate if source fields changed
-  translateIfChanged('classe_material', 'classe_material_en')
-  translateIfChanged('tipo_rosca', 'tipo_rosca_en')
   translateIfChanged('comprimento_rosca', 'comprimento_rosca_en')
   translateIfChanged('informacao_extra', 'informacao_extra_en')
   translateIfChanged('descricao_extra', 'descricao_extra_en')
 
-  // 2. We unconditionally regenerate the short description to ensure it stays in sync
-  // with any changes (e.g. if norma changed, or translation changed).
   let descBasePt = e.record.getString('descricao_base_pt') || ''
   let descBaseEn = e.record.getString('descricao_base_en') || ''
   const descBaseId = e.record.getString('descricao_base_id')
@@ -50,7 +45,7 @@ onRecordUpdate((e) => {
   const ptParts = [
     descBasePt,
     e.record.getString('norma'),
-    e.record.getString('classe_material'),
+    e.record.getString('grau'),
     e.record.getString('tipo_rosca'),
     e.record.getString('comprimento_rosca'),
     e.record.getString('informacao_extra'),
@@ -61,8 +56,8 @@ onRecordUpdate((e) => {
   const enParts = [
     descBaseEn,
     e.record.getString('norma'),
-    e.record.getString('classe_material_en'),
-    e.record.getString('tipo_rosca_en'),
+    e.record.getString('grau'),
+    e.record.getString('tipo_rosca'),
     e.record.getString('comprimento_rosca_en'),
     e.record.getString('informacao_extra_en'),
   ].filter(Boolean)

@@ -219,8 +219,8 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
 
       const previewCurtaPt = [
         descBasePt,
-        dataToSave.material,
         dataToSave.norma,
+        dataToSave.grau,
         dataToSave.tipo_rosca,
         dataToSave.comprimento_rosca,
         dataToSave.informacao_extra,
@@ -230,8 +230,8 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
 
       const previewCurtaEn = [
         descBaseEn,
-        dataToSave.material,
         dataToSave.norma,
+        dataToSave.grau,
         dataToSave.tipo_rosca,
         dataToSave.comprimento_rosca_en,
         dataToSave.informacao_extra_en,
@@ -300,8 +300,8 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
 
   const autoDescCurtaPt = [
     descBasePt,
-    formData.material,
     formData.norma,
+    formData.grau,
     formData.tipo_rosca,
     formData.comprimento_rosca,
     formData.informacao_extra,
@@ -311,8 +311,8 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
 
   const autoDescCurtaEn = [
     descBaseEn,
-    formData.material,
     formData.norma,
+    formData.grau,
     formData.tipo_rosca,
     formData.comprimento_rosca_en,
     formData.informacao_extra_en,
@@ -326,10 +326,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
   const descCurtaToUseEn = formData.descricao_curta_en || autoDescCurtaEn
   const autoDescCompletaEn = `${descCurtaToUseEn}${formData.tamanho ? ` - ${formData.tamanho}` : ''}${selAcabamento?.nome_en || selAcabamento?.nome_pt ? ` /${selAcabamento.nome_en || selAcabamento.nome_pt}` : ''}`
 
-  const imageUrl =
-    formData.foto_arquivo && item?.id
-      ? pb.files.getURL(item, formData.foto_arquivo)
-      : formData.foto_url || 'https://img.usecurling.com/p/200/200?q=tools&color=gray'
+  const imageUrl = formData.foto_url || 'https://img.usecurling.com/p/200/200?q=tools&color=gray'
 
   const categoryOptions = categorias.map((c) => ({ value: c.id, label: c.nome_pt, color: c.color }))
   const filteredLinhas = linhas.filter(
@@ -366,7 +363,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
   const confTamanho = getFieldConfig('tamanho', 'Tamanho', 'Size')
   const confTipoRosca = getFieldConfig('tipo_rosca', 'Tipo Rosca', 'Thread Type')
   const confCompRosca = getFieldConfig('comprimento_rosca', 'Comp. Rosca', 'Thread Length')
-  const confClasse = getFieldConfig('classe_material', 'Grau/Material', 'Grade/Material')
+  const confGrau = getFieldConfig('grau', 'Grau', 'Grade')
   const confNorma = getFieldConfig('norma', 'Norma', 'Standard')
 
   return (
@@ -592,19 +589,13 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                   />
                 </Field>
-                {confClasse.isVisible && (
-                  <Field label={confClasse.labelPt} className="md:col-span-3">
+                {confGrau.isVisible && (
+                  <Field label={confGrau.labelPt} className="md:col-span-3">
                     <Input
                       className="h-8 text-xs"
                       disabled={!isEditing}
-                      value={formData.classe_material || formData.material || ''}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          classe_material: e.target.value,
-                          material: e.target.value,
-                        })
-                      }
+                      value={formData.grau || ''}
+                      onChange={(e) => setFormData({ ...formData, grau: e.target.value })}
                     />
                   </Field>
                 )}
@@ -878,19 +869,13 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                   />
                 </Field>
-                {confClasse.isVisible && (
-                  <Field label={confClasse.labelEn} className="md:col-span-3">
+                {confGrau.isVisible && (
+                  <Field label={confGrau.labelEn} className="md:col-span-3">
                     <Input
                       className="h-8 text-xs"
                       disabled={!isEditing}
-                      value={formData.classe_material || formData.material || ''}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          classe_material: e.target.value,
-                          material: e.target.value,
-                        })
-                      }
+                      value={formData.grau || ''}
+                      onChange={(e) => setFormData({ ...formData, grau: e.target.value })}
                     />
                   </Field>
                 )}
@@ -1170,7 +1155,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
       <GalleryModal
         open={galleryOpen}
         onOpenChange={setGalleryOpen}
-        onSelect={(url) => setFormData({ ...formData, foto_url: url, foto_arquivo: '' })}
+        onSelect={(url) => setFormData({ ...formData, foto_url: url })}
       />
       <CategoryModal
         open={catModalOpen}
