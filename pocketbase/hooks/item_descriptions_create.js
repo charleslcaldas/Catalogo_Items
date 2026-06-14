@@ -18,12 +18,22 @@ onRecordCreate((e) => {
     }
   }
 
-  // 1. Translate EN fields
-  e.record.set('classe_material_en', translateField(e.record.getString('classe_material')))
-  e.record.set('tipo_rosca_en', translateField(e.record.getString('tipo_rosca')))
-  e.record.set('comprimento_rosca_en', translateField(e.record.getString('comprimento_rosca')))
-  e.record.set('informacao_extra_en', translateField(e.record.getString('informacao_extra')))
-  e.record.set('descricao_extra_en', translateField(e.record.getString('descricao_extra')))
+  // 1. Translate EN fields if empty
+  if (!e.record.getString('classe_material_en')) {
+    e.record.set('classe_material_en', translateField(e.record.getString('classe_material')))
+  }
+  if (!e.record.getString('tipo_rosca_en')) {
+    e.record.set('tipo_rosca_en', translateField(e.record.getString('tipo_rosca')))
+  }
+  if (!e.record.getString('comprimento_rosca_en')) {
+    e.record.set('comprimento_rosca_en', translateField(e.record.getString('comprimento_rosca')))
+  }
+  if (!e.record.getString('informacao_extra_en')) {
+    e.record.set('informacao_extra_en', translateField(e.record.getString('informacao_extra')))
+  }
+  if (!e.record.getString('descricao_extra_en')) {
+    e.record.set('descricao_extra_en', translateField(e.record.getString('descricao_extra')))
+  }
 
   // 2. Fetch base descriptions
   let descBasePt = e.record.getString('descricao_base_pt') || ''

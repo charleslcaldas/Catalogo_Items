@@ -87,6 +87,7 @@ export function ItemFormModal({
         descricao_catalogo_pt: autoDescCompletaPt || 'Sem descrição',
         descricao_catalogo_en: autoDescCompletaEn || '',
       } as Item)
+      toast.success('Item salvo com sucesso!')
       onOpenChange(false)
     } catch (err: any) {
       const fieldErrors = extractFieldErrors(err)
