@@ -1,5 +1,15 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Plus, Search, Layers, PackageOpen, FilterX } from 'lucide-react'
+import {
+  Plus,
+  Search,
+  Layers,
+  PackageOpen,
+  FilterX,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+  Trash2,
+} from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -13,12 +23,24 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { useData } from '@/contexts/data-context'
 import { ItemDetailPanel } from './ItemDetailPanel'
 import { BulkEditDialog } from './BulkEditDialog'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { cn, getContrastColor } from '@/lib/utils'
 import pb from '@/lib/pocketbase/client'
+import { useRealtime } from '@/hooks/use-realtime'
+import { toast } from 'sonner'
 
 function AcabamentoBadge({ acabamentoId }: { acabamentoId?: string }) {
   const { acabamentos } = useData()
@@ -38,14 +60,64 @@ function AcabamentoBadge({ acabamentoId }: { acabamentoId?: string }) {
   )
 }
 
+function SortableHeader({ column, title, sortColumn, sortDirection, onSort }: any) {
+  const isActive = sortColumn === column
+  return (
+    <div
+      className="flex items-center gap-1 cursor-pointer hover:text-foreground select-none"
+      onClick={() => onSort(column)}
+    >
+      {title}
+      {isActive ? (
+        sortDirection === 'asc' ? (
+          <ArrowUp className="w-3 h-3" />
+        ) : (
+          <ArrowDown className="w-3 h-3" />
+        )
+      ) : (
+        <ArrowUpDown className="w-3 h-3 opacity-30" />
+      )}
+    </div>
+  )
+}
+
 export default function ItemsPage() {
-  const { itens, linhas, categorias, ncms, descricoesBase, acabamentos } = useData()
+  const { linhas, categorias, ncms, descricoesBase, acabamentos } = useData()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
 
   const filterStatus = searchParams.get('status')
   const filterLinhaId = searchParams.get('linha_id')
   const [searchTerm, setSearchTerm] = useState('')
+
+  const [sortColumn, setSortColumn] = useState<string | null>(null)
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [apiItens, setApiItens] = useState<any[]>([])
+
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set())
+  const [isBulkEditOpen, setIsBulkEditOpen] = useState(false)
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false)
+
+  const fetchApiItens = async () => {
+    let sortStr = ''
+    if (sortColumn) {
+      sortStr = sortDirection === 'asc' ? sortColumn : `-${sortColumn}`
+    }
+    try {
+      const records = await pb.collection('itens').getFullList({ sort: sortStr })
+      setApiItens(records)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  useEffect(() => {
+    fetchApiItens()
+  }, [sortColumn, sortDirection])
+
+  useRealtime('itens', () => {
+    fetchApiItens()
+  })
 
   useEffect(() => {
     const storedItemId = localStorage.getItem('lastSelectedItemId')
@@ -69,9 +141,6 @@ export default function ItemsPage() {
     setSearchParams(newParams)
   }
 
-  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set())
-  const [isBulkEditOpen, setIsBulkEditOpen] = useState(false)
-
   const getLinhaName = (id: string) => linhas.find((l) => l.id === id)?.nome_pt || 'N/A'
   const getCategoriaName = (linhaId: string) => {
     const linha = linhas.find((l) => l.id === linhaId)
@@ -82,7 +151,7 @@ export default function ItemsPage() {
   const getDescricaoBasePt = (id?: string) => descricoesBase.find((d) => d.id === id)?.nome_pt || ''
 
   const filteredItems = useMemo(() => {
-    return itens.filter((item) => {
+    return apiItens.filter((item) => {
       if (filterStatus === 'Ativo' && !item.ativo) return false
       if (filterLinhaId && item.linha_id !== filterLinhaId) return false
 
@@ -126,7 +195,7 @@ export default function ItemsPage() {
       return tokens.every((token) => searchableText.includes(token))
     })
   }, [
-    itens,
+    apiItens,
     searchTerm,
     filterStatus,
     filterLinhaId,
@@ -137,10 +206,10 @@ export default function ItemsPage() {
     acabamentos,
   ])
 
-  const selectedItem = itens.find((i) => i.id === selectedItemId)
+  const selectedItem = apiItens.find((i) => i.id === selectedItemId)
 
   const toggleSelectAll = () => {
-    if (selectedItemIds.size === filteredItems.length) {
+    if (selectedItemIds.size === filteredItems.length && filteredItems.length > 0) {
       setSelectedItemIds(new Set())
     } else {
       setSelectedItemIds(new Set(filteredItems.map((i) => i.id)))
@@ -159,8 +228,33 @@ export default function ItemsPage() {
     setIsBulkEditOpen(false)
   }
 
+  const executeBulkDelete = async () => {
+    try {
+      await Promise.all(Array.from(selectedItemIds).map((id) => pb.collection('itens').delete(id)))
+      setSelectedItemIds(new Set())
+      toast.success(`${selectedItemIds.size} itens excluídos com sucesso.`)
+    } catch (e) {
+      toast.error('Erro ao excluir itens.')
+    } finally {
+      setIsBulkDeleteOpen(false)
+    }
+  }
+
+  const handleSortClick = (col: string) => {
+    if (sortColumn === col) {
+      if (sortDirection === 'asc') setSortDirection('desc')
+      else {
+        setSortColumn(null)
+        setSortDirection('asc')
+      }
+    } else {
+      setSortColumn(col)
+      setSortDirection('asc')
+    }
+  }
+
   return (
-    <div className="flex flex-col space-y-4 animate-fade-in relative pb-12 pt-2">
+    <div className="flex flex-col space-y-4 animate-fade-in relative pb-12 pt-2 h-full">
       <div className="flex items-center justify-between gap-4 shrink-0">
         <div className="flex items-center gap-4 w-full max-w-3xl">
           <h1 className="font-bold tracking-tight whitespace-nowrap text-[1.18rem] m-0">
@@ -201,10 +295,10 @@ export default function ItemsPage() {
         </div>
       </div>
 
-      <div className="flex gap-4 flex-1 items-start">
+      <div className="flex gap-4 flex-1 items-start overflow-hidden">
         <div
           className={cn(
-            'border rounded-xl bg-card relative transition-all duration-300 shadow-sm overflow-x-auto',
+            'border rounded-xl bg-card relative transition-all duration-300 shadow-sm overflow-x-auto h-full overflow-y-auto',
             selectedItemId ? 'w-[40%] hidden lg:block' : 'w-full',
           )}
         >
@@ -221,9 +315,33 @@ export default function ItemsPage() {
                 </TableHead>
                 <TableHead className="w-12 text-center px-2">Foto</TableHead>
                 <TableHead className="px-2">SKU</TableHead>
-                <TableHead className="px-2">Descrição Curta</TableHead>
-                <TableHead className="px-2">Tamanho</TableHead>
-                <TableHead className="px-2">Acab.</TableHead>
+                <TableHead className="px-2">
+                  <SortableHeader
+                    column="descricao_curta"
+                    title="Descrição Curta"
+                    sortColumn={sortColumn}
+                    sortDirection={sortDirection}
+                    onSort={handleSortClick}
+                  />
+                </TableHead>
+                <TableHead className="px-2">
+                  <SortableHeader
+                    column="tamanho"
+                    title="Tamanho"
+                    sortColumn={sortColumn}
+                    sortDirection={sortDirection}
+                    onSort={handleSortClick}
+                  />
+                </TableHead>
+                <TableHead className="px-2">
+                  <SortableHeader
+                    column="acabamento_id"
+                    title="Acab."
+                    sortColumn={sortColumn}
+                    sortDirection={sortDirection}
+                    onSort={handleSortClick}
+                  />
+                </TableHead>
                 {!selectedItemId && (
                   <>
                     <TableHead className="px-2">Preço Venda</TableHead>
@@ -236,7 +354,10 @@ export default function ItemsPage() {
             <TableBody>
               {filteredItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-16 text-muted-foreground">
+                  <TableCell
+                    colSpan={selectedItemId ? 6 : 9}
+                    className="text-center py-16 text-muted-foreground"
+                  >
                     <PackageOpen className="w-12 h-12 mx-auto opacity-20 mb-4" />
                     Nenhum item encontrado com os filtros atuais.
                   </TableCell>
@@ -361,7 +482,7 @@ export default function ItemsPage() {
 
         <div
           className={cn(
-            'border rounded-xl bg-card flex flex-col transition-all duration-300 shadow-sm',
+            'border rounded-xl bg-card flex flex-col transition-all duration-300 shadow-sm overflow-hidden h-full',
             selectedItemId
               ? 'w-full lg:w-[60%] animate-in slide-in-from-right-8'
               : 'w-0 opacity-0 border-0 hidden',
@@ -387,7 +508,15 @@ export default function ItemsPage() {
           </div>
           <div className="w-px h-4 bg-border" />
           <Button onClick={() => setIsBulkEditOpen(true)} size="sm" className="rounded-full">
-            <Layers className="w-3.5 h-3.5 mr-1.5" /> Editar em Massa
+            <Layers className="w-3.5 h-3.5 mr-1.5" /> Editar
+          </Button>
+          <Button
+            onClick={() => setIsBulkDeleteOpen(true)}
+            size="sm"
+            variant="destructive"
+            className="rounded-full"
+          >
+            <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Excluir
           </Button>
           <Button
             onClick={() => setSelectedItemIds(new Set())}
@@ -406,6 +535,27 @@ export default function ItemsPage() {
         selectedIds={Array.from(selectedItemIds)}
         onSuccess={handleBulkSuccess}
       />
+
+      <AlertDialog open={isBulkDeleteOpen} onOpenChange={setIsBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Itens</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir <strong>{selectedItemIds.size}</strong> itens
+              selecionados? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={executeBulkDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

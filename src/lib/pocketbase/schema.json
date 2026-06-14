@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-13T12:21:34.788Z",
+  "generatedAt": "2026-06-14T07:00:01.080Z",
   "collections": [
     {
       "name": "users",
@@ -571,7 +571,9 @@
         "CREATE UNIQUE INDEX idx_itens_sku ON itens (sku)",
         "CREATE INDEX idx_itens_linha_id ON itens (linha_id)",
         "CREATE INDEX idx_itens_acabamento_id ON itens (acabamento_id)",
-        "CREATE INDEX idx_itens_ncm_id ON itens (ncm_id)"
+        "CREATE INDEX idx_itens_ncm_id ON itens (ncm_id)",
+        "CREATE INDEX `idx_itens_descricao_curta` ON `itens` (descricao_curta)",
+        "CREATE INDEX `idx_itens_tamanho` ON `itens` (tamanho)"
       ]
     },
     {
