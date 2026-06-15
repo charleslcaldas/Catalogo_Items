@@ -199,12 +199,12 @@ export default function ItemsPage() {
 
       for (const token of includeTokens) {
         filters.push(
-          `(sku ~ "${token}" || descr_pt ~ "${token}" || descricao_curta ~ "${token}" || tamanho ~ "${token}" || linha_id.nome_pt ~ "${token}" || acabamento_id.nome_pt ~ "${token}" || acabamento_id.codigo ~ "${token}")`,
+          `(sku ~ "${token}" || descr_pt ~ "${token}" || descr_en ~ "${token}" || descricao_curta ~ "${token}" || descricao_curta_en ~ "${token}" || descricao_catalogo_pt ~ "${token}" || descricao_catalogo_en ~ "${token}" || tamanho ~ "${token}" || linha_id.nome_pt ~ "${token}" || acabamento_id.nome_pt ~ "${token}" || acabamento_id.codigo ~ "${token}")`,
         )
       }
       for (const token of excludeTokens) {
         filters.push(
-          `(sku !~ "${token}" && descr_pt !~ "${token}" && descricao_curta !~ "${token}" && tamanho !~ "${token}" && linha_id.nome_pt !~ "${token}" && acabamento_id.nome_pt !~ "${token}" && acabamento_id.codigo !~ "${token}")`,
+          `(sku !~ "${token}" && descr_pt !~ "${token}" && descr_en !~ "${token}" && descricao_curta !~ "${token}" && descricao_curta_en !~ "${token}" && descricao_catalogo_pt !~ "${token}" && descricao_catalogo_en !~ "${token}" && tamanho !~ "${token}" && linha_id.nome_pt !~ "${token}" && acabamento_id.nome_pt !~ "${token}" && acabamento_id.codigo !~ "${token}")`,
         )
       }
     }
