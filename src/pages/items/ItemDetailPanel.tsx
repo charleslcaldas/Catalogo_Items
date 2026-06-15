@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { useData } from '@/contexts/data-context'
 import type { Item } from '@/types'
 import { X, Copy, ImageIcon, History as HistoryIcon, Activity, Edit2 } from 'lucide-react'
@@ -56,6 +57,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
 
   const [formData, setFormData] = useState<Partial<Item>>({})
   const [galleryOpen, setGalleryOpen] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const [transactions, setTransactions] = useState<any[]>([])
   const [isEditing, setIsEditing] = useState(false)
 
@@ -66,6 +68,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
 
   const lastTranslatedInfoExtra = useRef<string | undefined>()
   const lastTranslatedDescExtra = useRef<string | undefined>()
+  const imageClickTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (!isEditing) return
@@ -366,13 +369,40 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
   const confGrau = getFieldConfig('grau', 'Grau', 'Grade')
   const confNorma = getFieldConfig('norma', 'Norma', 'Standard')
 
+  const handleImageClick = () => {
+    if (imageClickTimeout.current) return
+    imageClickTimeout.current = setTimeout(() => {
+      if (isEditing) setGalleryOpen(true)
+      else setPreviewOpen(true)
+      imageClickTimeout.current = null
+    }, 250)
+  }
+
+  const handleImageDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (imageClickTimeout.current) {
+      clearTimeout(imageClickTimeout.current)
+      imageClickTimeout.current = null
+    }
+    if (!isEditing) setIsEditing(true)
+  }
+
   return (
-    <div className="flex flex-col bg-background relative h-full rounded-xl">
+    <div
+      className="flex flex-col bg-background relative h-full rounded-xl"
+      onDoubleClick={(e) => {
+        if ((e.target as HTMLElement).closest('button, input, textarea, select, .cursor-pointer'))
+          return
+        if (!isEditing) setIsEditing(true)
+      }}
+    >
       <div className="flex items-start justify-between p-3 border-b bg-card z-10 shrink-0 sticky top-0 rounded-t-xl">
         <div className="flex items-center gap-3 flex-1 min-w-0 pr-4">
           <div
             className="w-10 h-10 shrink-0 rounded-md border bg-muted/30 cursor-pointer hover:opacity-80 relative group flex items-center justify-center overflow-hidden shadow-sm"
-            onClick={() => isEditing && setGalleryOpen(true)}
+            onClick={handleImageClick}
+            onDoubleClick={handleImageDoubleClick}
+            title={isEditing ? 'Alterar imagem' : 'Ampliar imagem'}
           >
             <img
               src={imageUrl}
@@ -1175,6 +1205,19 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
         onOpenChange={setNewDescBaseModalOpen}
         onSaved={(id) => setFormData((f) => ({ ...f, descricao_base_id: id }))}
       />
+
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-4xl w-[90vw] p-0 overflow-hidden bg-transparent border-none shadow-none flex items-center justify-center">
+          <DialogTitle className="sr-only">Visualização da Imagem</DialogTitle>
+          <div className="relative flex items-center justify-center w-full h-full">
+            <img
+              src={imageUrl}
+              alt="Item Ampliado"
+              className="max-w-full max-h-[85vh] object-contain rounded-md shadow-2xl"
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
