@@ -33,7 +33,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { useData } from '@/contexts/data-context'
 import { ImagePreviewModal } from '@/components/ImagePreviewModal'
 import { ItemDetailPanel } from './ItemDetailPanel'
 import { BulkEditDialog } from './BulkEditDialog'
@@ -45,12 +44,10 @@ import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
 import { ResizableHeader } from '@/components/ui/resizable-header'
 
-function AcabamentoBadge({ acabamentoId }: { acabamentoId?: string }) {
-  const { acabamentos } = useData()
-  const aca = acabamentos.find((a) => a.id === acabamentoId)
-  if (!aca) return <span className="text-muted-foreground">-</span>
+function AcabamentoBadge({ acabamento }: { acabamento?: any }) {
+  if (!acabamento) return <span className="text-muted-foreground">-</span>
 
-  const bgColor = aca.cor_hex || '#e2e8f0'
+  const bgColor = acabamento.cor_hex || '#e2e8f0'
   const textColor = getContrastColor(bgColor)
 
   return (
@@ -58,7 +55,7 @@ function AcabamentoBadge({ acabamentoId }: { acabamentoId?: string }) {
       className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border border-black/10 shadow-sm whitespace-nowrap"
       style={{ backgroundColor: bgColor, color: textColor }}
     >
-      {aca.nome_pt}
+      {acabamento.nome_pt}
     </span>
   )
 }
@@ -85,13 +82,14 @@ function SortableHeader({ column, title, sortColumn, sortDirection, onSort }: an
 }
 
 export default function ItemsPage() {
-  const { linhas, categorias, ncms, descricoesBase, acabamentos } = useData()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
 
   const filterStatus = searchParams.get('status')
   const filterLinhaId = searchParams.get('linha_id')
+
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
 
   const { user, updatePreferences } = useAuth()
 
@@ -132,31 +130,105 @@ export default function ItemsPage() {
 
   const [sortColumn, setSortColumn] = useState<string | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+
   const [apiItens, setApiItens] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set())
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false)
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false)
 
-  const fetchApiItens = async () => {
+  // Debounce search term to prevent rate limits while typing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
+  const fetchApiItens = async (searchStr: string) => {
+    setIsLoading(true)
+    setError(null)
+
     let sortStr = ''
     if (sortColumn) {
       sortStr = sortDirection === 'asc' ? sortColumn : `-${sortColumn}`
     }
+
+    const filters: string[] = []
+
+    if (filterStatus === 'Ativo') {
+      filters.push(`ativo = true`)
+    } else if (filterStatus === 'Inativo') {
+      filters.push(`ativo = false`)
+    }
+
+    if (filterLinhaId) {
+      filters.push(`linha_id = "${filterLinhaId}"`)
+    }
+
+    if (searchStr.trim()) {
+      const normalizedTerm = searchStr.toLowerCase().replace(/["']/g, '')
+      const tokens = normalizedTerm.split(/\s+/).filter(Boolean)
+      const includeTokens: string[] = []
+      const excludeTokens: string[] = []
+
+      for (const token of tokens) {
+        if (token.startsWith('-') && token.length > 1) {
+          excludeTokens.push(token.substring(1))
+        } else {
+          includeTokens.push(token)
+        }
+      }
+
+      for (const token of includeTokens) {
+        filters.push(
+          `(sku ~ "${token}" || descr_pt ~ "${token}" || descricao_curta ~ "${token}" || tamanho ~ "${token}" || linha_id.nome_pt ~ "${token}" || acabamento_id.nome_pt ~ "${token}" || acabamento_id.codigo ~ "${token}")`,
+        )
+      }
+      for (const token of excludeTokens) {
+        filters.push(
+          `(sku !~ "${token}" && descr_pt !~ "${token}" && descricao_curta !~ "${token}" && tamanho !~ "${token}" && linha_id.nome_pt !~ "${token}" && acabamento_id.nome_pt !~ "${token}" && acabamento_id.codigo !~ "${token}")`,
+        )
+      }
+    }
+
+    const filterStr = filters.join(' && ')
+
     try {
-      const records = await pb.collection('itens').getFullList({ sort: sortStr })
+      const records = await pb.collection('itens').getFullList({
+        sort: sortStr,
+        filter: filterStr,
+        expand: 'linha_id,linha_id.categoria_id,acabamento_id,ncm_id,descricao_base_id',
+        requestKey: 'items_page_search', // Auto-cancel previous identical requests to save bandwidth and rate limits
+      })
       setApiItens(records)
-    } catch (e) {
-      console.error(e)
+    } catch (e: any) {
+      if (e.isAbort) return // Skip updating state if the request was naturally cancelled by a newer one
+      if (e.status === 429) {
+        setError('Muitas requisições. Por favor, aguarde um momento e tente novamente.')
+      } else {
+        console.error(e)
+        setError('Erro ao carregar itens.')
+      }
+    } finally {
+      setIsLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchApiItens()
-  }, [sortColumn, sortDirection])
+    fetchApiItens(debouncedSearch)
+  }, [sortColumn, sortDirection, debouncedSearch, filterStatus, filterLinhaId])
 
+  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Debounce realtime refreshes to avoid 429 when processing bulk operations
   useRealtime('itens', () => {
-    fetchApiItens()
+    if (fetchTimeoutRef.current) clearTimeout(fetchTimeoutRef.current)
+    fetchTimeoutRef.current = setTimeout(() => {
+      fetchApiItens(debouncedSearch)
+    }, 1000)
   })
 
   useEffect(() => {
@@ -181,98 +253,13 @@ export default function ItemsPage() {
     setSearchParams(newParams)
   }
 
-  const getLinhaName = (id: string) => linhas.find((l) => l.id === id)?.nome_pt || 'N/A'
-  const getCategoriaName = (linhaId: string) => {
-    const linha = linhas.find((l) => l.id === linhaId)
-    if (!linha) return ''
-    return categorias.find((c) => c.id === linha.categoria_id)?.nome_pt || ''
-  }
-  const getNcmCode = (id?: string) => ncms.find((n) => n.id === id)?.codigo || ''
-  const getDescricaoBasePt = (id?: string) => descricoesBase.find((d) => d.id === id)?.nome_pt || ''
-
-  const filteredItems = useMemo(() => {
-    return apiItens.filter((item) => {
-      if (filterStatus === 'Ativo' && !item.ativo) return false
-      if (filterLinhaId && item.linha_id !== filterLinhaId) return false
-
-      if (!searchTerm.trim()) return true
-      const normalizedTerm = searchTerm
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-      const tokens = normalizedTerm.split(/\s+/).filter(Boolean)
-      if (tokens.length === 0) return true
-
-      const includeTokens: string[] = []
-      const excludeTokens: string[] = []
-
-      for (const token of tokens) {
-        if (token.startsWith('-') && token.length > 1) {
-          excludeTokens.push(token.substring(1))
-        } else {
-          includeTokens.push(token)
-        }
-      }
-
-      const getAcabamentoInfo = (id?: string) => {
-        const aca = acabamentos.find((a) => a.id === id)
-        return aca ? `${aca.nome_pt} ${aca.nome_en || ''} ${aca.codigo}` : ''
-      }
-
-      const textToSearch = [
-        item.sku,
-        item.descr_pt,
-        item.descr_en,
-        getDescricaoBasePt(item.descricao_base_id),
-        item.descricao_curta,
-        item.descricao_curta_en,
-        item.descricao_base_pt,
-        item.grau,
-        item.tipo_rosca,
-        item.norma,
-        item.informacao_extra,
-        item.tamanho,
-        item.unidade,
-        getLinhaName(item.linha_id),
-        getCategoriaName(item.linha_id),
-        getNcmCode(item.ncm_id),
-        getAcabamentoInfo(item.acabamento_id),
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-
-      for (const token of excludeTokens) {
-        if (textToSearch.includes(token)) return false
-      }
-
-      for (const token of includeTokens) {
-        if (!textToSearch.includes(token)) return false
-      }
-
-      return true
-    })
-  }, [
-    apiItens,
-    searchTerm,
-    filterStatus,
-    filterLinhaId,
-    linhas,
-    categorias,
-    ncms,
-    descricoesBase,
-    acabamentos,
-  ])
-
   const selectedItem = apiItens.find((i) => i.id === selectedItemId)
 
   const toggleSelectAll = () => {
-    if (selectedItemIds.size === filteredItems.length && filteredItems.length > 0) {
+    if (selectedItemIds.size === apiItens.length && apiItens.length > 0) {
       setSelectedItemIds(new Set())
     } else {
-      setSelectedItemIds(new Set(filteredItems.map((i) => i.id)))
+      setSelectedItemIds(new Set(apiItens.map((i) => i.id)))
     }
   }
 
@@ -394,9 +381,7 @@ export default function ItemsPage() {
                   className="text-center px-2"
                 >
                   <Checkbox
-                    checked={
-                      selectedItemIds.size > 0 && selectedItemIds.size === filteredItems.length
-                    }
+                    checked={selectedItemIds.size > 0 && selectedItemIds.size === apiItens.length}
                     onCheckedChange={toggleSelectAll}
                   />
                 </TableHead>
@@ -490,8 +475,41 @@ export default function ItemsPage() {
                 )}
               </TableRow>
             </TableHeader>
-            <TableBody>
-              {filteredItems.length === 0 ? (
+            <TableBody
+              className={cn(isLoading && apiItens.length > 0 && 'opacity-50 pointer-events-none')}
+            >
+              {error ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={selectedItemId ? 6 : 9}
+                    className="text-center py-16 text-destructive"
+                  >
+                    <div className="flex flex-col items-center justify-center gap-3">
+                      <FilterX className="w-10 h-10 mb-2 opacity-50" />
+                      <p className="font-medium">{error}</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fetchApiItens(debouncedSearch)}
+                      >
+                        Tentar Novamente
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : isLoading && apiItens.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={selectedItemId ? 6 : 9}
+                    className="text-center py-16 text-muted-foreground"
+                  >
+                    <div className="flex flex-col items-center justify-center gap-3">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                      <p>Carregando itens...</p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : apiItens.length === 0 ? (
                 <TableRow>
                   <TableCell
                     colSpan={selectedItemId ? 6 : 9}
@@ -502,7 +520,7 @@ export default function ItemsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredItems.map((item) => {
+                apiItens.map((item) => {
                   const isSelected = selectedItemIds.has(item.id)
                   const isRowActive = selectedItemId === item.id
                   return (
@@ -566,7 +584,7 @@ export default function ItemsPage() {
                         {item.tamanho || '-'}
                       </TableCell>
                       <TableCell className="py-1 px-2 overflow-hidden text-ellipsis whitespace-nowrap">
-                        <AcabamentoBadge acabamentoId={item.acabamento_id} />
+                        <AcabamentoBadge acabamento={item.expand?.acabamento_id} />
                       </TableCell>
                       {!selectedItemId && (
                         <>

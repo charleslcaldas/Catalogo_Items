@@ -124,11 +124,25 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [isAuthenticated])
 
-  useRealtime(
+  useRealtime<Item>(
     'itens',
-    () => {
+    (e) => {
       if (isAuthenticated) {
-        pb.collection('itens').getFullList<Item>({ sort: '-created' }).then(setItens)
+        setItens((prev) => {
+          if (e.action === 'create') {
+            const exists = prev.some((i) => i.id === e.record.id)
+            return exists
+              ? prev.map((i) => (i.id === e.record.id ? e.record : i))
+              : [e.record, ...prev]
+          }
+          if (e.action === 'update') {
+            return prev.map((i) => (i.id === e.record.id ? e.record : i))
+          }
+          if (e.action === 'delete') {
+            return prev.filter((i) => i.id !== e.record.id)
+          }
+          return prev
+        })
       }
     },
     isAuthenticated,
