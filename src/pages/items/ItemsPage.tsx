@@ -332,44 +332,46 @@ export default function ItemsPage() {
   }
 
   return (
-    <div className="flex flex-col space-y-4 animate-fade-in relative pb-12 pt-2 h-full">
-      <div className="flex items-center justify-between gap-4 shrink-0">
-        <div className="flex items-center gap-4 w-full max-w-3xl">
-          <h1 className="font-bold tracking-tight whitespace-nowrap text-[1.18rem] m-0">
+    <div className="flex flex-col animate-fade-in relative pb-12 h-full">
+      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 pt-4 pb-4 mb-4 -mt-4 border-b border-border/50 shadow-sm flex flex-col gap-4 shrink-0">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full max-w-4xl">
+          <h1 className="font-bold tracking-tight whitespace-nowrap text-[1.18rem] m-0 hidden sm:block">
             Catálogo de Itens
           </h1>
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <div className="relative w-full sm:flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
               placeholder="Buscar item..."
-              className="pl-9 w-full rounded-full bg-card h-8 text-xs"
+              className="pl-9 w-full rounded-full bg-card h-9 text-sm"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button
-            onClick={() => setSelectedItemId('new')}
-            size="sm"
-            className="rounded-full h-8 px-4 shrink-0"
-          >
-            <Plus className="mr-1.5 h-3.5 w-3.5" /> Novo Item
-          </Button>
-          {filterLinhaId && (
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <Button
-              variant="secondary"
+              onClick={() => setSelectedItemId('new')}
               size="sm"
-              className="rounded-full h-8 px-3 shrink-0"
-              onClick={() => {
-                const newParams = new URLSearchParams(searchParams)
-                newParams.delete('linha_id')
-                setSearchParams(newParams)
-              }}
+              className="rounded-full h-9 px-4 shrink-0 w-full sm:w-auto flex-1 sm:flex-none text-sm font-medium"
             >
-              <FilterX className="h-3.5 w-3.5 mr-1.5" />
-              Limpar
+              <Plus className="mr-1.5 h-4 w-4" /> Novo Item
             </Button>
-          )}
+            {filterLinhaId && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="rounded-full h-9 px-3 shrink-0"
+                onClick={() => {
+                  const newParams = new URLSearchParams(searchParams)
+                  newParams.delete('linha_id')
+                  setSearchParams(newParams)
+                }}
+              >
+                <FilterX className="h-4 w-4 mr-1.5" />
+                Limpar
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
