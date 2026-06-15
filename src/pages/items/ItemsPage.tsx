@@ -42,6 +42,8 @@ import { cn, getContrastColor } from '@/lib/utils'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 import { toast } from 'sonner'
+import { useAuth } from '@/hooks/use-auth'
+import { ResizableHeader } from '@/components/ui/resizable-header'
 
 function AcabamentoBadge({ acabamentoId }: { acabamentoId?: string }) {
   const { acabamentos } = useData()
@@ -90,6 +92,43 @@ export default function ItemsPage() {
   const filterStatus = searchParams.get('status')
   const filterLinhaId = searchParams.get('linha_id')
   const [searchTerm, setSearchTerm] = useState('')
+
+  const { user, updatePreferences } = useAuth()
+
+  const defaultWidths = useMemo(
+    () => ({
+      checkbox: 40,
+      foto: 48,
+      sku: 120,
+      descricao_curta: 300,
+      tamanho: 100,
+      acabamento_id: 120,
+      preco_venda: 100,
+      validade_preco: 120,
+      status: 150,
+    }),
+    [],
+  )
+
+  const [colWidths, setColWidths] = useState<Record<string, number>>(
+    user?.preferencias_ui?.items_table_widths || defaultWidths,
+  )
+
+  useEffect(() => {
+    if (user?.preferencias_ui?.items_table_widths) {
+      setColWidths((prev) => ({ ...prev, ...user.preferencias_ui.items_table_widths }))
+    }
+  }, [user?.preferencias_ui?.items_table_widths])
+
+  const handleResize = (col: string, width: number) => {
+    setColWidths((prev) => ({ ...prev, [col]: width }))
+  }
+
+  const handleResizeEnd = (col: string, width: number) => {
+    const newWidths = { ...colWidths, [col]: width }
+    setColWidths(newWidths)
+    updatePreferences({ items_table_widths: newWidths })
+  }
 
   const [sortColumn, setSortColumn] = useState<string | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
@@ -341,10 +380,17 @@ export default function ItemsPage() {
             selectedItemId ? 'w-[40%] hidden lg:block' : 'w-full',
           )}
         >
-          <Table>
+          <Table style={{ tableLayout: 'fixed', width: 'max-content', minWidth: '100%' }}>
             <TableHeader className="sticky top-0 bg-card z-10 shadow-sm">
               <TableRow className="h-8">
-                <TableHead className="w-10 text-center px-2">
+                <TableHead
+                  style={{
+                    width: colWidths.checkbox,
+                    minWidth: colWidths.checkbox,
+                    maxWidth: colWidths.checkbox,
+                  }}
+                  className="text-center px-2"
+                >
                   <Checkbox
                     checked={
                       selectedItemIds.size > 0 && selectedItemIds.size === filteredItems.length
@@ -352,9 +398,30 @@ export default function ItemsPage() {
                     onCheckedChange={toggleSelectAll}
                   />
                 </TableHead>
-                <TableHead className="w-12 text-center px-2">Foto</TableHead>
-                <TableHead className="px-2">SKU</TableHead>
-                <TableHead className="px-2">
+                <TableHead
+                  style={{
+                    width: colWidths.foto,
+                    minWidth: colWidths.foto,
+                    maxWidth: colWidths.foto,
+                  }}
+                  className="text-center px-2"
+                >
+                  Foto
+                </TableHead>
+                <ResizableHeader
+                  width={colWidths.sku}
+                  onResize={(w) => handleResize('sku', w)}
+                  onResizeEnd={(w) => handleResizeEnd('sku', w)}
+                  className="px-2"
+                >
+                  SKU
+                </ResizableHeader>
+                <ResizableHeader
+                  width={colWidths.descricao_curta}
+                  onResize={(w) => handleResize('descricao_curta', w)}
+                  onResizeEnd={(w) => handleResizeEnd('descricao_curta', w)}
+                  className="px-2"
+                >
                   <SortableHeader
                     column="descricao_curta"
                     title="Descrição Curta"
@@ -362,8 +429,13 @@ export default function ItemsPage() {
                     sortDirection={sortDirection}
                     onSort={handleSortClick}
                   />
-                </TableHead>
-                <TableHead className="px-2">
+                </ResizableHeader>
+                <ResizableHeader
+                  width={colWidths.tamanho}
+                  onResize={(w) => handleResize('tamanho', w)}
+                  onResizeEnd={(w) => handleResizeEnd('tamanho', w)}
+                  className="px-2"
+                >
                   <SortableHeader
                     column="tamanho"
                     title="Tamanho"
@@ -371,8 +443,13 @@ export default function ItemsPage() {
                     sortDirection={sortDirection}
                     onSort={handleSortClick}
                   />
-                </TableHead>
-                <TableHead className="px-2">
+                </ResizableHeader>
+                <ResizableHeader
+                  width={colWidths.acabamento_id}
+                  onResize={(w) => handleResize('acabamento_id', w)}
+                  onResizeEnd={(w) => handleResizeEnd('acabamento_id', w)}
+                  className="px-2"
+                >
                   <SortableHeader
                     column="acabamento_id"
                     title="Acab."
@@ -380,12 +457,33 @@ export default function ItemsPage() {
                     sortDirection={sortDirection}
                     onSort={handleSortClick}
                   />
-                </TableHead>
+                </ResizableHeader>
                 {!selectedItemId && (
                   <>
-                    <TableHead className="px-2">Preço Venda</TableHead>
-                    <TableHead className="px-2">Validade do Preço</TableHead>
-                    <TableHead className="px-2">Status</TableHead>
+                    <ResizableHeader
+                      width={colWidths.preco_venda}
+                      onResize={(w) => handleResize('preco_venda', w)}
+                      onResizeEnd={(w) => handleResizeEnd('preco_venda', w)}
+                      className="px-2"
+                    >
+                      Preço Venda
+                    </ResizableHeader>
+                    <ResizableHeader
+                      width={colWidths.validade_preco}
+                      onResize={(w) => handleResize('validade_preco', w)}
+                      onResizeEnd={(w) => handleResizeEnd('validade_preco', w)}
+                      className="px-2"
+                    >
+                      Validade do Preço
+                    </ResizableHeader>
+                    <ResizableHeader
+                      width={colWidths.status}
+                      onResize={(w) => handleResize('status', w)}
+                      onResizeEnd={(w) => handleResizeEnd('status', w)}
+                      className="px-2"
+                    >
+                      Status
+                    </ResizableHeader>
                   </>
                 )}
               </TableRow>
@@ -434,10 +532,10 @@ export default function ItemsPage() {
                           onClick={(e) => handleImageClick(e, item)}
                         />
                       </TableCell>
-                      <TableCell className="font-medium whitespace-nowrap py-1 px-2 text-sm">
+                      <TableCell className="font-medium whitespace-nowrap py-1 px-2 text-sm overflow-hidden text-ellipsis">
                         {item.sku}
                       </TableCell>
-                      <TableCell className={cn('py-1 px-2 text-sm max-w-[200px]')}>
+                      <TableCell className={cn('py-1 px-2 text-sm overflow-hidden')}>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <div
@@ -462,25 +560,25 @@ export default function ItemsPage() {
                           )}
                         </Tooltip>
                       </TableCell>
-                      <TableCell className="whitespace-nowrap py-1 px-2 text-sm">
+                      <TableCell className="whitespace-nowrap py-1 px-2 text-sm overflow-hidden text-ellipsis">
                         {item.tamanho || '-'}
                       </TableCell>
-                      <TableCell className="py-1 px-2">
+                      <TableCell className="py-1 px-2 overflow-hidden text-ellipsis whitespace-nowrap">
                         <AcabamentoBadge acabamentoId={item.acabamento_id} />
                       </TableCell>
                       {!selectedItemId && (
                         <>
-                          <TableCell className="whitespace-nowrap py-1 px-2 text-xs">
+                          <TableCell className="whitespace-nowrap py-1 px-2 text-xs overflow-hidden text-ellipsis">
                             {typeof item.preco_venda === 'number'
                               ? `$ ${item.preco_venda.toFixed(2)}`
                               : '-'}
                           </TableCell>
-                          <TableCell className="whitespace-nowrap py-1 px-2 text-xs">
+                          <TableCell className="whitespace-nowrap py-1 px-2 text-xs overflow-hidden text-ellipsis">
                             {item.validade_preco
                               ? item.validade_preco.split('T')[0].split('-').reverse().join('/')
                               : '-'}
                           </TableCell>
-                          <TableCell className="py-1 px-2">
+                          <TableCell className="py-1 px-2 overflow-hidden text-ellipsis whitespace-nowrap">
                             <div className="flex items-center gap-1.5">
                               {item.ativo ? (
                                 <Badge

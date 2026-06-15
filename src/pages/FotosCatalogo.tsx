@@ -40,6 +40,8 @@ import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 import { useData } from '@/contexts/data-context'
 import { ImagePreviewModal } from '@/components/ImagePreviewModal'
+import { useAuth } from '@/hooks/use-auth'
+import { ResizableHeader } from '@/components/ui/resizable-header'
 
 export default function FotosCatalogo() {
   const [fotos, setFotos] = useState<any[]>([])
@@ -50,6 +52,41 @@ export default function FotosCatalogo() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [searchTerm, setSearchTerm] = useState('')
   const [sortBy, setSortBy] = useState('created-desc')
+
+  const { user, updatePreferences } = useAuth()
+
+  const defaultFotosWidths = useMemo(
+    () => ({
+      imagem: 80,
+      descricao: 300,
+      tipo: 120,
+      subtipo: 120,
+      tamanho: 100,
+      acabamento: 150,
+      acoes: 100,
+    }),
+    [],
+  )
+
+  const [colWidths, setColWidths] = useState<Record<string, number>>(
+    user?.preferencias_ui?.fotos_table_widths || defaultFotosWidths,
+  )
+
+  useEffect(() => {
+    if (user?.preferencias_ui?.fotos_table_widths) {
+      setColWidths((prev) => ({ ...prev, ...user.preferencias_ui.fotos_table_widths }))
+    }
+  }, [user?.preferencias_ui?.fotos_table_widths])
+
+  const handleResize = (col: string, width: number) => {
+    setColWidths((prev) => ({ ...prev, [col]: width }))
+  }
+
+  const handleResizeEnd = (col: string, width: number) => {
+    const newWidths = { ...colWidths, [col]: width }
+    setColWidths(newWidths)
+    updatePreferences({ fotos_table_widths: newWidths })
+  }
 
   const [previewImage, setPreviewImage] = useState<{ url: string; alt: string } | null>(null)
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -346,12 +383,25 @@ export default function FotosCatalogo() {
           ))}
         </div>
       ) : (
-        <div className="border rounded-xl bg-card overflow-hidden shadow-sm">
-          <Table>
+        <div className="border rounded-xl bg-card overflow-x-auto shadow-sm">
+          <Table style={{ tableLayout: 'fixed', width: 'max-content', minWidth: '100%' }}>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[80px]">Imagem</TableHead>
-                <TableHead>
+                <TableHead
+                  style={{
+                    width: colWidths.imagem,
+                    minWidth: colWidths.imagem,
+                    maxWidth: colWidths.imagem,
+                  }}
+                  className="px-2"
+                >
+                  Imagem
+                </TableHead>
+                <ResizableHeader
+                  width={colWidths.descricao}
+                  onResize={(w) => handleResize('descricao', w)}
+                  onResizeEnd={(w) => handleResizeEnd('descricao', w)}
+                >
                   <button
                     className="flex items-center gap-1 font-semibold hover:text-foreground"
                     onClick={() =>
@@ -361,25 +411,56 @@ export default function FotosCatalogo() {
                     Descrição{' '}
                     {sortBy.startsWith('descricao') && <ArrowUpDown className="w-3 h-3" />}
                   </button>
-                </TableHead>
-                <TableHead>
+                </ResizableHeader>
+                <ResizableHeader
+                  width={colWidths.tipo}
+                  onResize={(w) => handleResize('tipo', w)}
+                  onResizeEnd={(w) => handleResizeEnd('tipo', w)}
+                >
                   <button
                     className="flex items-center gap-1 font-semibold hover:text-foreground"
                     onClick={() => setSortBy(sortBy === 'tipo-asc' ? 'tipo-desc' : 'tipo-asc')}
                   >
                     Tipo {sortBy.startsWith('tipo') && <ArrowUpDown className="w-3 h-3" />}
                   </button>
+                </ResizableHeader>
+                <ResizableHeader
+                  width={colWidths.subtipo}
+                  onResize={(w) => handleResize('subtipo', w)}
+                  onResizeEnd={(w) => handleResizeEnd('subtipo', w)}
+                >
+                  Subtipo
+                </ResizableHeader>
+                <ResizableHeader
+                  width={colWidths.tamanho}
+                  onResize={(w) => handleResize('tamanho', w)}
+                  onResizeEnd={(w) => handleResizeEnd('tamanho', w)}
+                >
+                  Tamanho
+                </ResizableHeader>
+                <ResizableHeader
+                  width={colWidths.acabamento}
+                  onResize={(w) => handleResize('acabamento', w)}
+                  onResizeEnd={(w) => handleResizeEnd('acabamento', w)}
+                >
+                  Acabamento
+                </ResizableHeader>
+                <TableHead
+                  className="text-right px-2"
+                  style={{
+                    width: colWidths.acoes,
+                    minWidth: colWidths.acoes,
+                    maxWidth: colWidths.acoes,
+                  }}
+                >
+                  Ações
                 </TableHead>
-                <TableHead>Subtipo</TableHead>
-                <TableHead>Tamanho</TableHead>
-                <TableHead>Acabamento</TableHead>
-                <TableHead className="w-[100px] text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredAndSortedFotos.map((f) => (
                 <TableRow key={f.id}>
-                  <TableCell>
+                  <TableCell className="px-2">
                     {f.arquivo ? (
                       <div
                         className="w-12 h-12 rounded bg-muted overflow-hidden border cursor-pointer hover:opacity-80 transition-opacity"
@@ -402,12 +483,37 @@ export default function FotosCatalogo() {
                       </div>
                     )}
                   </TableCell>
-                  <TableCell className="font-medium">{f.descricao || '-'}</TableCell>
-                  <TableCell>{f.tipo || '-'}</TableCell>
-                  <TableCell>{f.subtipo || '-'}</TableCell>
-                  <TableCell>{f.tamanho || '-'}</TableCell>
-                  <TableCell>{getAcabamentoName(f.acabamento_id)}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell
+                    className="font-medium overflow-hidden text-ellipsis whitespace-nowrap px-2"
+                    title={f.descricao}
+                  >
+                    {f.descricao || '-'}
+                  </TableCell>
+                  <TableCell
+                    className="overflow-hidden text-ellipsis whitespace-nowrap px-2"
+                    title={f.tipo}
+                  >
+                    {f.tipo || '-'}
+                  </TableCell>
+                  <TableCell
+                    className="overflow-hidden text-ellipsis whitespace-nowrap px-2"
+                    title={f.subtipo}
+                  >
+                    {f.subtipo || '-'}
+                  </TableCell>
+                  <TableCell
+                    className="overflow-hidden text-ellipsis whitespace-nowrap px-2"
+                    title={f.tamanho}
+                  >
+                    {f.tamanho || '-'}
+                  </TableCell>
+                  <TableCell
+                    className="overflow-hidden text-ellipsis whitespace-nowrap px-2"
+                    title={getAcabamentoName(f.acabamento_id)}
+                  >
+                    {getAcabamentoName(f.acabamento_id)}
+                  </TableCell>
+                  <TableCell className="text-right px-2">
                     <div className="flex items-center justify-end gap-2">
                       <Button
                         variant="ghost"

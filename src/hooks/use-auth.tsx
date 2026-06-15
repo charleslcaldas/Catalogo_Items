@@ -7,6 +7,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: any }>
   signOut: () => void
   loading: boolean
+  updatePreferences: (newPrefs: any) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -55,8 +56,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     pb.authStore.clear()
   }
 
+  const updatePreferences = async (newPrefs: any) => {
+    if (!user) return
+    try {
+      const currentPrefs = user.preferencias_ui || {}
+      const merged = { ...currentPrefs, ...newPrefs }
+      const updatedUser = await pb.collection('users').update(user.id, { preferencias_ui: merged })
+      setUser(updatedUser)
+    } catch (error) {
+      console.error('Failed to update UI preferences', error)
+    }
+  }
+
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, signIn, signOut, loading }}>
+    <AuthContext.Provider
+      value={{ user, isAuthenticated, signIn, signOut, loading, updatePreferences }}
+    >
       {children}
     </AuthContext.Provider>
   )
