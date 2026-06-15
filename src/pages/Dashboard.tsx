@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Package, Folders, RefreshCw, Layers, Target, Activity } from 'lucide-react'
+import { Package, Folders, RefreshCw, Layers, Target, Activity, Archive } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import pb from '@/lib/pocketbase/client'
@@ -53,6 +53,7 @@ export default function Dashboard() {
   useRealtime('categorias', fetchData)
 
   const ativos = itens.filter((i) => i.ativo).length
+  const inativos = itens.filter((i) => !i.ativo).length
   const totalItens = itens.length
   const totalCategorias = categorias.length
   const openPotenciais = potenciais.filter(
@@ -117,7 +118,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
         <Card
           className="cursor-pointer hover:bg-muted/50 transition-colors"
           onClick={() => navigate('/itens?showInactive=true')}
@@ -142,6 +143,21 @@ export default function Dashboard() {
             <div className="text-2xl font-bold">{ativos}</div>
             <p className="text-xs text-muted-foreground">
               {totalItens > 0 ? Math.round((ativos / totalItens) * 100) : 0}% do catálogo
+            </p>
+          </CardContent>
+        </Card>
+        <Card
+          className="cursor-pointer hover:bg-muted/50 transition-colors"
+          onClick={() => navigate('/itens?status=Inativo')}
+        >
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Itens Inativos</CardTitle>
+            <Archive className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{inativos}</div>
+            <p className="text-xs text-muted-foreground">
+              {totalItens > 0 ? Math.round((inativos / totalItens) * 100) : 0}% do catálogo
             </p>
           </CardContent>
         </Card>
@@ -277,7 +293,10 @@ export default function Dashboard() {
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-medium leading-none">{item.sku}</p>
                       {!item.ativo && (
-                        <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+                        <Badge
+                          variant="outline"
+                          className="bg-red-50 text-red-700 border-red-200 text-[10px] h-4 px-1.5"
+                        >
                           Inativo
                         </Badge>
                       )}

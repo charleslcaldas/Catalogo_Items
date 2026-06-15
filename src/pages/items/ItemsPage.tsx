@@ -641,7 +641,10 @@ export default function ItemsPage() {
                                   Ativo
                                 </Badge>
                               ) : (
-                                <Badge variant="outline" className="bg-muted text-muted-foreground">
+                                <Badge
+                                  variant="outline"
+                                  className="bg-red-50 text-red-700 border-red-200"
+                                >
                                   Inativo
                                 </Badge>
                               )}
