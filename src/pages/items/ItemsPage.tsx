@@ -39,6 +39,8 @@ import { BulkEditDialog } from './BulkEditDialog'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { cn, getContrastColor } from '@/lib/utils'
 import pb from '@/lib/pocketbase/client'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import { useRealtime } from '@/hooks/use-realtime'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
@@ -87,6 +89,17 @@ export default function ItemsPage() {
 
   const filterStatus = searchParams.get('status')
   const filterLinhaId = searchParams.get('linha_id')
+
+  const showInactiveParam = searchParams.get('showInactive') === 'true'
+  const [showInactive, setShowInactive] = useState(showInactiveParam)
+
+  const handleShowInactiveChange = (checked: boolean) => {
+    setShowInactive(checked)
+    const newParams = new URLSearchParams(searchParams)
+    if (checked) newParams.set('showInactive', 'true')
+    else newParams.delete('showInactive')
+    setSearchParams(newParams)
+  }
 
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -162,6 +175,8 @@ export default function ItemsPage() {
       filters.push(`ativo = true`)
     } else if (filterStatus === 'Inativo') {
       filters.push(`ativo = false`)
+    } else if (!showInactive) {
+      filters.push(`ativo = true`)
     }
 
     if (filterLinhaId) {
@@ -219,7 +234,7 @@ export default function ItemsPage() {
 
   useEffect(() => {
     fetchApiItens(debouncedSearch)
-  }, [sortColumn, sortDirection, debouncedSearch, filterStatus, filterLinhaId])
+  }, [sortColumn, sortDirection, debouncedSearch, filterStatus, filterLinhaId, showInactive])
 
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -335,29 +350,46 @@ export default function ItemsPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <Button
-              onClick={() => setSelectedItemId('new')}
-              size="sm"
-              className="rounded-full h-9 px-4 shrink-0 w-full sm:w-auto flex-1 sm:flex-none text-sm font-medium"
-            >
-              <Plus className="mr-1.5 h-4 w-4" /> Novo Item
-            </Button>
-            {filterLinhaId && (
-              <Button
-                variant="secondary"
-                size="sm"
-                className="rounded-full h-9 px-3 shrink-0"
-                onClick={() => {
-                  const newParams = new URLSearchParams(searchParams)
-                  newParams.delete('linha_id')
-                  setSearchParams(newParams)
-                }}
+          <div className="flex items-center gap-4 w-full sm:w-auto">
+            <div className="flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded-full border shadow-sm h-9">
+              <Switch
+                id="show-inactive"
+                checked={showInactive}
+                onCheckedChange={handleShowInactiveChange}
+                className="scale-75 origin-left"
+              />
+              <Label
+                htmlFor="show-inactive"
+                className="text-xs font-medium cursor-pointer whitespace-nowrap"
               >
-                <FilterX className="h-4 w-4 mr-1.5" />
-                Limpar
+                Mostrar Inativos
+              </Label>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => setSelectedItemId('new')}
+                size="sm"
+                className="rounded-full h-9 px-4 shrink-0 w-full sm:w-auto flex-1 sm:flex-none text-sm font-medium"
+              >
+                <Plus className="mr-1.5 h-4 w-4" /> Novo Item
               </Button>
-            )}
+              {filterLinhaId && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="rounded-full h-9 px-3 shrink-0"
+                  onClick={() => {
+                    const newParams = new URLSearchParams(searchParams)
+                    newParams.delete('linha_id')
+                    setSearchParams(newParams)
+                  }}
+                >
+                  <FilterX className="h-4 w-4 mr-1.5" />
+                  Limpar
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -528,6 +560,7 @@ export default function ItemsPage() {
                       key={item.id}
                       className={cn(
                         'cursor-pointer transition-colors',
+                        !item.ativo && 'opacity-60 grayscale-[0.3]',
                         isRowActive
                           ? 'bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40'
                           : 'hover:bg-muted/50',
