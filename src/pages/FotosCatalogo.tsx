@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import {
   Plus,
   Trash2,
@@ -39,6 +39,7 @@ import { toast } from 'sonner'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 import { useData } from '@/contexts/data-context'
+import { ImagePreviewModal } from '@/components/ImagePreviewModal'
 
 export default function FotosCatalogo() {
   const [fotos, setFotos] = useState<any[]>([])
@@ -49,6 +50,26 @@ export default function FotosCatalogo() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [searchTerm, setSearchTerm] = useState('')
   const [sortBy, setSortBy] = useState('created-desc')
+
+  const [previewImage, setPreviewImage] = useState<{ url: string; alt: string } | null>(null)
+  const clickTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  const handleImageClick = (e: React.MouseEvent, f: any) => {
+    e.stopPropagation()
+    if (e.detail === 1) {
+      clickTimerRef.current = setTimeout(() => {
+        setPreviewImage({
+          url: f.arquivo
+            ? pb.files.getURL(f, f.arquivo)
+            : 'https://img.usecurling.com/p/800/800?q=photo',
+          alt: f.descricao || 'Foto sem descrição',
+        })
+      }, 250)
+    } else if (e.detail === 2) {
+      if (clickTimerRef.current) clearTimeout(clickTimerRef.current)
+      openEdit(f)
+    }
+  }
 
   const [formData, setFormData] = useState({
     descricao: '',
@@ -252,7 +273,11 @@ export default function FotosCatalogo() {
               key={f.id}
               className="border rounded-xl bg-card overflow-hidden shadow-sm flex flex-col group relative"
             >
-              <div className="aspect-square bg-muted relative border-b">
+              <div
+                className="aspect-square bg-muted relative border-b cursor-pointer hover:opacity-90 transition-opacity"
+                onClick={(e) => handleImageClick(e, f)}
+                title="Clique para ampliar / Duplo clique para editar"
+              >
                 {f.arquivo ? (
                   <img
                     src={pb.files.getURL(f, f.arquivo, { thumb: '400x400' })}
@@ -269,7 +294,10 @@ export default function FotosCatalogo() {
                     variant="secondary"
                     size="icon"
                     className="h-8 w-8"
-                    onClick={() => openEdit(f)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      openEdit(f)
+                    }}
                   >
                     <Edit2 className="w-4 h-4" />
                   </Button>
@@ -277,7 +305,10 @@ export default function FotosCatalogo() {
                     variant="destructive"
                     size="icon"
                     className="h-8 w-8"
-                    onClick={() => handleDelete(f.id)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDelete(f.id)
+                    }}
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
@@ -350,7 +381,11 @@ export default function FotosCatalogo() {
                 <TableRow key={f.id}>
                   <TableCell>
                     {f.arquivo ? (
-                      <div className="w-12 h-12 rounded bg-muted overflow-hidden border">
+                      <div
+                        className="w-12 h-12 rounded bg-muted overflow-hidden border cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={(e) => handleImageClick(e, f)}
+                        title="Clique para ampliar / Duplo clique para editar"
+                      >
                         <img
                           src={pb.files.getURL(f, f.arquivo, { thumb: '100x100' })}
                           alt={f.descricao}
@@ -358,7 +393,11 @@ export default function FotosCatalogo() {
                         />
                       </div>
                     ) : (
-                      <div className="w-12 h-12 rounded bg-muted flex items-center justify-center border">
+                      <div
+                        className="w-12 h-12 rounded bg-muted flex items-center justify-center border cursor-pointer hover:bg-muted/80 transition-colors"
+                        onClick={(e) => handleImageClick(e, f)}
+                        title="Clique para ampliar / Duplo clique para editar"
+                      >
                         <ImageIcon className="w-5 h-5 text-muted-foreground opacity-30" />
                       </div>
                     )}
@@ -393,6 +432,15 @@ export default function FotosCatalogo() {
             </TableBody>
           </Table>
         </div>
+      )}
+
+      {previewImage && (
+        <ImagePreviewModal
+          isOpen={!!previewImage}
+          onClose={() => setPreviewImage(null)}
+          imageUrl={previewImage.url}
+          altText={previewImage.alt}
+        />
       )}
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>

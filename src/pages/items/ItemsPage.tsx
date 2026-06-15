@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import {
   Plus,
   Search,
@@ -34,6 +34,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { useData } from '@/contexts/data-context'
+import { ImagePreviewModal } from '@/components/ImagePreviewModal'
 import { ItemDetailPanel } from './ItemDetailPanel'
 import { BulkEditDialog } from './BulkEditDialog'
 import { useSearchParams, useNavigate } from 'react-router-dom'
@@ -248,6 +249,24 @@ export default function ItemsPage() {
     setIsBulkEditOpen(false)
   }
 
+  const [previewImage, setPreviewImage] = useState<{ url: string; alt: string } | null>(null)
+  const clickTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  const handleImageClick = (e: React.MouseEvent, item: any) => {
+    e.stopPropagation()
+    if (e.detail === 1) {
+      clickTimerRef.current = setTimeout(() => {
+        setPreviewImage({
+          url: item.foto_url || 'https://img.usecurling.com/p/800/800?q=tools',
+          alt: item.sku,
+        })
+      }, 250)
+    } else if (e.detail === 2) {
+      if (clickTimerRef.current) clearTimeout(clickTimerRef.current)
+      setSelectedItemId(item.id)
+    }
+  }
+
   const executeBulkDelete = async () => {
     try {
       await Promise.all(Array.from(selectedItemIds).map((id) => pb.collection('itens').delete(id)))
@@ -410,7 +429,9 @@ export default function ItemsPage() {
                         <img
                           src={item.foto_url || 'https://img.usecurling.com/p/100/100?q=tools'}
                           alt={item.sku}
-                          className="w-6 h-6 rounded object-cover border bg-muted mx-auto"
+                          className="w-6 h-6 rounded object-cover border bg-muted mx-auto cursor-pointer hover:opacity-80 transition-opacity"
+                          title="Clique para ampliar / Duplo clique para editar"
+                          onClick={(e) => handleImageClick(e, item)}
                         />
                       </TableCell>
                       <TableCell className="font-medium whitespace-nowrap py-1 px-2 text-sm">
@@ -551,6 +572,15 @@ export default function ItemsPage() {
         selectedIds={Array.from(selectedItemIds)}
         onSuccess={handleBulkSuccess}
       />
+
+      {previewImage && (
+        <ImagePreviewModal
+          isOpen={!!previewImage}
+          onClose={() => setPreviewImage(null)}
+          imageUrl={previewImage.url}
+          altText={previewImage.alt}
+        />
+      )}
 
       <AlertDialog open={isBulkDeleteOpen} onOpenChange={setIsBulkDeleteOpen}>
         <AlertDialogContent>
