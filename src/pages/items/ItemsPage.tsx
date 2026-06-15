@@ -163,12 +163,23 @@ export default function ItemsPage() {
       const tokens = normalizedTerm.split(/\s+/).filter(Boolean)
       if (tokens.length === 0) return true
 
+      const includeTokens: string[] = []
+      const excludeTokens: string[] = []
+
+      for (const token of tokens) {
+        if (token.startsWith('-') && token.length > 1) {
+          excludeTokens.push(token.substring(1))
+        } else {
+          includeTokens.push(token)
+        }
+      }
+
       const getAcabamentoInfo = (id?: string) => {
         const aca = acabamentos.find((a) => a.id === id)
         return aca ? `${aca.nome_pt} ${aca.nome_en || ''} ${aca.codigo}` : ''
       }
 
-      const searchableText = [
+      const textToSearch = [
         item.sku,
         item.descr_pt,
         item.descr_en,
@@ -181,6 +192,7 @@ export default function ItemsPage() {
         item.norma,
         item.informacao_extra,
         item.tamanho,
+        item.unidade,
         getLinhaName(item.linha_id),
         getCategoriaName(item.linha_id),
         getNcmCode(item.ncm_id),
@@ -192,7 +204,15 @@ export default function ItemsPage() {
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
 
-      return tokens.every((token) => searchableText.includes(token))
+      for (const token of excludeTokens) {
+        if (textToSearch.includes(token)) return false
+      }
+
+      for (const token of includeTokens) {
+        if (!textToSearch.includes(token)) return false
+      }
+
+      return true
     })
   }, [
     apiItens,
