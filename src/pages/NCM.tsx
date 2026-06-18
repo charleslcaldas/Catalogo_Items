@@ -11,13 +11,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useData } from '@/contexts/data-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, Pencil, Search, History, UploadCloud } from 'lucide-react'
+import { Plus, Pencil, Search, History, UploadCloud, Download } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { NcmModal } from '@/components/MetadataModals'
 import { NcmHistoryModal } from '@/components/NcmHistoryModal'
 import { NcmImportModal } from '@/components/NcmImportModal'
 
 export default function NCMPage() {
   const { ncms, itens } = useData()
+  const navigate = useNavigate()
   const [modalOpen, setModalOpen] = useState(false)
   const [importModalOpen, setImportModalOpen] = useState(false)
   const [historyModalOpen, setHistoryModalOpen] = useState(false)
@@ -32,6 +34,35 @@ export default function NCMPage() {
       (n.observacoes && n.observacoes.toLowerCase().includes(term))
     )
   })
+
+  const handleExport = () => {
+    const headers = ['Código NCM', 'II (%)', 'IPI (%)', 'PIS (%)', 'COFINS (%)', 'Observações']
+    const csvData = ncms.map((ncm) => [
+      ncm.codigo,
+      ncm.ii,
+      ncm.ipi,
+      ncm.pis,
+      ncm.cofins,
+      ncm.observacoes || '',
+    ])
+
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map((row) =>
+        row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','),
+      ),
+    ].join('\n')
+
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `ncm_export_${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -53,6 +84,10 @@ export default function NCMPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleExport}>
+            <Download className="mr-2 h-4 w-4" />
+            Exportar
+          </Button>
           <Button variant="outline" onClick={() => setImportModalOpen(true)}>
             <UploadCloud className="mr-2 h-4 w-4" />
             Importar CSV
@@ -92,9 +127,23 @@ export default function NCMPage() {
                 const associatedCount = itens.filter((i) => i.ncm_id === ncm.id).length
                 return (
                   <TableRow key={ncm.id}>
-                    <TableCell className="font-medium font-mono">{ncm.codigo}</TableCell>
-                    <TableCell className="text-right text-muted-foreground font-medium">
-                      {associatedCount}
+                    <TableCell className="font-medium font-mono">
+                      <button
+                        onClick={() => navigate(`/itens?ncm_id=${ncm.id}`)}
+                        className="text-primary hover:underline hover:text-primary/80 transition-colors"
+                        title="Ver itens associados"
+                      >
+                        {ncm.codigo}
+                      </button>
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      <button
+                        onClick={() => navigate(`/itens?ncm_id=${ncm.id}`)}
+                        className="text-primary hover:underline hover:text-primary/80 transition-colors"
+                        title="Ver itens associados"
+                      >
+                        {associatedCount}
+                      </button>
                     </TableCell>
                     <TableCell className="text-right">{ncm.ii}%</TableCell>
                     <TableCell className="text-right">{ncm.ipi}%</TableCell>

@@ -89,6 +89,7 @@ export default function ItemsPage() {
 
   const filterStatus = searchParams.get('status')
   const filterLinhaId = searchParams.get('linha_id')
+  const filterNcmId = searchParams.get('ncm_id')
 
   const showInactiveParam = searchParams.get('showInactive') === 'true'
   const [showInactive, setShowInactive] = useState(showInactiveParam)
@@ -183,6 +184,10 @@ export default function ItemsPage() {
       filters.push(`linha_id = "${filterLinhaId}"`)
     }
 
+    if (filterNcmId) {
+      filters.push(`ncm_id = "${filterNcmId}"`)
+    }
+
     if (searchStr.trim()) {
       const normalizedTerm = searchStr.toLowerCase().replace(/["']/g, '')
       const tokens = normalizedTerm.split(/\s+/).filter(Boolean)
@@ -234,7 +239,15 @@ export default function ItemsPage() {
 
   useEffect(() => {
     fetchApiItens(debouncedSearch)
-  }, [sortColumn, sortDirection, debouncedSearch, filterStatus, filterLinhaId, showInactive])
+  }, [
+    sortColumn,
+    sortDirection,
+    debouncedSearch,
+    filterStatus,
+    filterLinhaId,
+    filterNcmId,
+    showInactive,
+  ])
 
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -374,7 +387,7 @@ export default function ItemsPage() {
               >
                 <Plus className="mr-1.5 h-4 w-4" /> Novo Item
               </Button>
-              {filterLinhaId && (
+              {(filterLinhaId || filterNcmId) && (
                 <Button
                   variant="secondary"
                   size="sm"
@@ -382,6 +395,7 @@ export default function ItemsPage() {
                   onClick={() => {
                     const newParams = new URLSearchParams(searchParams)
                     newParams.delete('linha_id')
+                    newParams.delete('ncm_id')
                     setSearchParams(newParams)
                   }}
                 >
