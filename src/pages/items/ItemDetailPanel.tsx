@@ -23,7 +23,16 @@ import {
   Edit2,
   Sparkles,
   RefreshCcw,
+  LineChart,
 } from 'lucide-react'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { toast } from 'sonner'
 import pb from '@/lib/pocketbase/client'
 import { Badge } from '@/components/ui/badge'
@@ -69,6 +78,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
   const [previewOpen, setPreviewOpen] = useState(false)
   const [transactions, setTransactions] = useState<any[]>([])
   const [isEditing, setIsEditing] = useState(false)
+  const [priceHistory, setPriceHistory] = useState<any[]>([])
 
   const [catModalOpen, setCatModalOpen] = useState(false)
   const [lineModalOpen, setLineModalOpen] = useState(false)
@@ -132,6 +142,18 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
     return () => clearTimeout(timer)
   }, [formData.informacao_extra, formData.descricao_extra, isEditing])
 
+  const fetchPriceHistory = async (itemId: string) => {
+    try {
+      const res = await pb.collection('historico_precos').getList(1, 50, {
+        filter: `item_id="${itemId}"`,
+        sort: '-data_cotacao',
+      })
+      setPriceHistory(res.items)
+    } catch (err) {
+      console.error('Failed to fetch price history', err)
+    }
+  }
+
   useEffect(() => {
     if (item) {
       setFormData(item)
@@ -145,13 +167,26 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
         .getList(1, 20, { filter: `item_id="${item.id}"`, expand: 'potencial_id' })
         .then((res) => setTransactions(res.items))
         .catch(() => {})
+
+      fetchPriceHistory(item.id)
     } else {
       setFormData({ ativo: true, sincronizado_com_zoho: false })
       setSelectedCategoryId('')
       setTransactions([])
+      setPriceHistory([])
       setIsEditing(true)
     }
   }, [item, linhas])
+
+  useRealtime(
+    'historico_precos',
+    (e) => {
+      if (e.record.item_id === item?.id) {
+        fetchPriceHistory(item.id)
+      }
+    },
+    !!item?.id,
+  )
 
   const handleSave = async () => {
     if (!formData.sku || !formData.linha_id)
@@ -601,6 +636,12 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
               Transações
             </TabsTrigger>
             <TabsTrigger
+              value="prices"
+              className="rounded-full px-4 py-1 text-xs transition-all font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+            >
+              Histórico de Preços
+            </TabsTrigger>
+            <TabsTrigger
               value="history"
               className="rounded-full px-4 py-1 text-xs transition-all font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
             >
@@ -808,6 +849,16 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     onChange={(val) => setFormData({ ...formData, preco_compra: val })}
                   />
                 </Field>
+                <Field label="Fornecedor Atual" className="md:col-span-3">
+                  <Input
+                    className="h-8 text-xs"
+                    disabled={!isEditing}
+                    value={formData.fornecedor_ultima_atualizacao || ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, fornecedor_ultima_atualizacao: e.target.value })
+                    }
+                  />
+                </Field>
                 <Field label="Preço Venda" className="md:col-span-3">
                   <PriceInput
                     disabled={!isEditing}
@@ -815,7 +866,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     onChange={(val) => setFormData({ ...formData, preco_venda: val })}
                   />
                 </Field>
-                <Field label="Descrição Curta (PT) (Auto/Manual)" className="md:col-span-6">
+                <Field label="Descrição Curta (PT) (Auto/Manual)" className="md:col-span-3">
                   <Input
                     className="h-8 text-xs font-medium"
                     disabled={!isEditing}
@@ -1109,6 +1160,16 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     onChange={(val) => setFormData({ ...formData, preco_compra: val })}
                   />
                 </Field>
+                <Field label="Current Supplier" className="md:col-span-3">
+                  <Input
+                    className="h-8 text-xs"
+                    disabled={!isEditing}
+                    value={formData.fornecedor_ultima_atualizacao || ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, fornecedor_ultima_atualizacao: e.target.value })
+                    }
+                  />
+                </Field>
                 <Field label="Sale Price" className="md:col-span-3">
                   <PriceInput
                     disabled={!isEditing}
@@ -1116,7 +1177,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     onChange={(val) => setFormData({ ...formData, preco_venda: val })}
                   />
                 </Field>
-                <Field label="Short Description (EN) (Auto/Manual)" className="md:col-span-6">
+                <Field label="Short Description (EN) (Auto/Manual)" className="md:col-span-3">
                   <Input
                     className="h-8 text-xs font-medium"
                     disabled={!isEditing}
@@ -1244,6 +1305,57 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                   </div>
                 ))
               )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="prices" className="m-0 animate-fade-in-up h-full">
+            <div className="bg-card border rounded-lg shadow-sm divide-y flex flex-col max-h-[500px]">
+              <div className="p-3 bg-muted/30 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3">
+                  <LineChart className="w-4 h-4 text-primary" />
+                  <div>
+                    <h3 className="font-semibold text-xs">Histórico de Preços</h3>
+                    <p className="text-[10px] text-muted-foreground">
+                      Flutuações de preço de compra e fornecedores
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="overflow-y-auto flex-1">
+                <Table>
+                  <TableHeader className="sticky top-0 bg-card z-10 shadow-sm">
+                    <TableRow className="h-8 hover:bg-transparent">
+                      <TableHead className="text-xs h-8">Data</TableHead>
+                      <TableHead className="text-xs h-8">Fornecedor</TableHead>
+                      <TableHead className="text-xs h-8 text-right">Preço</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {priceHistory.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={3}
+                          className="text-center py-8 text-muted-foreground text-xs"
+                        >
+                          Nenhum histórico de preço encontrado.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      priceHistory.map((h) => (
+                        <TableRow key={h.id} className="h-8 hover:bg-muted/50">
+                          <TableCell className="text-xs py-1.5 whitespace-nowrap">
+                            {h.data_cotacao ? new Date(h.data_cotacao).toLocaleDateString() : '-'}
+                          </TableCell>
+                          <TableCell className="text-xs py-1.5">{h.fornecedor || '-'}</TableCell>
+                          <TableCell className="text-xs py-1.5 text-right font-medium">
+                            {typeof h.preco === 'number' ? `$ ${h.preco.toFixed(2)}` : '-'}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           </TabsContent>
 

@@ -90,6 +90,16 @@ export type NCM = {
   updated: string
 }
 
+export type HistoricoPreco = {
+  id: string
+  item_id: string
+  preco: number
+  fornecedor: string
+  data_cotacao: string
+  created: string
+  updated: string
+}
+
 export type NcmAuditLog = {
   id: string
   ncm_id: string
