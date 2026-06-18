@@ -65,7 +65,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const [cats, lins, acabs, ncmData, itemsData, atributosData, unids, descs] =
         await Promise.all([
           pb.collection('categorias').getFullList<Categoria>(),
-          pb.collection('linhas').getFullList<Linha>({ expand: 'categoria_id,ncm_id' }),
+          pb.collection('linhas').getFullList<Linha>({ expand: 'categoria_id' }),
           pb.collection('acabamentos').getFullList<Acabamento>(),
           pb.collection('ncm').getFullList<NCM>(),
           pb.collection('itens').getFullList<Item>({ sort: '-created' }),
@@ -90,7 +90,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     try {
       const [cats, lins, acabs, ncmData, atributosData, unids, descs] = await Promise.all([
         pb.collection('categorias').getFullList<Categoria>(),
-        pb.collection('linhas').getFullList<Linha>({ expand: 'categoria_id,ncm_id' }),
+        pb.collection('linhas').getFullList<Linha>({ expand: 'categoria_id' }),
         pb.collection('acabamentos').getFullList<Acabamento>(),
         pb.collection('ncm').getFullList<NCM>(),
         pb.collection('atributos_linha').getFullList<AtributoLinha>(),
