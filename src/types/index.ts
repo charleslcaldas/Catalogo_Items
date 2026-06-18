@@ -85,8 +85,27 @@ export type NCM = {
   ipi: number
   pis: number
   cofins: number
+  observacoes?: string
   created: string
   updated: string
+}
+
+export type NcmAuditLog = {
+  id: string
+  ncm_id: string
+  user_id?: string
+  action: string
+  previous_values?: any
+  new_values?: any
+  created: string
+  updated: string
+  expand?: {
+    user_id?: {
+      id: string
+      name: string
+      email: string
+    }
+  }
 }
 
 export type Potencial = {

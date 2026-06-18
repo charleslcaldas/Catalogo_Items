@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-15T12:40:43.737Z",
+  "generatedAt": "2026-06-18T02:56:39.402Z",
   "collections": [
     {
       "name": "users",
@@ -1002,6 +1002,69 @@
       "indexes": [
         "CREATE UNIQUE INDEX idx_descricoes_base_codigo ON descricoes_base (codigo)",
         "CREATE UNIQUE INDEX `idx_descricoes_base_nome_pt` ON `descricoes_base` (nome_pt)"
+      ]
+    },
+    {
+      "name": "ncm_audit_logs",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": null,
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "ncm_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "ncm"
+        },
+        {
+          "name": "user_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "previous_values",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "new_values",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_ncm_audit_ncm_id ON ncm_audit_logs (ncm_id)",
+        "CREATE INDEX idx_ncm_audit_created ON ncm_audit_logs (created)"
       ]
     }
   ]
