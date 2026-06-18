@@ -1,14 +1,65 @@
-// @deps papaparse@5.4.1
 routerAdd(
   'POST',
   '/backend/v1/csv/import-items',
   (e) => {
-    const Papa = require('papaparse')
     const body = e.requestInfo().body || {}
     const csv = body.csv
     if (!csv) return e.badRequestError('csv is required')
 
-    const parsed = Papa.parse(csv, { header: true, skipEmptyLines: true })
+    const rows = []
+    let row = []
+    let inQuotes = false
+    let val = ''
+    for (let i = 0; i < csv.length; i++) {
+      const char = csv[i]
+      const nextChar = csv[i + 1]
+
+      if (inQuotes) {
+        if (char === '"' && nextChar === '"') {
+          val += '"'
+          i++
+        } else if (char === '"') {
+          inQuotes = false
+        } else {
+          val += char
+        }
+      } else {
+        if (char === '"') {
+          inQuotes = true
+        } else if (char === ',') {
+          row.push(val)
+          val = ''
+        } else if (char === '\n' || char === '\r') {
+          if (char === '\r' && nextChar === '\n') i++
+          row.push(val)
+          val = ''
+          if (row.length > 0 && row.some((c) => c.trim() !== '')) {
+            rows.push(row)
+          }
+          row = []
+        } else {
+          val += char
+        }
+      }
+    }
+    row.push(val)
+    if (row.length > 0 && row.some((c) => c.trim() !== '')) {
+      rows.push(row)
+    }
+
+    const parsedData = []
+    if (rows.length > 1) {
+      const headers = rows[0].map((h) => h.trim())
+      for (let i = 1; i < rows.length; i++) {
+        const obj = {}
+        for (let j = 0; j < headers.length; j++) {
+          obj[headers[j]] = (rows[i][j] || '').trim()
+        }
+        parsedData.push(obj)
+      }
+    }
+
+    const parsed = { data: parsedData }
     let sucessos = 0
     let erros = 0
     const detalhes_erros = []
