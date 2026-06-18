@@ -25,12 +25,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 export function BulkEditDialog({
   open,
   onOpenChange,
-  selectedIds,
+  selectedIds = [],
   onSuccess,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  selectedIds: string[]
+  selectedIds?: string[]
   onSuccess: () => void
 }) {
   const { linhas, acabamentos, ncms } = useData()
@@ -68,8 +68,9 @@ export function BulkEditDialog({
 
     setLoading(true)
     try {
-      await Promise.all(selectedIds.map((id) => pb.collection('itens').update(id, payload)))
-      toast.success(`${selectedIds.length} itens atualizados com sucesso.`)
+      const idsToUpdate = selectedIds || []
+      await Promise.all(idsToUpdate.map((id) => pb.collection('itens').update(id, payload)))
+      toast.success(`${idsToUpdate.length} itens atualizados com sucesso.`)
       onSuccess()
     } catch (error: any) {
       toast.error('Erro na atualização em massa: ' + error.message)
@@ -88,8 +89,8 @@ export function BulkEditDialog({
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Você está prestes a alterar <strong>{selectedIds.length}</strong> itens simultaneamente.
-            Selecione os campos que deseja sobrescrever.
+            Você está prestes a alterar <strong>{selectedIds?.length || 0}</strong> itens
+            simultaneamente. Selecione os campos que deseja sobrescrever.
           </AlertDescription>
         </Alert>
 
