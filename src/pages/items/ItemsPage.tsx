@@ -36,12 +36,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion'
 import { ImagePreviewModal } from '@/components/ImagePreviewModal'
 import { ItemDetailPanel } from './ItemDetailPanel'
 import { BulkEditDialog } from './BulkEditDialog'
@@ -51,7 +45,6 @@ import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
-import { useData } from '@/contexts/data-context'
 import { ResizableHeader } from '@/components/ui/resizable-header'
 
 function AcabamentoBadge({ acabamento }: { acabamento?: any }) {
@@ -93,7 +86,6 @@ function SortableHeader({ column, title, sortColumn, sortDirection, onSort }: an
 
 export default function ItemsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const { categorias, acabamentos } = useData()
   const navigate = useNavigate()
 
   const filterLinhaId = searchParams.get('linha_id')
@@ -150,32 +142,6 @@ export default function ItemsPage() {
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false)
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false)
 
-  // Filters State
-  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set())
-  const [selectedFinishes, setSelectedFinishes] = useState<Set<string>>(new Set())
-  const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set(['true']))
-
-  const toggleCategory = (id: string) => {
-    const next = new Set(selectedCategories)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
-    setSelectedCategories(next)
-  }
-
-  const toggleFinish = (id: string) => {
-    const next = new Set(selectedFinishes)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
-    setSelectedFinishes(next)
-  }
-
-  const toggleStatus = (val: string) => {
-    const next = new Set(selectedStatuses)
-    if (next.has(val)) next.delete(val)
-    else next.add(val)
-    setSelectedStatuses(next)
-  }
-
   // Debounce search term to prevent rate limits while typing
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -194,26 +160,6 @@ export default function ItemsPage() {
     }
 
     const filters: string[] = []
-
-    if (selectedStatuses.size === 1) {
-      filters.push(`ativo = ${selectedStatuses.has('true')}`)
-    }
-
-    if (selectedCategories.size > 0) {
-      filters.push(
-        `(${Array.from(selectedCategories)
-          .map((c) => `linha_id.categoria_id = "${c}"`)
-          .join(' || ')})`,
-      )
-    }
-
-    if (selectedFinishes.size > 0) {
-      filters.push(
-        `(${Array.from(selectedFinishes)
-          .map((f) => `acabamento_id = "${f}"`)
-          .join(' || ')})`,
-      )
-    }
 
     if (filterLinhaId) {
       filters.push(`linha_id = "${filterLinhaId}"`)
@@ -274,16 +220,7 @@ export default function ItemsPage() {
 
   useEffect(() => {
     fetchApiItens(debouncedSearch)
-  }, [
-    sortColumn,
-    sortDirection,
-    debouncedSearch,
-    filterLinhaId,
-    filterNcmId,
-    selectedCategories,
-    selectedFinishes,
-    selectedStatuses,
-  ])
+  }, [sortColumn, sortDirection, debouncedSearch, filterLinhaId, filterNcmId])
 
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -500,96 +437,6 @@ export default function ItemsPage() {
       </div>
 
       <div className="flex gap-4 flex-1 items-start overflow-hidden">
-        {/* Sidebar Filtros */}
-        <div className="w-64 shrink-0 bg-card border rounded-xl overflow-y-auto h-full hidden md:flex flex-col">
-          <div className="p-4 font-bold border-b sticky top-0 bg-card z-10 flex items-center justify-between shadow-sm">
-            Filtros
-            {(selectedCategories.size > 0 ||
-              selectedFinishes.size > 0 ||
-              selectedStatuses.size < 2) && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 text-xs px-2"
-                onClick={() => {
-                  setSelectedCategories(new Set())
-                  setSelectedFinishes(new Set())
-                  setSelectedStatuses(new Set(['true', 'false']))
-                }}
-              >
-                Limpar
-              </Button>
-            )}
-          </div>
-          <Accordion
-            type="multiple"
-            defaultValue={['status', 'category', 'finish']}
-            className="px-4 py-2"
-          >
-            <AccordionItem value="status" className="border-b-0">
-              <AccordionTrigger className="py-2 text-sm font-semibold hover:no-underline">
-                Status
-              </AccordionTrigger>
-              <AccordionContent className="flex flex-col gap-2 pt-1 pb-3">
-                <label className="flex items-center gap-2 cursor-pointer text-sm hover:text-primary transition-colors">
-                  <Checkbox
-                    checked={selectedStatuses.has('true')}
-                    onCheckedChange={() => toggleStatus('true')}
-                  />
-                  Ativo
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer text-sm hover:text-primary transition-colors">
-                  <Checkbox
-                    checked={selectedStatuses.has('false')}
-                    onCheckedChange={() => toggleStatus('false')}
-                  />
-                  Inativo
-                </label>
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="category" className="border-b-0">
-              <AccordionTrigger className="py-2 text-sm font-semibold hover:no-underline">
-                Categoria
-              </AccordionTrigger>
-              <AccordionContent className="flex flex-col gap-2 pt-1 pb-3 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
-                {categorias.map((c) => (
-                  <label
-                    key={c.id}
-                    className="flex items-center gap-2 cursor-pointer text-sm hover:text-primary transition-colors"
-                  >
-                    <Checkbox
-                      checked={selectedCategories.has(c.id)}
-                      onCheckedChange={() => toggleCategory(c.id)}
-                    />
-                    {c.nome_pt}
-                  </label>
-                ))}
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="finish" className="border-b-0">
-              <AccordionTrigger className="py-2 text-sm font-semibold hover:no-underline">
-                Acabamento
-              </AccordionTrigger>
-              <AccordionContent className="flex flex-col gap-2 pt-1 pb-3 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
-                {acabamentos.map((a) => (
-                  <label
-                    key={a.id}
-                    className="flex items-center gap-2 cursor-pointer text-sm hover:text-primary transition-colors"
-                  >
-                    <Checkbox
-                      checked={selectedFinishes.has(a.id)}
-                      onCheckedChange={() => toggleFinish(a.id)}
-                    />
-                    {a.nome_pt}
-                  </label>
-                ))}
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        </div>
-
         <div
           className={cn(
             'border rounded-xl bg-card relative transition-all duration-300 shadow-sm overflow-x-auto h-full overflow-y-auto',
