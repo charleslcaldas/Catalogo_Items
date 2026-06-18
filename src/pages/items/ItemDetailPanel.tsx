@@ -45,6 +45,7 @@ import { NewDescBaseModal } from '@/components/NewDescBaseModal'
 import { PriceInput } from '@/components/PriceInput'
 import { useAtributosLinha } from '@/hooks/use-atributos-linha'
 import { extractFieldErrors, getErrorMessage } from '@/lib/pocketbase/errors'
+import { useRealtime } from '@/hooks/use-realtime'
 
 function Field({
   label,
