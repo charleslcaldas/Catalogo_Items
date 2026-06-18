@@ -9,6 +9,9 @@ import {
   ArrowDown,
   ArrowUpDown,
   Trash2,
+  Download,
+  Upload,
+  RefreshCcw,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -33,17 +36,22 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion'
 import { ImagePreviewModal } from '@/components/ImagePreviewModal'
 import { ItemDetailPanel } from './ItemDetailPanel'
 import { BulkEditDialog } from './BulkEditDialog'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { cn, getContrastColor } from '@/lib/utils'
 import pb from '@/lib/pocketbase/client'
-import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
 import { useRealtime } from '@/hooks/use-realtime'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
+import { useData } from '@/contexts/data-context'
 import { ResizableHeader } from '@/components/ui/resizable-header'
 
 function AcabamentoBadge({ acabamento }: { acabamento?: any }) {
@@ -85,22 +93,11 @@ function SortableHeader({ column, title, sortColumn, sortDirection, onSort }: an
 
 export default function ItemsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const { categorias, acabamentos } = useData()
   const navigate = useNavigate()
 
-  const filterStatus = searchParams.get('status')
   const filterLinhaId = searchParams.get('linha_id')
   const filterNcmId = searchParams.get('ncm_id')
-
-  const showInactiveParam = searchParams.get('showInactive') === 'true'
-  const [showInactive, setShowInactive] = useState(showInactiveParam)
-
-  const handleShowInactiveChange = (checked: boolean) => {
-    setShowInactive(checked)
-    const newParams = new URLSearchParams(searchParams)
-    if (checked) newParams.set('showInactive', 'true')
-    else newParams.delete('showInactive')
-    setSearchParams(newParams)
-  }
 
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -153,6 +150,32 @@ export default function ItemsPage() {
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false)
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false)
 
+  // Filters State
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set())
+  const [selectedFinishes, setSelectedFinishes] = useState<Set<string>>(new Set())
+  const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set(['true']))
+
+  const toggleCategory = (id: string) => {
+    const next = new Set(selectedCategories)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setSelectedCategories(next)
+  }
+
+  const toggleFinish = (id: string) => {
+    const next = new Set(selectedFinishes)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setSelectedFinishes(next)
+  }
+
+  const toggleStatus = (val: string) => {
+    const next = new Set(selectedStatuses)
+    if (next.has(val)) next.delete(val)
+    else next.add(val)
+    setSelectedStatuses(next)
+  }
+
   // Debounce search term to prevent rate limits while typing
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -172,12 +195,24 @@ export default function ItemsPage() {
 
     const filters: string[] = []
 
-    if (filterStatus === 'Ativo') {
-      filters.push(`ativo = true`)
-    } else if (filterStatus === 'Inativo') {
-      filters.push(`ativo = false`)
-    } else if (!showInactive) {
-      filters.push(`ativo = true`)
+    if (selectedStatuses.size === 1) {
+      filters.push(`ativo = ${selectedStatuses.has('true')}`)
+    }
+
+    if (selectedCategories.size > 0) {
+      filters.push(
+        `(${Array.from(selectedCategories)
+          .map((c) => `linha_id.categoria_id = "${c}"`)
+          .join(' || ')})`,
+      )
+    }
+
+    if (selectedFinishes.size > 0) {
+      filters.push(
+        `(${Array.from(selectedFinishes)
+          .map((f) => `acabamento_id = "${f}"`)
+          .join(' || ')})`,
+      )
     }
 
     if (filterLinhaId) {
@@ -243,10 +278,11 @@ export default function ItemsPage() {
     sortColumn,
     sortDirection,
     debouncedSearch,
-    filterStatus,
     filterLinhaId,
     filterNcmId,
-    showInactive,
+    selectedCategories,
+    selectedFinishes,
+    selectedStatuses,
   ])
 
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -346,14 +382,84 @@ export default function ItemsPage() {
     }
   }
 
+  const handleExportCSV = () => {
+    if (apiItens.length === 0) return toast.warning('Nenhum item para exportar')
+    const headers = [
+      'SKU',
+      'Descricao Pt',
+      'Descricao En',
+      'Tamanho',
+      'Preco Compra',
+      'Preco Venda',
+      'Ativo',
+    ]
+    const rows = apiItens.map((i) => [
+      i.sku,
+      i.descr_pt,
+      i.descr_en,
+      i.tamanho,
+      i.preco_compra,
+      i.preco_venda,
+      i.ativo,
+    ])
+    const csv = [
+      headers.join(','),
+      ...rows.map((r) => r.map((c) => `"${String(c || '').replace(/"/g, '""')}"`).join(',')),
+    ].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'itens_export.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const text = await file.text()
+    const tid = toast.loading('Importando CSV...')
+    try {
+      const res = await pb.send('/backend/v1/csv/import-items', {
+        method: 'POST',
+        body: JSON.stringify({ csv: text }),
+      })
+      toast.success(`Importação concluída: ${res.sucessos} sucessos, ${res.erros} erros.`, {
+        id: tid,
+      })
+      fetchApiItens(debouncedSearch)
+    } catch (err: any) {
+      toast.error('Erro na importação: ' + err.message, { id: tid })
+    }
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const handleBulkSync = async () => {
+    const ids = Array.from(selectedItemIds)
+    if (ids.length === 0) return
+    const tid = toast.loading(`Sincronizando ${ids.length} itens com Zoho...`)
+    try {
+      await pb.send('/backend/v1/zoho/force-sync', {
+        method: 'POST',
+        body: JSON.stringify({ itemIds: ids }),
+      })
+      toast.success('Itens sincronizados com sucesso!', { id: tid })
+      setSelectedItemIds(new Set())
+    } catch (err) {
+      toast.error('Erro na sincronização em massa', { id: tid })
+    }
+  }
+
   return (
     <div className="flex flex-col animate-fade-in relative pb-12 h-full">
       <div className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 pt-4 pb-4 mb-4 -mt-4 border-b border-border/50 shadow-sm flex flex-col gap-4 shrink-0">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full max-w-4xl">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full">
           <h1 className="font-bold tracking-tight whitespace-nowrap text-[1.18rem] m-0 hidden sm:block">
             Catálogo de Itens
           </h1>
-          <div className="relative w-full sm:flex-1">
+          <div className="relative w-full sm:flex-1 max-w-xl">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
@@ -363,56 +469,131 @@ export default function ItemsPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-4 w-full sm:w-auto">
-            <div className="flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded-full border shadow-sm h-9">
-              <Switch
-                id="show-inactive"
-                checked={showInactive}
-                onCheckedChange={handleShowInactiveChange}
-                className="scale-75 origin-left"
+          <div className="flex items-center gap-2 w-full sm:w-auto ml-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportCSV}
+              className="h-9 rounded-full px-3 text-sm hidden lg:flex"
+            >
+              <Download className="w-4 h-4 mr-1.5" /> Exportar
+            </Button>
+            <label className="cursor-pointer hidden lg:inline-flex items-center justify-center whitespace-nowrap rounded-full text-sm font-medium transition-colors border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-3">
+              <Upload className="w-4 h-4 mr-1.5" /> Importar
+              <input
+                type="file"
+                accept=".csv"
+                className="hidden"
+                ref={fileInputRef}
+                onChange={handleImportCSV}
               />
-              <Label
-                htmlFor="show-inactive"
-                className="text-xs font-medium cursor-pointer whitespace-nowrap"
-              >
-                Mostrar Inativos
-              </Label>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={() => setSelectedItemId('new')}
-                size="sm"
-                className="rounded-full h-9 px-4 shrink-0 w-full sm:w-auto flex-1 sm:flex-none text-sm font-medium"
-              >
-                <Plus className="mr-1.5 h-4 w-4" /> Novo Item
-              </Button>
-              {(filterLinhaId || filterNcmId) && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="rounded-full h-9 px-3 shrink-0"
-                  onClick={() => {
-                    const newParams = new URLSearchParams(searchParams)
-                    newParams.delete('linha_id')
-                    newParams.delete('ncm_id')
-                    setSearchParams(newParams)
-                  }}
-                >
-                  <FilterX className="h-4 w-4 mr-1.5" />
-                  Limpar
-                </Button>
-              )}
-            </div>
+            </label>
+            <Button
+              onClick={() => setSelectedItemId('new')}
+              size="sm"
+              className="rounded-full h-9 px-4 shrink-0 w-full sm:w-auto flex-1 sm:flex-none text-sm font-medium"
+            >
+              <Plus className="mr-1.5 h-4 w-4" /> Novo Item
+            </Button>
           </div>
         </div>
       </div>
 
       <div className="flex gap-4 flex-1 items-start overflow-hidden">
+        {/* Sidebar Filtros */}
+        <div className="w-64 shrink-0 bg-card border rounded-xl overflow-y-auto h-full hidden md:flex flex-col">
+          <div className="p-4 font-bold border-b sticky top-0 bg-card z-10 flex items-center justify-between shadow-sm">
+            Filtros
+            {(selectedCategories.size > 0 ||
+              selectedFinishes.size > 0 ||
+              selectedStatuses.size < 2) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 text-xs px-2"
+                onClick={() => {
+                  setSelectedCategories(new Set())
+                  setSelectedFinishes(new Set())
+                  setSelectedStatuses(new Set(['true', 'false']))
+                }}
+              >
+                Limpar
+              </Button>
+            )}
+          </div>
+          <Accordion
+            type="multiple"
+            defaultValue={['status', 'category', 'finish']}
+            className="px-4 py-2"
+          >
+            <AccordionItem value="status" className="border-b-0">
+              <AccordionTrigger className="py-2 text-sm font-semibold hover:no-underline">
+                Status
+              </AccordionTrigger>
+              <AccordionContent className="flex flex-col gap-2 pt-1 pb-3">
+                <label className="flex items-center gap-2 cursor-pointer text-sm hover:text-primary transition-colors">
+                  <Checkbox
+                    checked={selectedStatuses.has('true')}
+                    onCheckedChange={() => toggleStatus('true')}
+                  />
+                  Ativo
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-sm hover:text-primary transition-colors">
+                  <Checkbox
+                    checked={selectedStatuses.has('false')}
+                    onCheckedChange={() => toggleStatus('false')}
+                  />
+                  Inativo
+                </label>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="category" className="border-b-0">
+              <AccordionTrigger className="py-2 text-sm font-semibold hover:no-underline">
+                Categoria
+              </AccordionTrigger>
+              <AccordionContent className="flex flex-col gap-2 pt-1 pb-3 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
+                {categorias.map((c) => (
+                  <label
+                    key={c.id}
+                    className="flex items-center gap-2 cursor-pointer text-sm hover:text-primary transition-colors"
+                  >
+                    <Checkbox
+                      checked={selectedCategories.has(c.id)}
+                      onCheckedChange={() => toggleCategory(c.id)}
+                    />
+                    {c.nome_pt}
+                  </label>
+                ))}
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="finish" className="border-b-0">
+              <AccordionTrigger className="py-2 text-sm font-semibold hover:no-underline">
+                Acabamento
+              </AccordionTrigger>
+              <AccordionContent className="flex flex-col gap-2 pt-1 pb-3 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
+                {acabamentos.map((a) => (
+                  <label
+                    key={a.id}
+                    className="flex items-center gap-2 cursor-pointer text-sm hover:text-primary transition-colors"
+                  >
+                    <Checkbox
+                      checked={selectedFinishes.has(a.id)}
+                      onCheckedChange={() => toggleFinish(a.id)}
+                    />
+                    {a.nome_pt}
+                  </label>
+                ))}
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </div>
+
         <div
           className={cn(
             'border rounded-xl bg-card relative transition-all duration-300 shadow-sm overflow-x-auto h-full overflow-y-auto',
-            selectedItemId ? 'w-[40%] hidden lg:block' : 'w-full',
+            selectedItemId ? 'w-[40%] hidden lg:block' : 'flex-1',
           )}
         >
           <Table style={{ tableLayout: 'fixed', width: 'max-content', minWidth: '100%' }}>
@@ -662,17 +843,21 @@ export default function ItemsPage() {
                                   Inativo
                                 </Badge>
                               )}
-                              {item.sincronizado_com_zoho ? (
-                                <div
-                                  className="w-2 h-2 rounded-full bg-blue-500 shrink-0"
-                                  title="Sincronizado com Zoho"
-                                />
-                              ) : (
-                                <div
-                                  className="w-2 h-2 rounded-full bg-orange-400 shrink-0"
-                                  title="Pendente sincronização"
-                                />
-                              )}
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  <div
+                                    className={cn(
+                                      'w-2 h-2 rounded-full shrink-0',
+                                      item.sincronizado_com_zoho ? 'bg-blue-500' : 'bg-orange-400',
+                                    )}
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {item.sincronizado_com_zoho
+                                    ? `Sincronizado: ${item.data_sincronizacao ? new Date(item.data_sincronizacao).toLocaleString() : 'Sim'}`
+                                    : 'Pendente sincronização'}
+                                </TooltipContent>
+                              </Tooltip>
                             </div>
                           </TableCell>
                         </>
@@ -712,6 +897,9 @@ export default function ItemsPage() {
             <span className="text-sm font-medium">itens selecionados</span>
           </div>
           <div className="w-px h-4 bg-border" />
+          <Button onClick={handleBulkSync} size="sm" variant="secondary" className="rounded-full">
+            <RefreshCcw className="w-3.5 h-3.5 mr-1.5" /> Sync Zoho
+          </Button>
           <Button onClick={() => setIsBulkEditOpen(true)} size="sm" className="rounded-full">
             <Layers className="w-3.5 h-3.5 mr-1.5" /> Editar
           </Button>
@@ -737,7 +925,7 @@ export default function ItemsPage() {
       <BulkEditDialog
         open={isBulkEditOpen}
         onOpenChange={setIsBulkEditOpen}
-        selectedIds={Array.from(selectedItemIds)}
+        selectedItems={apiItens.filter((i) => selectedItemIds.has(i.id))}
         onSuccess={handleBulkSuccess}
       />
 

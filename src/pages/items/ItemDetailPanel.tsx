@@ -14,7 +14,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { useData } from '@/contexts/data-context'
 import type { Item } from '@/types'
-import { X, Copy, ImageIcon, History as HistoryIcon, Activity, Edit2 } from 'lucide-react'
+import {
+  X,
+  Copy,
+  ImageIcon,
+  History as HistoryIcon,
+  Activity,
+  Edit2,
+  Sparkles,
+  RefreshCcw,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import pb from '@/lib/pocketbase/client'
 import { Badge } from '@/components/ui/badge'
@@ -250,10 +259,10 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
 
       await saveItem({
         ...dataToSave,
-        descr_pt: autoDescCompletaPt || 'Sem descrição',
-        descr_en: autoDescCompletaEn || '',
-        descricao_catalogo_pt: autoDescCompletaPt || 'Sem descrição',
-        descricao_catalogo_en: autoDescCompletaEn || '',
+        descr_pt: dataToSave.descr_pt || autoDescCompletaPt || 'Sem descrição',
+        descr_en: dataToSave.descr_en || autoDescCompletaEn || '',
+        descricao_catalogo_pt: dataToSave.descr_pt || autoDescCompletaPt || 'Sem descrição',
+        descricao_catalogo_en: dataToSave.descr_en || autoDescCompletaEn || '',
         data_atualizacao: new Date().toISOString(),
       } as Item)
 
@@ -288,6 +297,49 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
       } else {
         toast.error('Erro ao salvar: ' + (getErrorMessage(err) || err.message), { id: toastId })
       }
+    }
+  }
+
+  const handleForceSync = async () => {
+    if (!item?.id) return
+    const tid = toast.loading('Sincronizando com Zoho...')
+    try {
+      await pb.send('/backend/v1/zoho/force-sync', {
+        method: 'POST',
+        body: JSON.stringify({ itemIds: [item.id] }),
+      })
+      toast.success('Sincronizado com sucesso!', { id: tid })
+    } catch (err) {
+      toast.error('Erro ao sincronizar', { id: tid })
+    }
+  }
+
+  const handleAIGenerate = async () => {
+    const toastId = toast.loading('Gerando descrições com IA...')
+    try {
+      const res = await pb.send('/backend/v1/ai/generate-description', {
+        method: 'POST',
+        body: JSON.stringify({
+          tamanho: formData.tamanho,
+          norma: formData.norma,
+          grau: formData.grau,
+          tipo_rosca: formData.tipo_rosca,
+          comprimento_rosca: formData.comprimento_rosca,
+          informacao_extra: formData.informacao_extra,
+          acabamento: acabamentos.find((a) => a.id === formData.acabamento_id)?.nome_pt,
+          linha: linhas.find((l) => l.id === formData.linha_id)?.nome_pt,
+        }),
+      })
+      setFormData((prev) => ({
+        ...prev,
+        descr_pt: res.pt,
+        descr_en: res.en,
+        descricao_curta: res.pt?.split('.')[0] || prev.descricao_curta,
+        descricao_curta_en: res.en?.split('.')[0] || prev.descricao_curta_en,
+      }))
+      toast.success('Descrições geradas com sucesso!', { id: toastId })
+    } catch (err) {
+      toast.error('Erro ao gerar com IA', { id: toastId })
     }
   }
 
@@ -417,7 +469,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
           </div>
           <div className="flex flex-col min-w-0 flex-1">
             <h2 className="font-bold text-sm text-foreground break-words whitespace-normal leading-tight">
-              {autoDescCompletaPt || 'Nova Descrição Completa'}
+              {formData.descr_pt || autoDescCompletaPt || 'Nova Descrição Completa'}
             </h2>
             <h3 className="text-[10px] text-muted-foreground break-words whitespace-normal leading-snug mt-0.5">
               {descCurtaToUseEn || 'New Short Description'}
@@ -462,6 +514,18 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
               variant="outline"
               size="sm"
               className="rounded-full h-8 text-xs"
+              onClick={handleForceSync}
+              title="Forçar Sincronização Zoho"
+            >
+              <RefreshCcw className="h-3 w-3 sm:mr-1.5" />
+              <span className="hidden sm:inline">Zoho Sync</span>
+            </Button>
+          )}
+          {item && formData.id && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full h-8 text-xs"
               disabled={isEditing}
               onClick={() => {
                 const c = { ...formData }
@@ -472,7 +536,8 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                 toast.success('Duplicado na tela')
               }}
             >
-              <Copy className="h-3 w-3 mr-1.5" /> Duplicar
+              <Copy className="h-3 w-3 sm:mr-1.5" />
+              <span className="hidden sm:inline">Duplicar</span>
             </Button>
           )}
           {!isEditing ? (
@@ -750,13 +815,13 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     onChange={(val) => setFormData({ ...formData, preco_venda: val })}
                   />
                 </Field>
-                <Field label="Descrição Curta (PT) (Auto)" className="md:col-span-6">
+                <Field label="Descrição Curta (PT) (Auto/Manual)" className="md:col-span-6">
                   <Input
-                    className="h-8 text-xs bg-muted/50 font-medium text-muted-foreground"
-                    disabled
+                    className="h-8 text-xs font-medium"
+                    disabled={!isEditing}
                     placeholder="Gerado automaticamente..."
                     value={formData.descricao_curta || ''}
-                    title="Esta descrição é gerada automaticamente ao salvar."
+                    onChange={(e) => setFormData({ ...formData, descricao_curta: e.target.value })}
                   />
                 </Field>
               </div>
@@ -807,12 +872,27 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <Field label="Descrição Completa (PT) (Auto)" className="md:col-span-12">
+                <Field label="Descrição Completa (PT)" className="md:col-span-12">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[10px] text-muted-foreground opacity-70">
+                      Pode ser editada manualmente ou gerada com IA baseada nos atributos.
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAIGenerate}
+                      disabled={!isEditing}
+                      className="h-6 text-[10px] px-2"
+                    >
+                      <Sparkles className="w-3 h-3 mr-1 text-blue-500" /> Gerar IA
+                    </Button>
+                  </div>
                   <Textarea
-                    className="min-h-[50px] resize-none text-xs bg-muted/50 font-medium text-muted-foreground"
-                    disabled
-                    value={autoDescCompletaPt}
-                    title="Esta descrição é gerada automaticamente baseada nos atributos selecionados."
+                    className="min-h-[50px] resize-y text-xs font-medium"
+                    disabled={!isEditing}
+                    value={formData.descr_pt || ''}
+                    onChange={(e) => setFormData({ ...formData, descr_pt: e.target.value })}
                   />
                 </Field>
               </div>
@@ -1036,13 +1116,15 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     onChange={(val) => setFormData({ ...formData, preco_venda: val })}
                   />
                 </Field>
-                <Field label="Short Description (EN) (Auto)" className="md:col-span-6">
+                <Field label="Short Description (EN) (Auto/Manual)" className="md:col-span-6">
                   <Input
-                    className="h-8 text-xs bg-muted/50 font-medium text-muted-foreground"
-                    disabled
+                    className="h-8 text-xs font-medium"
+                    disabled={!isEditing}
                     placeholder="Auto-generated..."
                     value={formData.descricao_curta_en || ''}
-                    title="This description is auto-generated and translated on save."
+                    onChange={(e) =>
+                      setFormData({ ...formData, descricao_curta_en: e.target.value })
+                    }
                   />
                 </Field>
               </div>
@@ -1097,12 +1179,27 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <Field label="Full Description (EN) (Auto)" className="md:col-span-12">
+                <Field label="Full Description (EN)" className="md:col-span-12">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[10px] text-muted-foreground opacity-70">
+                      Can be edited manually or generated by AI based on attributes.
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAIGenerate}
+                      disabled={!isEditing}
+                      className="h-6 text-[10px] px-2"
+                    >
+                      <Sparkles className="w-3 h-3 mr-1 text-blue-500" /> AI Generate
+                    </Button>
+                  </div>
                   <Textarea
-                    className="min-h-[50px] resize-none text-xs bg-muted/50 font-medium text-muted-foreground"
-                    disabled
-                    value={autoDescCompletaEn}
-                    title="This description is auto-generated based on selected attributes."
+                    className="min-h-[50px] resize-y text-xs font-medium"
+                    disabled={!isEditing}
+                    value={formData.descr_en || ''}
+                    onChange={(e) => setFormData({ ...formData, descr_en: e.target.value })}
                   />
                 </Field>
               </div>
