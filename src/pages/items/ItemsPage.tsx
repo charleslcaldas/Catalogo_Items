@@ -109,9 +109,12 @@ export default function ItemsPage() {
       checkbox: 40,
       foto: 48,
       sku: 120,
+      linha_id: 120,
       descricao_curta: 300,
       tamanho: 100,
       acabamento_id: 120,
+      ncm_id: 100,
+      descricao_base_id: 150,
       preco_venda: 100,
       validade_preco: 120,
       status: 150,
@@ -209,17 +212,29 @@ export default function ItemsPage() {
       const records = await pb.collection('itens').getFullList({
         sort: sortStr,
         filter: filterStr,
-        expand: 'linha_id,linha_id.categoria_id,acabamento_id,ncm_id,descricao_base_id',
+        expand: 'linha_id,linha_id.categoria_id,acabamento_id,ncm_id,descricao_base_id,unidade_id',
         requestKey: 'items_page_search', // Auto-cancel previous identical requests to save bandwidth and rate limits
       })
       setApiItens(records)
     } catch (e: any) {
       if (e.isAbort) return // Skip updating state if the request was naturally cancelled by a newer one
-      if (e.status === 429) {
-        setError('Muitas requisições. Por favor, aguarde um momento e tente novamente.')
-      } else {
-        console.error(e)
-        setError('Erro ao carregar itens.')
+
+      // Fallback: Retry with simple or no expand to ensure items load gracefully if relations fail
+      try {
+        const fallbackRecords = await pb.collection('itens').getFullList({
+          sort: sortStr,
+          filter: filterStr,
+          requestKey: 'items_page_search_fallback',
+        })
+        setApiItens(fallbackRecords)
+      } catch (err: any) {
+        if (err.isAbort) return
+        if (err.status === 429 || e.status === 429) {
+          setError('Muitas requisições. Por favor, aguarde um momento e tente novamente.')
+        } else {
+          console.error(err)
+          setError('Erro ao carregar itens.')
+        }
       }
     } finally {
       setIsLoading(false)
@@ -486,6 +501,20 @@ export default function ItemsPage() {
                   SKU
                 </ResizableHeader>
                 <ResizableHeader
+                  width={colWidths.linha_id}
+                  onResize={(w) => handleResize('linha_id', w)}
+                  onResizeEnd={(w) => handleResizeEnd('linha_id', w)}
+                  className="px-2"
+                >
+                  <SortableHeader
+                    column="linha_id"
+                    title="Linha"
+                    sortColumn={sortColumn}
+                    sortDirection={sortDirection}
+                    onSort={handleSortClick}
+                  />
+                </ResizableHeader>
+                <ResizableHeader
                   width={colWidths.descricao_curta}
                   onResize={(w) => handleResize('descricao_curta', w)}
                   onResizeEnd={(w) => handleResizeEnd('descricao_curta', w)}
@@ -527,6 +556,34 @@ export default function ItemsPage() {
                     onSort={handleSortClick}
                   />
                 </ResizableHeader>
+                <ResizableHeader
+                  width={colWidths.ncm_id}
+                  onResize={(w) => handleResize('ncm_id', w)}
+                  onResizeEnd={(w) => handleResizeEnd('ncm_id', w)}
+                  className="px-2"
+                >
+                  <SortableHeader
+                    column="ncm_id"
+                    title="NCM"
+                    sortColumn={sortColumn}
+                    sortDirection={sortDirection}
+                    onSort={handleSortClick}
+                  />
+                </ResizableHeader>
+                <ResizableHeader
+                  width={colWidths.descricao_base_id}
+                  onResize={(w) => handleResize('descricao_base_id', w)}
+                  onResizeEnd={(w) => handleResizeEnd('descricao_base_id', w)}
+                  className="px-2"
+                >
+                  <SortableHeader
+                    column="descricao_base_id"
+                    title="Desc. Base"
+                    sortColumn={sortColumn}
+                    sortDirection={sortDirection}
+                    onSort={handleSortClick}
+                  />
+                </ResizableHeader>
                 {!selectedItemId && (
                   <>
                     <ResizableHeader
@@ -563,7 +620,7 @@ export default function ItemsPage() {
               {error ? (
                 <TableRow>
                   <TableCell
-                    colSpan={selectedItemId ? 6 : 9}
+                    colSpan={selectedItemId ? 9 : 12}
                     className="text-center py-16 text-destructive"
                   >
                     <div className="flex flex-col items-center justify-center gap-3">
@@ -582,7 +639,7 @@ export default function ItemsPage() {
               ) : isLoading && apiItens.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={selectedItemId ? 6 : 9}
+                    colSpan={selectedItemId ? 9 : 12}
                     className="text-center py-16 text-muted-foreground"
                   >
                     <div className="flex flex-col items-center justify-center gap-3">
@@ -594,7 +651,7 @@ export default function ItemsPage() {
               ) : apiItens.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={selectedItemId ? 6 : 9}
+                    colSpan={selectedItemId ? 9 : 12}
                     className="text-center py-16 text-muted-foreground"
                   >
                     <PackageOpen className="w-12 h-12 mx-auto opacity-20 mb-4" />
@@ -637,6 +694,9 @@ export default function ItemsPage() {
                       </TableCell>
                       <TableCell className="font-medium whitespace-nowrap py-1 px-2 text-sm overflow-hidden text-ellipsis">
                         {item.sku}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap py-1 px-2 text-sm overflow-hidden text-ellipsis">
+                        {item.expand?.linha_id?.nome_pt || '-'}
                       </TableCell>
                       <TableCell className={cn('py-1 px-2 text-sm overflow-hidden')}>
                         <Tooltip>
@@ -708,6 +768,14 @@ export default function ItemsPage() {
                             </TooltipContent>
                           )}
                         </Tooltip>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap py-1 px-2 text-sm overflow-hidden text-ellipsis">
+                        {item.expand?.ncm_id?.codigo || '-'}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap py-1 px-2 text-sm overflow-hidden text-ellipsis">
+                        {item.expand?.descricao_base_id?.codigo ||
+                          item.expand?.descricao_base_id?.nome_pt ||
+                          '-'}
                       </TableCell>
                       {!selectedItemId && (
                         <>

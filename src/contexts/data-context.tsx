@@ -62,27 +62,40 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const loadData = async () => {
     try {
-      const [cats, lins, acabs, ncmData, itemsData, atributosData, unids, descs] =
-        await Promise.all([
-          pb.collection('categorias').getFullList<Categoria>(),
-          pb.collection('linhas').getFullList<Linha>({ expand: 'categoria_id' }),
-          pb.collection('acabamentos').getFullList<Acabamento>(),
-          pb.collection('ncm').getFullList<NCM>(),
-          pb.collection('itens').getFullList<Item>({ sort: '-created' }),
-          pb.collection('atributos_linha').getFullList<AtributoLinha>(),
-          pb.collection('unidades_medida').getFullList<UnidadeMedida>(),
-          pb.collection('descricoes_base').getFullList<DescricaoBase>(),
-        ])
+      const [cats, lins, acabs, ncmData, atributosData, unids, descs] = await Promise.all([
+        pb.collection('categorias').getFullList<Categoria>(),
+        pb.collection('linhas').getFullList<Linha>({ expand: 'categoria_id' }),
+        pb.collection('acabamentos').getFullList<Acabamento>(),
+        pb.collection('ncm').getFullList<NCM>(),
+        pb.collection('atributos_linha').getFullList<AtributoLinha>(),
+        pb.collection('unidades_medida').getFullList<UnidadeMedida>(),
+        pb.collection('descricoes_base').getFullList<DescricaoBase>(),
+      ])
       setCategorias(cats)
       setLinhas(lins)
       setAcabamentos(acabs)
       setNcms(ncmData)
-      setItens(itemsData)
       setAtributosLinha(atributosData)
       setUnidadesMedida(unids)
       setDescricoesBase(descs)
     } catch (e) {
-      console.error('Error loading data', e)
+      console.error('Error loading base metadata', e)
+    }
+
+    try {
+      const itemsData = await pb.collection('itens').getFullList<Item>({
+        sort: '-created',
+        expand: 'linha_id,linha_id.categoria_id,acabamento_id,ncm_id,descricao_base_id,unidade_id',
+      })
+      setItens(itemsData)
+    } catch (e) {
+      console.error('Error loading itens with relations', e)
+      try {
+        const fallbackItems = await pb.collection('itens').getFullList<Item>({ sort: '-created' })
+        setItens(fallbackItems)
+      } catch (err) {
+        console.error('Error loading itens without relations', err)
+      }
     }
   }
 

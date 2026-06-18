@@ -23,6 +23,6 @@ export const getItensPaginated = (
   return pb.collection<Item>('itens').getList(page, perPage, {
     filter,
     sort,
-    expand: 'acabamento_id',
+    expand: 'linha_id,linha_id.categoria_id,acabamento_id,ncm_id,descricao_base_id,unidade_id',
   })
 }
