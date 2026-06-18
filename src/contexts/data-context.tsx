@@ -83,16 +83,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const itemsData = await pb.collection('itens').getFullList<Item>({
+      // Replaced getFullList with getList as per requirements to avoid loading the entire catalog globally
+      const itemsData = await pb.collection('itens').getList<Item>(1, 50, {
         sort: '-created',
         expand: 'linha_id,linha_id.categoria_id,acabamento_id,ncm_id,descricao_base_id,unidade_id',
       })
-      setItens(itemsData)
+      setItens(itemsData.items)
     } catch (e) {
       console.error('Error loading itens with relations', e)
       try {
-        const fallbackItems = await pb.collection('itens').getFullList<Item>({ sort: '-created' })
-        setItens(fallbackItems)
+        const fallbackItems = await pb
+          .collection('itens')
+          .getList<Item>(1, 50, { sort: '-created' })
+        setItens(fallbackItems.items)
       } catch (err) {
         console.error('Error loading itens without relations', err)
       }
