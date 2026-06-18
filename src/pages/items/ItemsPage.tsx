@@ -47,7 +47,13 @@ import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
 import { ResizableHeader } from '@/components/ui/resizable-header'
 
-function AcabamentoBadge({ acabamento }: { acabamento?: any }) {
+function AcabamentoBadge({
+  acabamento,
+  selectedItemId,
+}: {
+  acabamento?: any
+  selectedItemId?: string | null
+}) {
   if (!acabamento) return <span className="text-muted-foreground">-</span>
 
   const bgColor = acabamento.cor_hex || '#e2e8f0'
@@ -55,10 +61,12 @@ function AcabamentoBadge({ acabamento }: { acabamento?: any }) {
 
   return (
     <span
-      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border border-black/10 shadow-sm whitespace-nowrap"
+      className="inline-flex items-center px-2.5 py-0.5 rounded-[12px] text-xs font-medium border border-black/10 shadow-sm max-w-full"
       style={{ backgroundColor: bgColor, color: textColor }}
     >
-      {acabamento.nome_pt}
+      <span className={cn(selectedItemId ? 'truncate' : 'whitespace-normal break-words text-left')}>
+        {acabamento.nome_pt}
+      </span>
     </span>
   )
 }
@@ -655,11 +663,51 @@ export default function ItemsPage() {
                           )}
                         </Tooltip>
                       </TableCell>
-                      <TableCell className="whitespace-nowrap py-1 px-2 text-sm overflow-hidden text-ellipsis">
-                        {item.tamanho || '-'}
+                      <TableCell className={cn('py-1 px-2 text-sm overflow-hidden')}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div
+                              className={cn(
+                                'cursor-default w-full',
+                                selectedItemId
+                                  ? 'truncate'
+                                  : 'whitespace-normal break-words leading-snug',
+                              )}
+                            >
+                              {item.tamanho || '-'}
+                            </div>
+                          </TooltipTrigger>
+                          {item.tamanho && (
+                            <TooltipContent
+                              side="bottom"
+                              align="start"
+                              className="max-w-xs break-words text-xs"
+                            >
+                              <p>{item.tamanho}</p>
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
                       </TableCell>
-                      <TableCell className="py-1 px-2 overflow-hidden text-ellipsis whitespace-nowrap">
-                        <AcabamentoBadge acabamento={item.expand?.acabamento_id} />
+                      <TableCell className={cn('py-1 px-2 overflow-hidden')}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="w-full flex items-center">
+                              <AcabamentoBadge
+                                acabamento={item.expand?.acabamento_id}
+                                selectedItemId={selectedItemId}
+                              />
+                            </div>
+                          </TooltipTrigger>
+                          {item.expand?.acabamento_id?.nome_pt && (
+                            <TooltipContent
+                              side="bottom"
+                              align="start"
+                              className="max-w-xs break-words text-xs"
+                            >
+                              <p>{item.expand.acabamento_id.nome_pt}</p>
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
                       </TableCell>
                       {!selectedItemId && (
                         <>
