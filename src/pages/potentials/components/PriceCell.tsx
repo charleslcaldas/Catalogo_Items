@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react'
-import { CheckCircle2 } from 'lucide-react'
+import { useState } from 'react'
+import { Check } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 export function PriceCell({
   cotacaoF,
@@ -15,101 +17,114 @@ export function PriceCell({
   onBlur,
   onToggleWinner,
 }: any) {
-  const [val, setVal] = useState('')
-  const [moq, setMoq] = useState('')
-
-  useEffect(() => {
-    if (draftPrice !== undefined) setVal(draftPrice.toString())
-    else if (cotacaoI?.preco_ofertado !== undefined && cotacaoI.preco_ofertado !== null)
-      setVal(cotacaoI.preco_ofertado.toString())
-    else setVal('')
-  }, [cotacaoI?.preco_ofertado, draftPrice])
-
-  useEffect(() => {
-    if (draftMoq !== undefined) setMoq(draftMoq.toString())
-    else if (cotacaoI?.quantidade_minima !== undefined && cotacaoI.quantidade_minima !== null)
-      setMoq(cotacaoI.quantidade_minima.toString())
-    else setMoq('')
-  }, [cotacaoI?.quantidade_minima, draftMoq])
-
-  const handlePriceBlur = () => {
-    let num = val !== '' ? parseFloat(String(val).replace(/,/g, '')) || 0 : 0
-    if (num !== (cotacaoI?.preco_ofertado || 0)) {
-      onBlur(cotacaoF.id, item.item_id, num, cotacaoI?.quantidade_minima || 0, cotacaoI?.id)
-    }
-  }
-
-  const handleMoqBlur = () => {
-    let num = moq !== '' ? parseFloat(String(moq).replace(/,/g, '')) || 0 : 0
-    if (num !== (cotacaoI?.quantidade_minima || 0)) {
-      onBlur(cotacaoF.id, item.item_id, cotacaoI?.preco_ofertado || 0, num, cotacaoI?.id)
-    }
-  }
-
+  const [editing, setEditing] = useState(false)
+  const price = draftPrice !== undefined ? draftPrice : cotacaoI?.preco_ofertado || 0
+  const moq = draftMoq !== undefined ? draftMoq : cotacaoI?.quantidade_minima || 0
   const isWinner = cotacaoI?.vencedor
-  const moqNum = parseFloat(moq) || cotacaoI?.quantidade_minima || 0
-  const hasMoqWarning = moqNum > (item.quantidade || 0)
+
+  const contraproposta = cotacaoI?.preco_contraproposta || 0
+
+  const handleBlur = () => {
+    setEditing(false)
+    if (draftPrice !== undefined || draftMoq !== undefined) {
+      onBlur(cotacaoF.id, item.item_id, price, moq, cotacaoI?.id)
+    }
+  }
+
+  const activePrice = contraproposta > 0 ? contraproposta : price
 
   return (
     <div
       className={cn(
-        'flex flex-col p-1.5 rounded-md border transition-all cursor-pointer justify-center relative group min-h-[56px]',
+        'relative flex flex-col gap-1 p-1.5 rounded-md min-h-[50px] border transition-colors',
         isWinner
-          ? 'bg-primary/10 border-primary ring-1 ring-primary/30'
-          : isLowest
-            ? 'bg-green-50/50 border-green-300 hover:border-green-400'
-            : 'bg-card border-transparent hover:border-border',
+          ? 'bg-green-50 border-green-300'
+          : 'bg-transparent border-transparent hover:border-muted',
       )}
-      onClick={() => onToggleWinner(cotacaoF.id, item.item_id, cotacaoI?.id, isWinner)}
+      onDoubleClick={() => setEditing(true)}
     >
-      {isWinner && (
-        <div className="absolute -top-1.5 -right-1.5 bg-primary text-primary-foreground rounded-full shadow-sm z-10">
-          <CheckCircle2 className="w-3.5 h-3.5" />
+      {editing ? (
+        <div className="flex flex-col gap-1 z-10 relative">
+          <Input
+            autoFocus
+            type="number"
+            placeholder="Preço"
+            className="h-6 text-xs px-1 text-right font-mono"
+            value={price || ''}
+            onChange={(e) =>
+              onDraftChange(cotacaoF.id, item.item_id, parseFloat(e.target.value) || 0)
+            }
+            onBlur={handleBlur}
+            onKeyDown={(e) => e.key === 'Enter' && handleBlur()}
+          />
+          <Input
+            type="number"
+            placeholder="MOQ"
+            className="h-6 text-xs px-1 text-right font-mono"
+            value={moq || ''}
+            onChange={(e) =>
+              onDraftMoqChange(cotacaoF.id, item.item_id, parseFloat(e.target.value) || 0)
+            }
+            onBlur={handleBlur}
+            onKeyDown={(e) => e.key === 'Enter' && handleBlur()}
+          />
+        </div>
+      ) : (
+        <div
+          className="flex flex-col justify-center items-end flex-1 cursor-pointer w-full group/cell"
+          onClick={() => setEditing(true)}
+        >
+          <div className="flex items-center gap-1.5 w-full justify-end">
+            {contraproposta > 0 && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-[10px] line-through text-muted-foreground font-mono">
+                    ${price.toFixed(4)}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>Preço Original: ${price.toFixed(4)}</TooltipContent>
+              </Tooltip>
+            )}
+            <span
+              className={cn(
+                'font-mono text-sm font-semibold text-right',
+                contraproposta > 0
+                  ? 'text-amber-600'
+                  : isLowest && price > 0
+                    ? 'text-green-600'
+                    : 'text-foreground',
+              )}
+            >
+              {activePrice > 0 ? `$${activePrice.toFixed(4)}` : '-'}
+            </span>
+          </div>
+
+          {moq > 0 && <span className="text-[9px] text-muted-foreground mt-0.5">MOQ: {moq}</span>}
+          {!moq && price > 0 && (
+            <span className="text-[9px] opacity-0 group-hover/cell:opacity-100 text-muted-foreground mt-0.5">
+              Add MOQ
+            </span>
+          )}
         </div>
       )}
-      <div className="flex items-center">
-        <span className="text-muted-foreground text-[10px] w-3 select-none">$</span>
-        <Input
-          type="text"
-          value={val}
-          onChange={(e) => {
-            setVal(e.target.value)
-            const parsed = parseFloat(e.target.value.replace(/,/g, ''))
-            if (!isNaN(parsed)) onDraftChange(cotacaoF.id, item.item_id, parsed)
-          }}
-          onBlur={handlePriceBlur}
-          onClick={(e) => e.stopPropagation()}
-          placeholder="0.00"
-          className="h-6 text-right font-mono text-xs px-1 shadow-none border-transparent bg-transparent hover:bg-background focus:bg-background focus-visible:ring-1"
-        />
-      </div>
-      <div className="flex items-center justify-between mt-0.5">
-        <span
+
+      {activePrice > 0 && !editing && (
+        <Button
+          variant={isWinner ? 'default' : 'outline'}
+          size="icon"
           className={cn(
-            'text-[9px] font-bold uppercase',
-            hasMoqWarning ? 'text-red-500' : 'text-muted-foreground/70',
+            'absolute -right-2 -top-2 h-5 w-5 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-10',
+            isWinner && 'opacity-100 bg-green-600 hover:bg-green-700 border-green-600',
+            !isWinner && 'bg-background hover:bg-green-50 hover:text-green-600 border-muted',
           )}
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggleWinner(cotacaoF.id, item.item_id, cotacaoI?.id, isWinner)
+          }}
         >
-          {hasMoqWarning ? 'MOQ ALERT' : 'MOQ'}
-        </span>
-        <Input
-          type="text"
-          value={moq}
-          onChange={(e) => {
-            setMoq(e.target.value)
-            const parsed = parseFloat(e.target.value.replace(/,/g, ''))
-            if (!isNaN(parsed)) onDraftMoqChange(cotacaoF.id, item.item_id, parsed)
-          }}
-          onBlur={handleMoqBlur}
-          onClick={(e) => e.stopPropagation()}
-          placeholder="0"
-          title={hasMoqWarning ? `MOQ ${moqNum} > Qtd ${item.quantidade}` : ''}
-          className={cn(
-            'h-5 w-12 text-right font-mono text-[10px] px-1 shadow-none border-transparent bg-transparent hover:bg-background focus:bg-background focus-visible:ring-1',
-            hasMoqWarning && 'text-red-700 font-bold border-red-200 bg-red-50/50',
-          )}
-        />
-      </div>
+          {isWinner ? <Check className="w-3 h-3 text-white" /> : <Check className="w-3 h-3" />}
+        </Button>
+      )}
     </div>
   )
 }

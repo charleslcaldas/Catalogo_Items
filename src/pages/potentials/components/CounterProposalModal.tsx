@@ -44,7 +44,7 @@ export function CounterProposalModal({ open, onOpenChange, cotacoesI, potencialI
           sku: pi?.expand?.item_id?.sku || 'N/A',
           currentPrice: w.preco_ofertado,
           bestPrice,
-          newPrice: w.preco_ofertado,
+          newPrice: w.preco_contraproposta > 0 ? w.preco_contraproposta : w.preco_ofertado,
           selected: true,
         }
       })
@@ -54,7 +54,7 @@ export function CounterProposalModal({ open, onOpenChange, cotacoesI, potencialI
 
   const applyLogic = () => {
     const d = parseFloat(discountVal.replace(',', '.'))
-    if (isNaN(d) && action !== 'match_best') return
+    if (isNaN(d) && action !== 'match_best' && action !== 'manual') return
 
     setItems((prev) =>
       prev.map((item) => {
@@ -75,10 +75,12 @@ export function CounterProposalModal({ open, onOpenChange, cotacoesI, potencialI
   const handleApply = async () => {
     try {
       const promises = items
-        .filter((i) => i.selected && i.newPrice !== i.currentPrice)
-        .map((i) => pb.collection('cotacoes_itens').update(i.id, { preco_ofertado: i.newPrice }))
+        .filter((i) => i.selected)
+        .map((i) =>
+          pb.collection('cotacoes_itens').update(i.id, { preco_contraproposta: i.newPrice }),
+        )
       if (promises.length === 0) {
-        toast({ title: 'Aviso', description: 'Nenhum preço foi alterado.' })
+        toast({ title: 'Aviso', description: 'Nenhum item selecionado.' })
         return
       }
       await Promise.all(promises)
@@ -105,8 +107,8 @@ export function CounterProposalModal({ open, onOpenChange, cotacoesI, potencialI
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex items-end gap-4 bg-muted/50 p-4 rounded-lg mt-2">
-          <div className="flex flex-col gap-1.5 flex-1">
+        <div className="flex flex-wrap items-end gap-4 bg-muted/50 p-4 rounded-lg mt-2">
+          <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
             <Label>Estratégia</Label>
             <Select value={action} onValueChange={setAction}>
               <SelectTrigger>
@@ -116,10 +118,11 @@ export function CounterProposalModal({ open, onOpenChange, cotacoesI, potencialI
                 <SelectItem value="discount">Desconto sobre o preço vencedor</SelectItem>
                 <SelectItem value="match_best">Igualar ao menor preço geral</SelectItem>
                 <SelectItem value="discount_best">Desconto sobre o menor preço geral</SelectItem>
+                <SelectItem value="manual">Definição Manual</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          {action !== 'match_best' && (
+          {action !== 'match_best' && action !== 'manual' && (
             <div className="flex flex-col gap-1.5 w-32">
               <Label>Desconto (%)</Label>
               <Input
@@ -130,7 +133,7 @@ export function CounterProposalModal({ open, onOpenChange, cotacoesI, potencialI
               />
             </div>
           )}
-          <Button variant="secondary" onClick={applyLogic}>
+          <Button variant="secondary" onClick={applyLogic} disabled={action === 'manual'}>
             Simular
           </Button>
         </div>
@@ -148,7 +151,9 @@ export function CounterProposalModal({ open, onOpenChange, cotacoesI, potencialI
                 <TableHead>SKU</TableHead>
                 <TableHead className="text-right">Preço Atual</TableHead>
                 <TableHead className="text-right">Menor Oferta</TableHead>
-                <TableHead className="text-right w-32">Novo Preço</TableHead>
+                <TableHead className="text-right w-32 text-amber-600">
+                  Alvo (Contraproposta)
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -173,15 +178,15 @@ export function CounterProposalModal({ open, onOpenChange, cotacoesI, potencialI
                     </TableCell>
                     <TableCell className="font-medium text-xs">{item.sku}</TableCell>
                     <TableCell className="text-right font-mono text-xs">
-                      $ {item.currentPrice.toFixed(2)}
+                      $ {item.currentPrice.toFixed(4)}
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs text-muted-foreground">
-                      $ {item.bestPrice.toFixed(2)}
+                      $ {item.bestPrice.toFixed(4)}
                     </TableCell>
                     <TableCell className="text-right">
                       <Input
                         type="number"
-                        className="h-7 text-right text-xs font-mono"
+                        className="h-7 text-right text-xs font-mono text-amber-600 font-bold"
                         value={item.newPrice}
                         onChange={(e) => {
                           const next = [...items]
@@ -202,7 +207,7 @@ export function CounterProposalModal({ open, onOpenChange, cotacoesI, potencialI
             Cancelar
           </Button>
           <Button onClick={handleApply}>
-            <Check className="w-4 h-4 mr-2" /> Aplicar Contraproposta
+            <Check className="w-4 h-4 mr-2" /> Salvar Target
           </Button>
         </div>
       </DialogContent>

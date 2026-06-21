@@ -101,6 +101,94 @@ export default function QuotationMatrix() {
   useRealtime('cotacoes_fornecedor', loadData)
   useRealtime('cotacoes_itens', loadData)
 
+  const handleUpdateCf = async (cfId: string, data: any) => {
+    try {
+      await pb.collection('cotacoes_fornecedor').update(cfId, data)
+      toast({ title: 'Logística atualizada' })
+    } catch (err: any) {
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
+    }
+  }
+
+  const handleSelectAllFor = async (cfId: string) => {
+    try {
+      const itemsToSelect = potencialItens.filter((pi) => {
+        const ci = cotacoesI.find((c) => c.cotacao_fornecedor_id === cfId && c.item_id === pi.item_id)
+        const draft = draftPrices[`${cfId}_${pi.item_id}`]
+        return (ci && ci.preco_ofertado > 0) || (draft && draft > 0)
+      })
+
+      const promises = []
+      for (const pi of itemsToSelect) {
+        const currentWinner = cotacoesI.find((c) => c.item_id === pi.item_id && c.vencedor)
+        if (currentWinner && currentWinner.cotacao_fornecedor_id !== cfId) {
+          promises.push(pb.collection('cotacoes_itens').update(currentWinner.id, { vencedor: false }))
+        }
+
+        const ci = cotacoesI.find((c) => c.cotacao_fornecedor_id === cfId && c.item_id === pi.item_id)
+        if (ci) {
+          if (!ci.vencedor) promises.push(pb.collection('cotacoes_itens').update(ci.id, { vencedor: true }))
+        } else {
+          promises.push(
+            pb.collection('cotacoes_itens').create({
+              cotacao_fornecedor_id: cfId,
+              item_id: pi.item_id,
+              preco_ofertado: draftPrices[`${cfId}_${pi.item_id}`] || 0,
+              quantidade_minima: draftMoqs[`${cfId}_${pi.item_id}`] || 0,
+              vencedor: true,
+            }),
+          )
+        }
+      }
+      if (promises.length > 0) {
+        await Promise.all(promises)
+        toast({ title: 'Sucesso', description: `${promises.length} itens selecionados.` })
+      }
+    } catch (err: any) {
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
+    }
+  }
+
+  const handleImportCSVFor = async (cfId: string, file: File) => {
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      const text = e.target?.result as string
+      const rows = text.split('\n').map((r) => r.split(','))
+      let updated = 0
+
+      const promises = []
+      for (let i = 1; i < rows.length; i++) {
+        const [sku, priceStr] = rows[i]
+        if (!sku || !priceStr) continue
+
+        const pi = potencialItens.find((p) => p.expand?.item_id?.sku === sku.trim().replace(/"/g, ''))
+        if (!pi) continue
+
+        const price = parseFloat(priceStr.replace(/"/g, '').replace(',', '.'))
+        if (isNaN(price)) continue
+
+        const ci = cotacoesI.find((c) => c.cotacao_fornecedor_id === cfId && c.item_id === pi.item_id)
+        if (ci) {
+          promises.push(pb.collection('cotacoes_itens').update(ci.id, { preco_ofertado: price }))
+        } else {
+          promises.push(
+            pb.collection('cotacoes_itens').create({
+              cotacao_fornecedor_id: cfId,
+              item_id: pi.item_id,
+              preco_ofertado: price,
+              quantidade_minima: 0,
+              vencedor: false,
+            }),
+          )
+        }
+        updated++
+      }
+      await Promise.all(promises)
+      toast({ title: `Importação concluída: ${updated} preços atualizados` })
+    }
+    reader.readAsText(file)
+  }
+
   const handleAddFornecedor = async () => {
     if (!potencialId || !selectedFornecedor) return
     try {
@@ -242,9 +330,8 @@ export default function QuotationMatrix() {
           const winner = cotacoesI.find((c) => c.item_id === pi.item_id && c.vencedor)
           const priceToUse = winner
             ? (draftPrices[`${winner.cotacao_fornecedor_id}_${pi.item_id}`] ??
-              winner.preco_ofertado)
-            : 0
-          if (priceToUse > 0 && pi.preco_unitario !== priceToUse) {
+              (winner.preco_contraproposta > 0 ? winner.preco_contraproposta : winner.preco_ofertado))
+            : 0          if (priceToUse > 0 && pi.preco_unitario !== priceToUse) {
             updatedCount++
             await pb.collection('potencial_itens').update(pi.id, { preco_unitario: priceToUse })
           }
@@ -304,12 +391,11 @@ export default function QuotationMatrix() {
       const qtd = pi.quantidade || 0
       vendaTotal += qtd * (pi.preco_unitario || 0)
       const winner = cotacoesI.find((c) => c.item_id === pi.item_id && c.vencedor)
-      if (winner)
-        custoTotal +=
-          qtd *
-          (draftPrices[`${winner.cotacao_fornecedor_id}_${pi.item_id}`] ??
-            winner.preco_ofertado ??
-            0)
+      if (winner) {
+        let draftP = draftPrices[`${winner.cotacao_fornecedor_id}_${pi.item_id}`];
+        let p = draftP !== undefined ? draftP : (winner.preco_contraproposta > 0 ? winner.preco_contraproposta : winner.preco_ofertado) ?? 0;
+        custoTotal += qtd * p;
+      }
     })
     return {
       vendaTotal,
@@ -470,13 +556,65 @@ export default function QuotationMatrix() {
                     key={cf.id}
                     className="min-w-[160px] bg-muted/30 border-r last:border-r-0 py-2"
                   >
-                    <div className="flex flex-col items-center">
-                      <span
-                        className="font-bold text-foreground truncate max-w-[140px] text-xs"
-                        title={cf.expand?.fornecedor_id?.nome}
-                      >
-                        {cf.expand?.fornecedor_id?.nome}
-                      </span>
+                    <div className="flex flex-col items-center relative group">
+                      <div className="flex items-center gap-1">
+                        <span
+                          className="font-bold text-foreground truncate max-w-[120px] text-xs"
+                          title={cf.expand?.fornecedor_id?.nome}
+                        >
+                          {cf.expand?.fornecedor_id?.nome}
+                        </span>
+                        {cf.expand?.fornecedor_id?.auditado && (
+                          <Badge variant="outline" className="text-[8px] h-4 px-1 bg-blue-50 text-blue-700 border-blue-200">
+                            Auditado
+                          </Badge>
+                        )}
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover:opacity-100">
+                              <Settings2 className="w-3 h-3" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-64 p-3" align="center">
+                             <div className="space-y-3">
+                               <h4 className="font-medium text-sm">Opções do Fabricante</h4>
+                               <div className="space-y-1">
+                                 <Label className="text-xs">Incoterm</Label>
+                                 <Input 
+                                   className="h-7 text-xs" 
+                                   defaultValue={cf.incoterm} 
+                                   onBlur={(e) => handleUpdateCf(cf.id, { incoterm: e.target.value })} 
+                                 />
+                               </div>
+                               <div className="space-y-1">
+                                 <Label className="text-xs">Tempo de Fabricação</Label>
+                                 <Input 
+                                   className="h-7 text-xs" 
+                                   defaultValue={cf.tempo_fabricacao} 
+                                   onBlur={(e) => handleUpdateCf(cf.id, { tempo_fabricacao: e.target.value })} 
+                                 />
+                               </div>
+                               <div className="pt-2 border-t flex flex-col gap-2">
+                                 <Button variant="outline" size="sm" className="w-full justify-start text-xs h-7" onClick={() => handleSelectAllFor(cf.id)}>
+                                    <CheckSquare className="w-3 h-3 mr-2" /> Selecionar Todos
+                                 </Button>
+                                 <div className="relative w-full">
+                                   <Input 
+                                     type="file" 
+                                     accept=".csv" 
+                                     className="absolute inset-0 opacity-0 cursor-pointer" 
+                                     onChange={(e) => e.target.files?.[0] && handleImportCSVFor(cf.id, e.target.files[0])}
+                                   />
+                                   <Button variant="outline" size="sm" className="w-full justify-start text-xs h-7 pointer-events-none">
+                                      <FileUp className="w-3 h-3 mr-2" /> Importar Preços (CSV)
+                                   </Button>
+                                 </div>
+                               </div>
+                             </div>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+
                       {cf.status === 'finalizada' ? (
                         <Badge
                           variant="secondary"
@@ -492,6 +630,11 @@ export default function QuotationMatrix() {
                           Pendente
                         </Badge>
                       )}
+
+                      <div className="flex gap-1 mt-1 text-[9px] text-muted-foreground">
+                        {cf.incoterm && <span className="bg-muted px-1 rounded truncate max-w-[60px]">{cf.incoterm}</span>}
+                        {cf.tempo_fabricacao && <span className="bg-muted px-1 rounded truncate max-w-[60px]">{cf.tempo_fabricacao}</span>}
+                      </div>
                     </div>
                   </TableHead>
                 ))}
@@ -527,19 +670,19 @@ export default function QuotationMatrix() {
 
                   return (
                     <TableRow key={pi.id} className="group hover:bg-transparent">
-                      <TableCell className="align-top py-2 px-3">
+                      <TableCell className="align-top py-1.5 px-3">
                         <div className="font-semibold text-xs">{pi.expand?.item_id?.sku}</div>
                         <div className="text-[10px] text-muted-foreground line-clamp-2 pr-2">
                           {pi.expand?.item_id?.descricao_curta}
                         </div>
                       </TableCell>
-                      <TableCell className="align-top py-2 px-2 text-center">
+                      <TableCell className="align-top py-1.5 px-2 text-center">
                         <span className="font-medium text-sm">{pi.quantidade}</span>
                         <span className="text-[9px] text-muted-foreground block">
                           {pi.unidade_medida || 'UN'}
                         </span>
                       </TableCell>
-                      <TableCell className="align-top py-2 px-2 text-right">
+                      <TableCell className="align-top py-1.5 px-2 text-right">
                         {lastPrice ? (
                           <span className="font-mono text-xs text-muted-foreground">
                             $ {formatCurrency(lastPrice)}
@@ -548,7 +691,7 @@ export default function QuotationMatrix() {
                           <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
-                      <TableCell className="align-top py-2 px-2 text-right">
+                      <TableCell className="align-top py-1.5 px-2 text-right">
                         {historicalMinPrice ? (
                           <span className="font-mono text-xs text-muted-foreground">
                             $ {formatCurrency(historicalMinPrice)}
@@ -557,7 +700,7 @@ export default function QuotationMatrix() {
                           <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
-                      <TableCell className="align-top py-2 px-2 text-right border-r bg-muted/5">
+                      <TableCell className="align-top py-1.5 px-2 text-right border-r bg-muted/5">
                         {lowestCurrentPrice ? (
                           <span className="font-mono text-xs text-green-600 font-bold">
                             $ {formatCurrency(lowestCurrentPrice)}
@@ -612,9 +755,9 @@ export default function QuotationMatrix() {
                     const ci = cotacoesI.find(
                       (c) => c.cotacao_fornecedor_id === cf.id && c.item_id === pi.item_id,
                     )
-                    total +=
-                      (draftPrices[`${cf.id}_${pi.item_id}`] ?? ci?.preco_ofertado ?? 0) *
-                      (pi.quantidade || 0)
+                    const draft = draftPrices[`${cf.id}_${pi.item_id}`]
+                    const price = draft !== undefined ? draft : (ci?.preco_contraproposta > 0 ? ci.preco_contraproposta : ci?.preco_ofertado) ?? 0;
+                    total += price * (pi.quantidade || 0)
                   })
                   return (
                     <TableCell
@@ -630,7 +773,7 @@ export default function QuotationMatrix() {
           </Table>
         </div>
         <div className="shrink-0 mb-4">
-          <QuotationNotes potencialId={potencialId} />
+          <QuotationNotes potencialId={potencialId} cotacoesF={cotacoesF} />
         </div>
       </div>
       <CounterProposalModal
