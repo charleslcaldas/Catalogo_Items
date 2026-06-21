@@ -12,9 +12,10 @@ import Finishes from './pages/Finishes'
 import NCMPage from './pages/NCM'
 import DescricoesBasePage from './pages/DescricoesBase'
 import ImportPage from './pages/Import'
-import AddItemsToPotential from './pages/potentials/AddItemsToPotential'
+import PotentialDetailsWrapper from './pages/potentials/PotentialDetailsWrapper'
 import PotentialsPage from './pages/potentials/PotentialsPage'
 import Login from './pages/Login'
+import Fornecedores from './pages/Fornecedores'
 import Unidades from './pages/Unidades'
 import FotosCatalogo from './pages/FotosCatalogo'
 import { DataProvider } from './contexts/data-context'
@@ -41,7 +42,8 @@ const App = () => (
                 <Route path="/descricoes-base" element={<DescricoesBasePage />} />
                 <Route path="/importar" element={<ImportPage />} />
                 <Route path="/potenciais" element={<PotentialsPage />} />
-                <Route path="/potenciais/adicionar" element={<AddItemsToPotential />} />
+                <Route path="/potenciais/adicionar" element={<PotentialDetailsWrapper />} />
+                <Route path="/fornecedores" element={<Fornecedores />} />
                 <Route path="/unidades" element={<Unidades />} />
                 <Route path="/fotos-catalogo" element={<FotosCatalogo />} />
               </Route>
