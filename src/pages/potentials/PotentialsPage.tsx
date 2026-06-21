@@ -15,6 +15,8 @@ import { Badge } from '@/components/ui/badge'
 import pb from '@/lib/pocketbase/client'
 import type { Potencial } from '@/types'
 import { useRealtime } from '@/hooks/use-realtime'
+import type { StatusPotencial } from '@/types'
+import { getContrastColor } from '@/lib/utils'
 
 export default function PotentialsPage() {
   const [potentials, setPotentials] = useState<Potencial[]>([])
@@ -29,6 +31,14 @@ export default function PotentialsPage() {
   const [filterProprietario, setFilterProprietario] = useState('all')
   const [filterDateStart, setFilterDateStart] = useState('')
   const [filterDateEnd, setFilterDateEnd] = useState('')
+  const [statuses, setStatuses] = useState<StatusPotencial[]>([])
+
+  useEffect(() => {
+    pb.collection('status_potencial')
+      .getFullList<StatusPotencial>()
+      .then(setStatuses)
+      .catch(() => {})
+  }, [])
 
   const loadPotentials = async () => {
     setLoading(true)
@@ -147,34 +157,44 @@ export default function PotentialsPage() {
   const getStatusBadge = (p: Potencial) => {
     const status = p.status || 'Sem Itens'
 
+    // Attempt dynamic status matching
+    const dynamicStatus = statuses.find((s) => s.nome === status)
+    if (dynamicStatus && dynamicStatus.cor_hex) {
+      return (
+        <Badge
+          style={{
+            backgroundColor: dynamicStatus.cor_hex,
+            color: getContrastColor(dynamicStatus.cor_hex),
+          }}
+          className="border-0 font-normal h-5 text-[10px] px-2 rounded-full shadow-none whitespace-nowrap"
+        >
+          {status}
+        </Badge>
+      )
+    }
+
+    // Fallbacks
     if (status === 'Completo') {
       return (
         <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-emerald-200 font-normal h-5 text-[10px] px-2 rounded-full">
-          ✅ Completo
+          Completo
         </Badge>
       )
     }
-
     if (status === 'Incompleto' || status === 'rascunho') {
       return (
         <Badge className="bg-amber-50 text-amber-700 hover:bg-amber-50 border-amber-200 font-normal h-5 text-[10px] px-2 rounded-full">
-          ⚠️ Itens incompletos
+          Itens incompletos
         </Badge>
       )
     }
-
-    if (status === 'Aguardando Cotação Fornecedor') {
+    if (status === 'Sem Itens') {
       return (
-        <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-50 border-blue-200 font-normal h-5 text-[10px] px-2 rounded-full">
-          ⏳ Aguardando Fornecedor
-        </Badge>
-      )
-    }
-
-    if (status === 'Cotação Recebida') {
-      return (
-        <Badge className="bg-purple-50 text-purple-700 hover:bg-purple-50 border-purple-200 font-normal h-5 text-[10px] px-2 rounded-full">
-          📋 Cotação Recebida
+        <Badge
+          variant="secondary"
+          className="bg-slate-100 text-slate-600 border-slate-200 font-normal h-5 text-[10px] px-2 rounded-full"
+        >
+          Sem Itens
         </Badge>
       )
     }
@@ -184,7 +204,7 @@ export default function PotentialsPage() {
         variant="secondary"
         className="bg-slate-100 text-slate-600 border-slate-200 font-normal h-5 text-[10px] px-2 rounded-full"
       >
-        🚫 {status}
+        {status}
       </Badge>
     )
   }
@@ -233,11 +253,12 @@ export default function PotentialsPage() {
               onChange={(e) => setFilterStatus(e.target.value)}
             >
               <option value="all">Todos Status</option>
-              <option value="Completo">Completo</option>
-              <option value="Incompleto">Incompleto</option>
               <option value="Sem Itens">Sem Itens</option>
-              <option value="Aguardando Cotação Fornecedor">Aguardando Cotação</option>
-              <option value="Cotação Recebida">Cotação Recebida</option>
+              {statuses.map((s) => (
+                <option key={s.id} value={s.nome}>
+                  {s.nome}
+                </option>
+              ))}
             </select>
 
             <select

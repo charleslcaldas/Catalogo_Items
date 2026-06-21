@@ -118,6 +118,14 @@ export type NcmAuditLog = {
   }
 }
 
+export type StatusPotencial = {
+  id: string
+  nome: string
+  cor_hex: string
+  created: string
+  updated: string
+}
+
 export type Potencial = {
   id: string
   numero_potencial: string

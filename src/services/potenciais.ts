@@ -62,3 +62,31 @@ export const savePotencialFull = async (
 export const addPotencialItens = async (items: Partial<PotencialItem>[]) => {
   return Promise.all(items.map((item) => pb.collection('potencial_itens').create(item)))
 }
+
+export const duplicatePotencial = async (potencialId: string) => {
+  const original = await pb.collection('potenciais').getOne<Potencial>(potencialId)
+  const items = await pb.collection('potencial_itens').getFullList<PotencialItem>({
+    filter: `potencial_id = "${potencialId}"`,
+  })
+
+  const duplicatedData = { ...original, numero_potencial: `${original.numero_potencial}-COPY` }
+  delete (duplicatedData as any).id
+  delete (duplicatedData as any).created
+  delete (duplicatedData as any).updated
+  delete (duplicatedData as any).anexos
+
+  const newPotencial = await pb.collection('potenciais').create(duplicatedData)
+
+  await Promise.all(
+    items.map((item) => {
+      const duplicatedItem = { ...item, potencial_id: newPotencial.id }
+      delete (duplicatedItem as any).id
+      delete (duplicatedItem as any).created
+      delete (duplicatedItem as any).updated
+      delete (duplicatedItem as any).expand
+      return pb.collection('potencial_itens').create(duplicatedItem)
+    }),
+  )
+
+  return newPotencial
+}

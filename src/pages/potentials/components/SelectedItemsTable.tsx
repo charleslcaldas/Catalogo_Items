@@ -229,18 +229,6 @@ export function SelectedItemsTable({
               </TableRow>
             )
           })}
-          <TableRow className="bg-slate-50/80 hover:bg-slate-50/80 border-t-2">
-            <TableCell
-              colSpan={8}
-              className="py-2 text-xs font-bold text-right text-muted-foreground uppercase tracking-wider"
-            >
-              Valor Total Geral
-            </TableCell>
-            <TableCell className="py-2 text-sm font-bold text-right text-primary whitespace-nowrap">
-              {formatCurrency(grandTotal)}
-            </TableCell>
-            <TableCell />
-          </TableRow>
         </TableBody>
       </Table>
     </div>

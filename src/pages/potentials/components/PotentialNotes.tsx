@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
-import { Send } from 'lucide-react'
+import { Send, Trash2, Edit2, X, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import pb from '@/lib/pocketbase/client'
@@ -12,6 +12,9 @@ export function PotentialNotes({ potencialId }: { potencialId: string }) {
   const [notes, setNotes] = useState<any[]>([])
   const [newNote, setNewNote] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editContent, setEditContent] = useState('')
 
   const loadNotes = async () => {
     try {
@@ -51,6 +54,34 @@ export function PotentialNotes({ potencialId }: { potencialId: string }) {
     }
   }
 
+  const handleDelete = async (id: string) => {
+    if (!confirm('Excluir esta nota?')) return
+    try {
+      await pb.collection('potencial_notas').delete(id)
+      loadNotes()
+      toast.success('Nota excluída.')
+    } catch (err) {
+      toast.error('Erro ao excluir nota.')
+    }
+  }
+
+  const startEdit = (note: any) => {
+    setEditingId(note.id)
+    setEditContent(note.conteudo)
+  }
+
+  const saveEdit = async () => {
+    if (!editingId) return
+    try {
+      await pb.collection('potencial_notas').update(editingId, { conteudo: editContent })
+      setEditingId(null)
+      loadNotes()
+      toast.success('Nota atualizada.')
+    } catch (err) {
+      toast.error('Erro ao atualizar nota.')
+    }
+  }
+
   if (!potencialId) {
     return (
       <div className="bg-white p-4 rounded-lg border shadow-sm flex flex-col gap-2">
@@ -82,15 +113,61 @@ export function PotentialNotes({ potencialId }: { potencialId: string }) {
         {notes.map((note) => (
           <div
             key={note.id}
-            className="flex flex-col gap-1 p-3 rounded-md bg-slate-50 border text-xs"
+            className="flex flex-col gap-1 p-3 rounded-md bg-slate-50 border text-xs relative group"
           >
             <div className="flex items-center justify-between text-muted-foreground">
               <span className="font-semibold text-slate-700">
                 {note.expand?.user_id?.name || 'Usuário Desconhecido'}
               </span>
-              <span>{format(new Date(note.created), 'dd/MM/yyyy HH:mm')}</span>
+              <div className="flex items-center gap-2">
+                <span>{format(new Date(note.created), 'dd/MM/yyyy HH:mm')}</span>
+                {note.user_id === user?.id && !editingId && (
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5"
+                      onClick={() => startEdit(note)}
+                    >
+                      <Edit2 className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5 text-destructive hover:text-destructive"
+                      onClick={() => handleDelete(note.id)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
-            <p className="whitespace-pre-wrap text-slate-800">{note.conteudo}</p>
+
+            {editingId === note.id ? (
+              <div className="flex flex-col gap-2 mt-2">
+                <Textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  className="min-h-[60px] text-xs bg-white"
+                />
+                <div className="flex items-center gap-2 justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setEditingId(null)}
+                  >
+                    <X className="h-3 w-3 mr-1" /> Cancelar
+                  </Button>
+                  <Button size="sm" className="h-7 text-xs" onClick={saveEdit}>
+                    <Check className="h-3 w-3 mr-1" /> Salvar
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <p className="whitespace-pre-wrap text-slate-800">{note.conteudo}</p>
+            )}
           </div>
         ))}
         {notes.length === 0 && (

@@ -1,15 +1,25 @@
+import { Settings } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import type { Potencial } from '@/types'
+import { Button } from '@/components/ui/button'
+import type { Potencial, StatusPotencial } from '@/types'
 
 interface PotencialFormProps {
   formData: any
   setFormData: any
   currentPotential: Potencial | null
   statusBadge: React.ReactNode
+  statuses: StatusPotencial[]
+  onManageStatuses: () => void
 }
 
-export function PotencialForm({ formData, setFormData, statusBadge }: PotencialFormProps) {
+export function PotencialForm({
+  formData,
+  setFormData,
+  statusBadge,
+  statuses,
+  onManageStatuses,
+}: PotencialFormProps) {
   return (
     <div className="bg-white p-3 rounded-lg shadow-sm border shrink-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3 items-start">
       <div className="flex items-center gap-2">
@@ -69,15 +79,21 @@ export function PotencialForm({ formData, setFormData, statusBadge }: PotencialF
             onChange={(e) => setFormData({ ...formData, status: e.target.value })}
           >
             <option value="Sem Itens">Sem Itens</option>
-            <option value="rascunho">Rascunho</option>
-            <option value="Incompleto">Incompleto</option>
-            <option value="Completo">Completo</option>
-            <option value="Aguardando Cotação Fornecedor">Aguardando Cotação</option>
-            <option value="Cotação Recebida">Cotação Recebida</option>
-            <option value="Negociação">Negociação</option>
-            <option value="Fechado Ganho">Fechado Ganho</option>
-            <option value="Fechado Perdido">Fechado Perdido</option>
+            {statuses.map((s) => (
+              <option key={s.id} value={s.nome}>
+                {s.nome}
+              </option>
+            ))}
           </select>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 shrink-0 text-muted-foreground hover:text-slate-900"
+            onClick={onManageStatuses}
+            title="Gerenciar Status"
+          >
+            <Settings className="h-3.5 w-3.5" />
+          </Button>
           {statusBadge}
         </div>
       </div>

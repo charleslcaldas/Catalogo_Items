@@ -1,9 +1,27 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Search, Plus, ArrowLeft, Save, CheckCircle } from 'lucide-react'
+import {
+  Search,
+  Plus,
+  ArrowLeft,
+  Save,
+  CheckCircle,
+  Copy,
+  Check,
+  ChevronsUpDown,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
 
 import { ProductCatalog } from './components/ProductCatalog'
 import { QuickItemModal } from './components/QuickItemModal'
@@ -12,9 +30,11 @@ import { PotencialForm } from './components/PotencialForm'
 import { SelectedItemsTable } from './components/SelectedItemsTable'
 import { PotentialNotes } from './components/PotentialNotes'
 import { PotentialAttachments } from './components/PotentialAttachments'
-import { savePotencialFull, getPotencialItens } from '@/services/potenciais'
+import { StatusManagementModal } from './components/StatusManagementModal'
+import { savePotencialFull, getPotencialItens, duplicatePotencial } from '@/services/potenciais'
+import { getContrastColor } from '@/lib/utils'
 import pb from '@/lib/pocketbase/client'
-import type { Potencial, Item, UnidadeMedida } from '@/types'
+import type { Potencial, Item, UnidadeMedida, StatusPotencial } from '@/types'
 
 export type SelectedItemData = {
   item: Item
@@ -51,15 +71,46 @@ export default function AddItemsToPotential() {
   const [isSaving, setIsSaving] = useState(false)
   const [isSearchQuoteOpen, setIsSearchQuoteOpen] = useState(false)
   const [isItemModalOpen, setIsItemModalOpen] = useState(false)
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
   const [itemToEdit, setItemToEdit] = useState<Partial<Item> | undefined>(undefined)
   const [unidades, setUnidades] = useState<UnidadeMedida[]>([])
+  const [statuses, setStatuses] = useState<StatusPotencial[]>([])
+
+  // Quick Search state
+  const [quickSearchOpen, setQuickSearchOpen] = useState(false)
+  const [quickSearchQuery, setQuickSearchQuery] = useState('')
+  const [quickSearchResults, setQuickSearchResults] = useState<Item[]>([])
+
+  const loadStatuses = () => {
+    pb.collection('status_potencial')
+      .getFullList<StatusPotencial>({ sort: 'created' })
+      .then(setStatuses)
+      .catch(console.error)
+  }
 
   useEffect(() => {
     pb.collection('unidades_medida')
       .getFullList<UnidadeMedida>()
       .then(setUnidades)
       .catch(console.error)
+    loadStatuses()
   }, [])
+
+  useEffect(() => {
+    const delay = setTimeout(() => {
+      if (quickSearchQuery.length > 1) {
+        pb.collection('itens')
+          .getList<Item>(1, 15, {
+            filter: `sku ~ "${quickSearchQuery}" || descr_pt ~ "${quickSearchQuery}" || descricao_curta ~ "${quickSearchQuery}"`,
+            expand: 'acabamento_id,unidade_id',
+          })
+          .then((res) => setQuickSearchResults(res.items))
+      } else {
+        setQuickSearchResults([])
+      }
+    }, 300)
+    return () => clearTimeout(delay)
+  }, [quickSearchQuery])
 
   useEffect(() => {
     const id = searchParams.get('id')
@@ -79,6 +130,39 @@ export default function AddItemsToPotential() {
       } else {
         const unidadeObj = unidades.find((u) => u.id === item.unidade_id)
         const unidadeNome = unidadeObj ? unidadeObj.nome : item.unidade || 'Pcs'
+        return [
+          ...prev,
+          {
+            id: item.id,
+            data: {
+              item,
+              quantidade: 1,
+              unidade_medida: unidadeNome,
+              preco_unitario: item.preco_venda !== undefined ? item.preco_venda : '',
+              observacoes: '',
+              ordem: prev.length + 1,
+            },
+          },
+        ]
+      }
+    })
+  }
+
+  const handleQuickAdd = (item: Item) => {
+    setSelectedItems((prev) => {
+      const idx = prev.findIndex((si) => si.id === item.id)
+      if (idx >= 0) {
+        const next = [...prev]
+        next[idx] = {
+          ...next[idx],
+          data: { ...next[idx].data, quantidade: Number(next[idx].data.quantidade || 0) + 1 },
+        }
+        toast.success(`Quantidade do item ${item.sku} atualizada.`)
+        return next
+      } else {
+        const unidadeObj = unidades.find((u) => u.id === item.unidade_id)
+        const unidadeNome = unidadeObj ? unidadeObj.nome : item.unidade || 'Pcs'
+        toast.success(`Item ${item.sku} adicionado à cotação.`)
         return [
           ...prev,
           {
@@ -138,7 +222,7 @@ export default function AddItemsToPotential() {
     })
   }
 
-  const handleSave = async (statusOverride: 'Incompleto' | 'Completo') => {
+  const handleSave = async (statusOverride: 'Incompleto' | 'Completo' | null = null) => {
     if (!formData.numero_potencial) {
       return toast.error('O número da cotação é obrigatório.')
     }
@@ -153,7 +237,11 @@ export default function AddItemsToPotential() {
 
     setIsSaving(true)
     try {
-      const statusToSave = selectedItems.length === 0 ? 'Sem Itens' : statusOverride
+      let statusToSave = formData.status
+      if (statusOverride) {
+        statusToSave = selectedItems.length === 0 ? 'Sem Itens' : statusOverride
+      }
+
       const itemsData = selectedItems
         .filter((si) => Number(si.data.quantidade) > 0)
         .map((si, index) => ({
@@ -172,6 +260,7 @@ export default function AddItemsToPotential() {
       )
 
       setCurrentPotential(saved)
+      setFormData((prev) => ({ ...prev, status: statusToSave }))
 
       toast.success(`Cotação ${saved.numero_potencial} salva com sucesso!`, {
         className: 'bg-green-500 text-white border-none',
@@ -184,6 +273,23 @@ export default function AddItemsToPotential() {
       }
     } catch (error) {
       toast.error('Erro ao salvar a cotação.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleDuplicate = async () => {
+    if (!currentPotential) return
+    if (!confirm('Deseja duplicar esta cotação? Isso criará uma cópia idêntica.')) return
+
+    setIsSaving(true)
+    try {
+      const newPotencial = await duplicatePotencial(currentPotential.id)
+      toast.success('Cotação duplicada com sucesso!')
+      navigate(`/potenciais/adicionar?id=${newPotencial.id}`, { replace: true })
+      handleQuoteSelected(newPotencial)
+    } catch (err) {
+      toast.error('Erro ao duplicar cotação.')
     } finally {
       setIsSaving(false)
     }
@@ -250,9 +356,23 @@ export default function AddItemsToPotential() {
       return (
         <Badge
           variant="secondary"
-          className="bg-slate-100 text-slate-600 border-slate-200 font-normal rounded-full px-2 h-5 text-[10px]"
+          className="border-0 font-normal rounded-full px-2 h-5 text-[10px]"
         >
-          🚫 Sem Itens
+          Sem Itens
+        </Badge>
+      )
+    }
+    const dynamicStatus = statuses.find((s) => s.nome === formData.status)
+    if (dynamicStatus && dynamicStatus.cor_hex) {
+      return (
+        <Badge
+          style={{
+            backgroundColor: dynamicStatus.cor_hex,
+            color: getContrastColor(dynamicStatus.cor_hex),
+          }}
+          className="border-0 font-normal rounded-full px-2 h-5 text-[10px] shadow-none whitespace-nowrap"
+        >
+          {formData.status}
         </Badge>
       )
     }
@@ -260,16 +380,28 @@ export default function AddItemsToPotential() {
     if (!hasIncomplete && formData.status === 'Completo') {
       return (
         <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-emerald-200 font-normal rounded-full px-2 h-5 text-[10px]">
-          ✅ Completo
+          Completo
         </Badge>
       )
     }
     return (
       <Badge className="bg-amber-50 text-amber-700 hover:bg-amber-50 border-amber-200 font-normal rounded-full px-2 h-5 text-[10px]">
-        ⚠️ Incompleto
+        {formData.status}
       </Badge>
     )
   }
+
+  const calculateTotals = () => {
+    const totalSKUs = new Set(selectedItems.map((si) => si.id)).size
+    const totalQty = selectedItems.reduce((acc, si) => acc + (Number(si.data.quantidade) || 0), 0)
+    const totalValue = selectedItems.reduce(
+      (acc, si) => acc + (Number(si.data.quantidade) || 0) * (Number(si.data.preco_unitario) || 0),
+      0,
+    )
+    return { totalSKUs, totalQty, totalValue }
+  }
+
+  const { totalSKUs, totalQty, totalValue } = calculateTotals()
 
   if (isSelecting) {
     return (
@@ -331,18 +463,29 @@ export default function AddItemsToPotential() {
           </h1>
         </div>
         <div className="flex items-center gap-2">
+          {currentPotential && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              onClick={handleDuplicate}
+              disabled={isSaving}
+            >
+              <Copy className="h-3 w-3 mr-1.5" /> Duplicar
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
-            className="h-8"
+            className="h-8 text-xs"
             onClick={() => setIsSearchQuoteOpen(true)}
           >
-            <Search className="h-3 w-3 mr-2" /> Buscar
+            <Search className="h-3 w-3 mr-1.5" /> Buscar
           </Button>
           <Button
             variant="outline"
             size="sm"
-            className="h-8"
+            className="h-8 text-xs"
             onClick={() => navigate('/potenciais')}
           >
             Cancelar
@@ -350,16 +493,16 @@ export default function AddItemsToPotential() {
           <Button
             variant="secondary"
             size="sm"
-            className="h-8 rounded-full"
+            className="h-8 rounded-full text-xs"
             disabled={isSaving}
-            onClick={() => handleSave('Incompleto')}
+            onClick={() => handleSave(null)}
           >
             <Save className="h-3.5 w-3.5 mr-1.5" /> Salvar Rascunho
           </Button>
           <Button
             disabled={isSaving}
             size="sm"
-            className="h-8 rounded-full"
+            className="h-8 rounded-full text-xs"
             onClick={() => handleSave('Completo')}
           >
             <CheckCircle className="h-3.5 w-3.5 mr-1.5" /> Salvar e Concluir
@@ -372,21 +515,71 @@ export default function AddItemsToPotential() {
         setFormData={setFormData}
         currentPotential={currentPotential}
         statusBadge={getStatusBadge()}
+        statuses={statuses}
+        onManageStatuses={() => setIsStatusModalOpen(true)}
       />
 
       <div className="bg-white rounded-lg border shadow-sm flex flex-col flex-1 min-h-0">
         <div className="p-3 border-b flex items-center justify-between bg-slate-50/50 rounded-t-lg shrink-0">
-          <div>
+          <div className="flex items-center gap-4">
             <h2 className="text-sm font-semibold">Itens da Cotação</h2>
+
+            <Popover open={quickSearchOpen} onOpenChange={setQuickSearchOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={quickSearchOpen}
+                  className="w-[300px] justify-between h-8 text-xs bg-white shadow-sm"
+                >
+                  Adição rápida de item...
+                  <Search className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[400px] p-0" align="start">
+                <Command>
+                  <CommandInput
+                    placeholder="Buscar por SKU ou descrição..."
+                    onValueChange={setQuickSearchQuery}
+                  />
+                  <CommandList>
+                    <CommandEmpty>Nenhum item encontrado.</CommandEmpty>
+                    <CommandGroup>
+                      {quickSearchResults.map((item) => (
+                        <CommandItem
+                          key={item.id}
+                          value={item.sku}
+                          onSelect={() => {
+                            handleQuickAdd(item)
+                            setQuickSearchOpen(false)
+                            setQuickSearchQuery('')
+                          }}
+                        >
+                          <Check className="mr-2 h-4 w-4 opacity-0" />
+                          <div className="flex flex-col gap-1">
+                            <span className="font-semibold text-xs">{item.sku}</span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {item.descricao_curta || item.descr_pt}
+                            </span>
+                          </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
+
           <Button
             size="sm"
             className="rounded-full h-8 px-4 text-xs font-medium shadow-sm"
             onClick={() => setIsSelecting(true)}
           >
-            <Plus className="h-3.5 w-3.5 mr-1.5" /> Incluir Itens
+            <Plus className="h-3.5 w-3.5 mr-1.5" /> Abrir Catálogo Completo
           </Button>
         </div>
+
         <SelectedItemsTable
           selectedItems={selectedItems}
           handleUpdateItem={handleUpdateItem}
@@ -395,6 +588,30 @@ export default function AddItemsToPotential() {
           handleMoveDown={handleMoveDown}
           setIsSelecting={setIsSelecting}
         />
+
+        {/* Totals Summary Widget */}
+        <div className="p-4 border-t bg-slate-50 flex items-center justify-end gap-6 shrink-0 rounded-b-lg">
+          <div className="flex flex-col items-end">
+            <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+              Total SKUs
+            </span>
+            <span className="text-sm font-semibold">{totalSKUs}</span>
+          </div>
+          <div className="w-px h-8 bg-border"></div>
+          <div className="flex flex-col items-end">
+            <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+              Quantidade Total
+            </span>
+            <span className="text-sm font-semibold">{totalQty.toLocaleString('en-US')}</span>
+          </div>
+          <div className="w-px h-8 bg-border"></div>
+          <div className="flex flex-col items-end">
+            <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+              Valor Total Estimado
+            </span>
+            <span className="text-lg font-bold text-primary">$ {totalValue.toFixed(2)}</span>
+          </div>
+        </div>
       </div>
 
       <PotentialNotes potencialId={currentPotential?.id || ''} />
@@ -404,6 +621,11 @@ export default function AddItemsToPotential() {
         open={isSearchQuoteOpen}
         onOpenChange={setIsSearchQuoteOpen}
         onSelect={handleQuoteSelected}
+      />
+      <StatusManagementModal
+        open={isStatusModalOpen}
+        onOpenChange={setIsStatusModalOpen}
+        onSaved={loadStatuses}
       />
     </div>
   )
