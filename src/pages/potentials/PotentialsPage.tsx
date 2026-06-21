@@ -35,7 +35,7 @@ const ESTAGIOS = [
   'Cotação Recebida',
   'Fechado Ganho',
   'Fechado Perdido',
-  'Sem Estágio'
+  'Sem Estágio',
 ]
 
 export default function PotentialsPage() {
@@ -194,12 +194,12 @@ export default function PotentialsPage() {
     const potencialId = e.dataTransfer.getData('potencialId')
     if (potencialId) {
       const newStage = targetStage === 'Sem Estágio' ? '' : targetStage
-      
+
       // Optimistic update
       setPotentials((prev) =>
-        prev.map((p) => (p.id === potencialId ? { ...p, estagio: newStage } : p))
+        prev.map((p) => (p.id === potencialId ? { ...p, estagio: newStage } : p)),
       )
-      
+
       try {
         await pb.collection('potenciais').update(potencialId, { estagio: newStage })
       } catch (err) {
@@ -324,7 +324,7 @@ export default function PotentialsPage() {
                       checked={selectedEstagios.includes(e)}
                       onCheckedChange={(checked) => {
                         setSelectedEstagios((prev) =>
-                          checked ? [...prev, e] : prev.filter((x) => x !== e)
+                          checked ? [...prev, e] : prev.filter((x) => x !== e),
                         )
                       }}
                     >
@@ -412,11 +412,11 @@ export default function PotentialsPage() {
           <div className="flex-1 overflow-x-auto overflow-y-hidden p-4 flex gap-4 bg-slate-50/50">
             {displayedEstagios.map((estagio) => {
               const stagePotentials = potentials.filter(
-                (p) => (p.estagio || 'Sem Estágio') === estagio
+                (p) => (p.estagio || 'Sem Estágio') === estagio,
               )
               const stageTotal = stagePotentials.reduce(
                 (acc, p) => acc + (itemTotals[p.id] || 0),
-                0
+                0,
               )
 
               return (
@@ -481,69 +481,74 @@ export default function PotentialsPage() {
           <div className="flex-1 overflow-auto">
             <Table>
               <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
-              <TableRow className="h-8">
-                <TableHead className="text-[11px] py-1">Número Potencial</TableHead>
-                <TableHead className="text-[11px] py-1">Cliente</TableHead>
-                <TableHead className="text-[11px] py-1">Nome Potencial</TableHead>
-                <TableHead className="text-[11px] py-1">Proprietário</TableHead>
-                <TableHead className="text-[11px] py-1">Estágio</TableHead>
-                <TableHead className="text-[11px] py-1">Status</TableHead>
-                <TableHead className="text-[11px] py-1 text-right">Valor Total</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading && potentials.length === 0 ? (                <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
-                    <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
-                    <span className="text-sm">Carregando...</span>
-                  </TableCell>
+                <TableRow className="h-8">
+                  <TableHead className="text-[11px] py-1">Número Potencial</TableHead>
+                  <TableHead className="text-[11px] py-1">Cliente</TableHead>
+                  <TableHead className="text-[11px] py-1">Nome Potencial</TableHead>
+                  <TableHead className="text-[11px] py-1">Proprietário</TableHead>
+                  <TableHead className="text-[11px] py-1">Estágio</TableHead>
+                  <TableHead className="text-[11px] py-1">Status</TableHead>
+                  <TableHead className="text-[11px] py-1 text-right">Valor Total</TableHead>
                 </TableRow>
-              ) : potentials.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground text-sm">
-                    Nenhuma cotação encontrada.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                potentials.map((p) => (
-                  <TableRow key={p.id} className="h-9 py-0 hover:bg-slate-50/50">
-                    <TableCell className="py-1 text-[11px] font-medium">
-                      <Link
-                        to={`/potenciais/adicionar?id=${p.id}`}
-                        className="text-primary hover:underline"
-                      >
-                        {p.numero_potencial}
-                      </Link>
+              </TableHeader>
+              <TableBody>
+                {loading && potentials.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                      <span className="text-sm">Carregando...</span>
                     </TableCell>
-                    <TableCell className="py-1 text-[11px]">{p.cliente || '-'}</TableCell>
-                    <TableCell className="py-1 text-[11px] font-medium">
-                      {p.nome_potencial ? (
+                  </TableRow>
+                ) : potentials.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={7}
+                      className="h-32 text-center text-muted-foreground text-sm"
+                    >
+                      Nenhuma cotação encontrada.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  potentials.map((p) => (
+                    <TableRow key={p.id} className="h-9 py-0 hover:bg-slate-50/50">
+                      <TableCell className="py-1 text-[11px] font-medium">
                         <Link
                           to={`/potenciais/adicionar?id=${p.id}`}
                           className="text-primary hover:underline"
                         >
-                          {p.nome_potencial}
+                          {p.numero_potencial}
                         </Link>
-                      ) : (
-                        '-'
-                      )}
-                    </TableCell>
-                    <TableCell className="py-1 text-[11px] text-muted-foreground">
-                      {p.proprietario || '-'}
-                    </TableCell>
-                    <TableCell className="py-1 text-[11px] text-muted-foreground">
-                      {p.estagio || '-'}
-                    </TableCell>
-                    <TableCell className="py-1">{getStatusBadge(p)}</TableCell>
-                    <TableCell className="py-1 text-[11px] text-right font-medium">
-                      {itemTotals[p.id] ? formatCurrency(itemTotals[p.id]) : '-'}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                      </TableCell>
+                      <TableCell className="py-1 text-[11px]">{p.cliente || '-'}</TableCell>
+                      <TableCell className="py-1 text-[11px] font-medium">
+                        {p.nome_potencial ? (
+                          <Link
+                            to={`/potenciais/adicionar?id=${p.id}`}
+                            className="text-primary hover:underline"
+                          >
+                            {p.nome_potencial}
+                          </Link>
+                        ) : (
+                          '-'
+                        )}
+                      </TableCell>
+                      <TableCell className="py-1 text-[11px] text-muted-foreground">
+                        {p.proprietario || '-'}
+                      </TableCell>
+                      <TableCell className="py-1 text-[11px] text-muted-foreground">
+                        {p.estagio || '-'}
+                      </TableCell>
+                      <TableCell className="py-1">{getStatusBadge(p)}</TableCell>
+                      <TableCell className="py-1 text-[11px] text-right font-medium">
+                        {itemTotals[p.id] ? formatCurrency(itemTotals[p.id]) : '-'}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </div>
     </div>
   )
