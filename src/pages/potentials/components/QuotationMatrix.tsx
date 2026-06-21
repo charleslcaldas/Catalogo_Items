@@ -348,42 +348,35 @@ export default function QuotationMatrix() {
         promises.push(pb.collection('cotacoes_itens').update(currentWinner.id, { vencedor: false }))
       }
 
+      let priceToSet = draftPrices[`${cotacaoFId}_${itemId}`]
+
       if (cotacaoIId) {
         promises.push(pb.collection('cotacoes_itens').update(cotacaoIId, { vencedor: true }))
+        if (priceToSet === undefined) {
+          const ci = cotacoesI.find((c) => c.id === cotacaoIId)
+          if (ci) {
+            priceToSet = ci.preco_contraproposta > 0 ? ci.preco_contraproposta : ci.preco_ofertado
+          } else {
+            priceToSet = 0
+          }
+        }
       } else {
-        promises.push(
-          pb.collection('cotacoes_itens').create({
-            cotacao_fornecedor_id: cotacaoFId,
-            item_id: itemId,
-            preco_ofertado: draftPrices[`${cotacaoFId}_${itemId}`] || 0,
-            quantidade_minima: draftMoqs[`${cotacaoFId}_${itemId}`] || 0,
-            vencedor: true,
-          }),
-        )
+        priceToSet = priceToSet || 0
+        const created = await pb.collection('cotacoes_itens').create({
+          cotacao_fornecedor_id: cotacaoFId,
+          item_id: itemId,
+          preco_ofertado: priceToSet,
+          quantidade_minima: draftMoqs[`${cotacaoFId}_${itemId}`] || 0,
+          vencedor: true,
+        })
+        priceToSet = created.preco_ofertado
       }
-      await Promise.all(promises)
-    } catch (err: any) {
-      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
-    }
-  }
 
-  const handleAcceptCounter = async (
-    cotacaoFId: string,
-    itemId: string,
-    cotacaoIId: string,
-    newPrice: number,
-  ) => {
-    try {
-      await pb.collection('cotacoes_itens').update(cotacaoIId, {
-        preco_ofertado: newPrice,
-        preco_contraproposta: 0,
-      })
-      setDraftPrices((prev) => {
-        const next = { ...prev }
-        delete next[`${cotacaoFId}_${itemId}`]
-        return next
-      })
-      toast({ title: 'Sucesso', description: 'Aceite aplicado. Preço atualizado com sucesso.' })
+      if (priceToSet > 0) {
+        promises.push(pb.collection('itens').update(itemId, { preco_compra: priceToSet }))
+      }
+
+      await Promise.all(promises)
     } catch (err: any) {
       toast({ title: 'Erro', description: err.message, variant: 'destructive' })
     }
@@ -677,10 +670,7 @@ export default function QuotationMatrix() {
                   </span>
                 </TableHead>
                 {cotacoesF.map((cf) => (
-                  <TableHead
-                    key={cf.id}
-                    className="min-w-[160px] bg-muted/30 border-r last:border-r-0 py-2"
-                  >
+                  <TableHead key={cf.id} className="min-w-[160px] bg-muted/30 border-r py-2">
                     <div className="flex flex-col items-center relative group">
                       <div className="flex items-center gap-1">
                         <span
@@ -794,9 +784,17 @@ export default function QuotationMatrix() {
                     </div>
                   </TableHead>
                 ))}
-                <TableHead className="font-semibold text-right min-w-[90px] py-2 border-l">
-                  Preço{' '}
-                  <span className="text-[9px] font-normal text-muted-foreground block">(Alvo)</span>
+                <TableHead className="font-semibold text-right min-w-[90px] py-2 border-l bg-muted/10">
+                  Menor Cotação
+                  <span className="text-[9px] font-normal text-muted-foreground block">
+                    (Atual)
+                  </span>
+                </TableHead>
+                <TableHead className="font-semibold text-right min-w-[90px] py-2 bg-muted/10">
+                  Último Hist.
+                  <span className="text-[9px] font-normal text-muted-foreground block">
+                    (Salvo)
+                  </span>
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -816,12 +814,22 @@ export default function QuotationMatrix() {
                     const ci = cotacoesI.find(
                       (c) => c.cotacao_fornecedor_id === cf.id && c.item_id === pi.item_id,
                     )
-                    return draftPrices[`${cf.id}_${pi.item_id}`] ?? ci?.preco_ofertado ?? 0
+                    const draft = draftPrices[`${cf.id}_${pi.item_id}`]
+                    return (
+                      draft ??
+                      (ci?.preco_contraproposta > 0
+                        ? ci.preco_contraproposta
+                        : ci?.preco_ofertado) ??
+                      0
+                    )
                   })
 
                   const validCurrentPrices = currentPrices.filter((p) => p > 0)
                   const lowestCurrentPrice =
                     validCurrentPrices.length > 0 ? Math.min(...validCurrentPrices) : undefined
+
+                  const itemHist = historico.filter((h) => h.item_id === pi.item_id)
+                  const lastHist = itemHist.length > 0 ? itemHist[0].preco : undefined
 
                   return (
                     <TableRow key={pi.id} className="group hover:bg-transparent">
@@ -851,11 +859,16 @@ export default function QuotationMatrix() {
                           (c) => c.cotacao_fornecedor_id === cf.id && c.item_id === pi.item_id,
                         )
                         const draft = draftPrices[`${cf.id}_${pi.item_id}`]
-                        const currentPrice = draft !== undefined ? draft : ci?.preco_ofertado || 0
+                        const currentPrice =
+                          draft !== undefined
+                            ? draft
+                            : (ci?.preco_contraproposta > 0
+                                ? ci.preco_contraproposta
+                                : ci?.preco_ofertado) || 0
                         return (
                           <TableCell
                             key={cf.id}
-                            className="align-top py-1 px-1 border-r last:border-r-0 bg-background/50 hover:bg-muted/20"
+                            className="align-top py-1 px-1 border-r bg-background/50 hover:bg-muted/20"
                           >
                             <PriceCell
                               cotacaoF={cf}
@@ -872,15 +885,23 @@ export default function QuotationMatrix() {
                               }
                               onBlur={handleBlur}
                               onToggleWinner={handleToggleWinner}
-                              onAcceptCounter={handleAcceptCounter}
                             />
                           </TableCell>
                         )
                       })}
                       <TableCell className="align-top py-1.5 px-2 text-right border-l bg-muted/5">
-                        {pi.expand?.item_id?.preco_compra ? (
+                        {lowestCurrentPrice ? (
                           <span className="font-mono text-xs text-blue-600 font-bold">
-                            $ {formatCurrency(pi.expand.item_id.preco_compra)}
+                            $ {formatCurrency(lowestCurrentPrice)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="align-top py-1.5 px-2 text-right bg-muted/5">
+                        {lastHist ? (
+                          <span className="font-mono text-xs text-muted-foreground font-medium">
+                            $ {formatCurrency(lastHist)}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">-</span>
@@ -914,13 +935,13 @@ export default function QuotationMatrix() {
                   return (
                     <TableCell
                       key={cf.id}
-                      className="text-center font-mono font-bold py-2 border-r last:border-r-0 text-foreground bg-background/50 text-xs"
+                      className="text-center font-mono font-bold py-2 border-r text-foreground bg-background/50 text-xs"
                     >
                       $ {formatCurrency(total)}
                     </TableCell>
                   )
                 })}
-                <TableCell className="border-l bg-muted/5" />
+                <TableCell className="border-l bg-muted/5" colSpan={2} />
               </TableRow>
             </TableFooter>
           </Table>
