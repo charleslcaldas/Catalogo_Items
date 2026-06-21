@@ -87,6 +87,45 @@ routerAdd(
         if (row['Preco Venda']) record.set('preco_venda', parseFloat(row['Preco Venda']) || 0)
         if (row['Ativo']) record.set('ativo', row['Ativo'].toLowerCase() !== 'false')
 
+        const fixEncoding = (str) => {
+          if (!str) return str
+          try {
+            return decodeURIComponent(escape(str))
+          } catch (e) {
+            return str
+          }
+        }
+
+        const descExtraKeys = [
+          'Descrição Extra (PT)',
+          'Descricao Extra (PT)',
+          'Descrição Extra Pt',
+          'Descricao Extra Pt',
+          'Descrição Extra',
+          'Descricao Extra',
+        ]
+        for (const k of descExtraKeys) {
+          if (row[k] !== undefined) {
+            record.set('descricao_extra', fixEncoding(row[k]))
+            break
+          }
+        }
+
+        const infoExtraKeys = [
+          'Informação Extra (PT)',
+          'Informacao Extra (PT)',
+          'Informação Extra Pt',
+          'Informacao Extra Pt',
+          'Informação Extra',
+          'Informacao Extra',
+        ]
+        for (const k of infoExtraKeys) {
+          if (row[k] !== undefined) {
+            record.set('informacao_extra', fixEncoding(row[k]))
+            break
+          }
+        }
+
         if (!record.getString('linha_id')) {
           const linhas = $app.findRecordsByFilter('linhas', '1=1', '', 1, 0)
           if (linhas.length > 0) {

@@ -26,6 +26,7 @@ export default function PotentialsPage() {
   const [search, setSearch] = useState('')
   const [filterEstagio, setFilterEstagio] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
+  const [filterProprietario, setFilterProprietario] = useState('all')
   const [filterDateStart, setFilterDateStart] = useState('')
   const [filterDateEnd, setFilterDateEnd] = useState('')
 
@@ -59,6 +60,9 @@ export default function PotentialsPage() {
       }
       if (filterStatus !== 'all') {
         filters.push(`status = "${filterStatus}"`)
+      }
+      if (filterProprietario !== 'all' && filterProprietario.trim() !== '') {
+        filters.push(`proprietario ~ "${filterProprietario.replace(/"/g, '')}"`)
       }
       if (filterDateStart) {
         filters.push(`created >= "${filterDateStart} 00:00:00"`)
@@ -126,7 +130,7 @@ export default function PotentialsPage() {
       loadPotentials()
     }, 300)
     return () => clearTimeout(delay)
-  }, [search, filterEstagio, filterStatus, filterDateStart, filterDateEnd])
+  }, [search, filterEstagio, filterStatus, filterProprietario, filterDateStart, filterDateEnd])
 
   useRealtime('potenciais', () => {
     loadPotentials()
@@ -159,12 +163,28 @@ export default function PotentialsPage() {
       )
     }
 
+    if (status === 'Aguardando Cotação Fornecedor') {
+      return (
+        <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-50 border-blue-200 font-normal h-5 text-[10px] px-2 rounded-full">
+          ⏳ Aguardando Fornecedor
+        </Badge>
+      )
+    }
+
+    if (status === 'Cotação Recebida') {
+      return (
+        <Badge className="bg-purple-50 text-purple-700 hover:bg-purple-50 border-purple-200 font-normal h-5 text-[10px] px-2 rounded-full">
+          📋 Cotação Recebida
+        </Badge>
+      )
+    }
+
     return (
       <Badge
         variant="secondary"
         className="bg-slate-100 text-slate-600 border-slate-200 font-normal h-5 text-[10px] px-2 rounded-full"
       >
-        🚫 Sem Itens
+        🚫 {status}
       </Badge>
     )
   }
@@ -199,6 +219,14 @@ export default function PotentialsPage() {
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
+            <Input
+              type="text"
+              placeholder="Filtrar Comprador..."
+              className="h-8 w-40 text-xs rounded-full bg-white"
+              value={filterProprietario === 'all' ? '' : filterProprietario}
+              onChange={(e) => setFilterProprietario(e.target.value || 'all')}
+            />
+
             <select
               className="h-8 rounded-full border-input bg-white px-3 text-xs ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border"
               value={filterStatus}
@@ -208,6 +236,8 @@ export default function PotentialsPage() {
               <option value="Completo">Completo</option>
               <option value="Incompleto">Incompleto</option>
               <option value="Sem Itens">Sem Itens</option>
+              <option value="Aguardando Cotação Fornecedor">Aguardando Cotação</option>
+              <option value="Cotação Recebida">Cotação Recebida</option>
             </select>
 
             <select
@@ -219,6 +249,8 @@ export default function PotentialsPage() {
               <option value="Qualificação">Qualificação</option>
               <option value="Proposta">Proposta</option>
               <option value="Negociação">Negociação</option>
+              <option value="Aguardando Cotação Fornecedor">Aguardando Cotação</option>
+              <option value="Cotação Recebida">Cotação Recebida</option>
               <option value="Fechado Ganho">Fechado Ganho</option>
               <option value="Fechado Perdido">Fechado Perdido</option>
             </select>
