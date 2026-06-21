@@ -26,9 +26,9 @@ export function PriceCell({
       className={cn(
         'p-1.5 rounded flex flex-col gap-1.5 relative group min-h-[44px] cursor-pointer transition-colors',
         cotacaoI?.vencedor
-          ? 'bg-green-50/50 ring-1 ring-green-500 hover:bg-green-100/50'
+          ? 'bg-blue-50/50 ring-1 ring-blue-500 hover:bg-blue-100/50'
           : isLowest
-            ? 'bg-blue-50/50 ring-1 ring-blue-400 hover:bg-blue-100/50'
+            ? 'bg-green-50/50 ring-1 ring-green-400 hover:bg-green-100/50'
             : 'hover:bg-muted/50',
       )}
     >
@@ -44,7 +44,10 @@ export function PriceCell({
             onBlur(cotacaoF.id, item.item_id, currentPrice, currentMoq, cotacaoI?.id)
           }
           onClick={(e) => e.stopPropagation()}
-          className="h-7 text-xs text-right font-mono flex-1 min-w-0"
+          className={cn(
+            'h-7 text-xs text-right font-mono flex-1 min-w-0',
+            isLowest ? 'text-green-700 font-bold' : '',
+          )}
           placeholder="Preço"
         />
         {hasCounter && (

@@ -42,7 +42,7 @@ export function CounterProposalModal({
       const allFornecedores = cotacoesF?.map((cf: any) => cf.id) || []
       setSelectedFornecedores(allFornecedores)
     }
-  }, [open, cotacoesF])
+  }, [open])
 
   useEffect(() => {
     if (open) {
@@ -140,6 +140,13 @@ export function CounterProposalModal({
 
       promises.push(pb.collection('itens').update(item.item_id, { preco_compra: finalPrice }))
 
+      const pItems = potencialItens.filter((pi: any) => pi.item_id === item.item_id)
+      for (const pi of pItems) {
+        promises.push(
+          pb.collection('potencial_itens').update(pi.id, { preco_unitario: finalPrice }),
+        )
+      }
+
       promises.push(
         pb.collection('historico_precos').create({
           item_id: item.item_id,
@@ -185,6 +192,13 @@ export function CounterProposalModal({
 
         promises.push(pb.collection('itens').update(item.item_id, { preco_compra: finalPrice }))
 
+        const pItems = potencialItens.filter((pi: any) => pi.item_id === item.item_id)
+        for (const pi of pItems) {
+          promises.push(
+            pb.collection('potencial_itens').update(pi.id, { preco_unitario: finalPrice }),
+          )
+        }
+
         promises.push(
           pb.collection('historico_precos').create({
             item_id: item.item_id,
@@ -199,7 +213,6 @@ export function CounterProposalModal({
         title: 'Sucesso',
         description: `${selectedItems.length} itens aceitos com sucesso.`,
       })
-      onOpenChange(false)
     } catch (err: any) {
       toast({ title: 'Erro', description: err.message, variant: 'destructive' })
     }

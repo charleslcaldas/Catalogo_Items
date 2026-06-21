@@ -152,21 +152,35 @@ export default function QuotationMatrix() {
           )
         }
 
+        let priceToSet = draftPrices[`${cfId}_${pi.item_id}`]
+
         const ci = cotacoesI.find(
           (c) => c.cotacao_fornecedor_id === cfId && c.item_id === pi.item_id,
         )
         if (ci) {
           if (!ci.vencedor)
             promises.push(pb.collection('cotacoes_itens').update(ci.id, { vencedor: true }))
+
+          if (priceToSet === undefined) {
+            priceToSet = ci.preco_contraproposta > 0 ? ci.preco_contraproposta : ci.preco_ofertado
+          }
         } else {
+          priceToSet = priceToSet || 0
           promises.push(
             pb.collection('cotacoes_itens').create({
               cotacao_fornecedor_id: cfId,
               item_id: pi.item_id,
-              preco_ofertado: draftPrices[`${cfId}_${pi.item_id}`] || 0,
+              preco_ofertado: priceToSet,
               quantidade_minima: draftMoqs[`${cfId}_${pi.item_id}`] || 0,
               vencedor: true,
             }),
+          )
+        }
+
+        if (priceToSet > 0) {
+          promises.push(pb.collection('itens').update(pi.item_id, { preco_compra: priceToSet }))
+          promises.push(
+            pb.collection('potencial_itens').update(pi.id, { preco_unitario: priceToSet }),
           )
         }
       }
@@ -374,6 +388,13 @@ export default function QuotationMatrix() {
 
       if (priceToSet > 0) {
         promises.push(pb.collection('itens').update(itemId, { preco_compra: priceToSet }))
+
+        const pItems = potencialItens.filter((pi: any) => pi.item_id === itemId)
+        for (const pi of pItems) {
+          promises.push(
+            pb.collection('potencial_itens').update(pi.id, { preco_unitario: priceToSet }),
+          )
+        }
       }
 
       await Promise.all(promises)
@@ -663,6 +684,18 @@ export default function QuotationMatrix() {
               <TableRow>
                 <TableHead className="min-w-[180px] font-semibold py-2">Item</TableHead>
                 <TableHead className="font-semibold text-center w-16 py-2">Qtd</TableHead>
+                <TableHead className="font-semibold text-right min-w-[90px] py-2 bg-muted/10">
+                  Último Hist.
+                  <span className="text-[9px] font-normal text-muted-foreground block">
+                    (Salvo)
+                  </span>
+                </TableHead>
+                <TableHead className="font-semibold text-right min-w-[90px] py-2 border-r bg-muted/10">
+                  Menor Cotação
+                  <span className="text-[9px] font-normal text-muted-foreground block">
+                    (Atual)
+                  </span>
+                </TableHead>
                 <TableHead className="font-semibold text-right min-w-[90px] py-2 border-r">
                   Preço{' '}
                   <span className="text-[9px] font-normal text-muted-foreground block">
@@ -784,18 +817,6 @@ export default function QuotationMatrix() {
                     </div>
                   </TableHead>
                 ))}
-                <TableHead className="font-semibold text-right min-w-[90px] py-2 border-l bg-muted/10">
-                  Menor Cotação
-                  <span className="text-[9px] font-normal text-muted-foreground block">
-                    (Atual)
-                  </span>
-                </TableHead>
-                <TableHead className="font-semibold text-right min-w-[90px] py-2 bg-muted/10">
-                  Último Hist.
-                  <span className="text-[9px] font-normal text-muted-foreground block">
-                    (Salvo)
-                  </span>
-                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -845,6 +866,24 @@ export default function QuotationMatrix() {
                           {pi.unidade_medida || 'UN'}
                         </span>
                       </TableCell>
+                      <TableCell className="align-top py-1.5 px-2 text-right bg-muted/5">
+                        {lastHist ? (
+                          <span className="font-mono text-xs text-muted-foreground font-medium">
+                            $ {formatCurrency(lastHist)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="align-top py-1.5 px-2 text-right border-r bg-muted/5">
+                        {lowestCurrentPrice ? (
+                          <span className="font-mono text-xs text-green-600 font-bold">
+                            $ {formatCurrency(lowestCurrentPrice)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
                       <TableCell className="align-top py-1.5 px-2 text-right border-r">
                         {pi.preco_unitario ? (
                           <span className="font-mono text-xs font-bold text-foreground">
@@ -889,24 +928,6 @@ export default function QuotationMatrix() {
                           </TableCell>
                         )
                       })}
-                      <TableCell className="align-top py-1.5 px-2 text-right border-l bg-muted/5">
-                        {lowestCurrentPrice ? (
-                          <span className="font-mono text-xs text-blue-600 font-bold">
-                            $ {formatCurrency(lowestCurrentPrice)}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="align-top py-1.5 px-2 text-right bg-muted/5">
-                        {lastHist ? (
-                          <span className="font-mono text-xs text-muted-foreground font-medium">
-                            $ {formatCurrency(lastHist)}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
                     </TableRow>
                   )
                 })
@@ -914,7 +935,7 @@ export default function QuotationMatrix() {
             </TableBody>
             <TableFooter className="bg-muted/30 border-t">
               <TableRow>
-                <TableCell colSpan={3} className="text-right font-semibold py-2 border-r text-xs">
+                <TableCell colSpan={5} className="text-right font-semibold py-2 border-r text-xs">
                   Total do Fornecedor:
                 </TableCell>
                 {cotacoesF.map((cf) => {
@@ -941,7 +962,6 @@ export default function QuotationMatrix() {
                     </TableCell>
                   )
                 })}
-                <TableCell className="border-l bg-muted/5" colSpan={2} />
               </TableRow>
             </TableFooter>
           </Table>
