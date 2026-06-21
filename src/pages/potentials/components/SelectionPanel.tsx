@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Trash2, PackageOpen, ArrowRight, Save, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { FormattedInput } from '@/components/FormattedInput'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import {
@@ -123,12 +124,10 @@ export function SelectionPanel({
                   <div className="grid grid-cols-12 gap-2 mb-3">
                     <div className="col-span-4 space-y-1">
                       <Label className="text-[10px] uppercase text-muted-foreground">Qtde *</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        className={`h-8 text-sm px-2 ${si.quantidade === '' || Number(si.quantidade) <= 0 ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                      <FormattedInput
+                        className={`h-8 text-sm px-2 text-right ${si.quantidade === '' || Number(si.quantidade) <= 0 ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                         value={si.quantidade}
-                        onChange={(e) => onUpdate(si.item.id, 'quantidade', e.target.value)}
+                        onValueChange={(val) => onUpdate(si.item.id, 'quantidade', val)}
                       />
                     </div>
                     <div className="col-span-4 space-y-1">
@@ -157,12 +156,12 @@ export function SelectionPanel({
                       <Label className="text-[10px] uppercase text-muted-foreground">
                         Preço $ *
                       </Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        className={`h-8 text-sm px-2 ${si.preco_unitario === '' ? 'border-destructive' : ''}`}
+                      <FormattedInput
+                        isPrice
+                        prefixText="$"
+                        className={`h-8 text-sm px-2 text-right ${si.preco_unitario === '' ? 'border-destructive' : ''}`}
                         value={si.preco_unitario}
-                        onChange={(e) => onUpdate(si.item.id, 'preco_unitario', e.target.value)}
+                        onValueChange={(val) => onUpdate(si.item.id, 'preco_unitario', val)}
                       />
                     </div>
                   </div>
@@ -253,7 +252,13 @@ export function SelectionPanel({
             </div>
             <div className="flex justify-between items-end mb-4">
               <span className="text-sm text-muted-foreground">Valor estimado:</span>
-              <span className="font-bold text-lg text-primary">$ {estimatedValue.toFixed(2)}</span>
+              <span className="font-bold text-lg text-primary">
+                ${' '}
+                {estimatedValue.toLocaleString('en-US', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </span>
             </div>
             <Button
               className="w-full bg-blue-600 hover:bg-blue-700 text-white"
@@ -267,7 +272,13 @@ export function SelectionPanel({
           <div className="space-y-3">
             <div className="flex justify-between items-end mb-4 px-2 py-3 bg-slate-50 rounded border">
               <span className="text-sm text-muted-foreground">Valor Final:</span>
-              <span className="font-bold text-lg text-primary">$ {estimatedValue.toFixed(2)}</span>
+              <span className="font-bold text-lg text-primary">
+                ${' '}
+                {estimatedValue.toLocaleString('en-US', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </span>
             </div>
             <Button
               className="w-full bg-slate-600 hover:bg-slate-700 text-white"

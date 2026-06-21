@@ -1,6 +1,6 @@
 import { Trash2, ChevronUp, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { FormattedInput } from '@/components/FormattedInput'
 import { Badge } from '@/components/ui/badge'
 import { getContrastColor, cn } from '@/lib/utils'
 import {
@@ -46,24 +46,29 @@ export function SelectedItemsTable({
   const formatCurrency = (value: number | '') => {
     if (value === '') return '-'
     const num = Number(value)
-    return isNaN(num) ? '-' : `$ ${num.toFixed(2)}`
+    return isNaN(num)
+      ? '-'
+      : `$ ${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   }
 
-  const handleQuantityBlur = async (id: string, quantidade: string | number) => {
-    // Only attempt auto-save if id is a saved PocketBase record (15 chars)
-    if (id && id.length === 15) {
+  const handleQuantityBlur = async (recordId: string | undefined, quantidade: string | number) => {
+    if (recordId && recordId.length === 15) {
       try {
-        await pb.collection('potencial_itens').update(id, { quantidade: Number(quantidade) || 0 })
+        await pb
+          .collection('potencial_itens')
+          .update(recordId, { quantidade: Number(quantidade) || 0 })
       } catch (err) {
         console.error('Auto-save quantity failed', err)
       }
     }
   }
 
-  const handlePriceBlur = async (id: string, preco: string | number) => {
-    if (id && id.length === 15) {
+  const handlePriceBlur = async (recordId: string | undefined, preco: string | number) => {
+    if (recordId && recordId.length === 15) {
       try {
-        await pb.collection('potencial_itens').update(id, { preco_unitario: Number(preco) || 0 })
+        await pb
+          .collection('potencial_itens')
+          .update(recordId, { preco_unitario: Number(preco) || 0 })
       } catch (err) {
         console.error('Auto-save price failed', err)
       }
@@ -173,45 +178,30 @@ export function SelectedItemsTable({
                   {data.item.unidade || '-'}
                 </TableCell>
                 <TableCell className="py-1">
-                  <Input
-                    type="number"
-                    min="0"
-                    lang="en-US"
-                    step="0.01"
+                  <FormattedInput
                     className="h-7 w-20 px-2 text-right text-xs bg-white"
                     value={data.quantidade}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/,/g, '.')
+                    onValueChange={(val) => {
                       if (Number(val) < 0) return
                       handleUpdateItem(id, 'quantidade', val)
                     }}
-                    onBlur={() => handleQuantityBlur(id, data.quantidade)}
+                    onBlur={() => handleQuantityBlur(record.recordId, data.quantidade)}
                   />
                 </TableCell>
                 <TableCell className="py-1">
-                  <div className="relative">
-                    <span className="absolute left-2 top-1.5 text-muted-foreground text-[10px] font-medium">
-                      $
-                    </span>
-                    <Input
-                      type="text"
-                      inputMode="decimal"
-                      className="h-7 w-24 pl-5 pr-2 text-right text-xs bg-white"
-                      value={String(data.preco_unitario).replace(/,/g, '.')}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/,/g, '.')
-                        if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                          handleUpdateItem(id, 'preco_unitario', val)
-                        }
-                      }}
-                      onBlur={(e) => {
-                        let parsed = parseFloat(String(data.preco_unitario).replace(/,/g, '.'))
-                        if (isNaN(parsed)) parsed = 0
-                        handleUpdateItem(id, 'preco_unitario', parsed.toFixed(2))
-                        handlePriceBlur(id, parsed)
-                      }}
-                    />
-                  </div>
+                  <FormattedInput
+                    isPrice
+                    prefixText="$"
+                    className="h-7 w-24 px-2 text-right text-xs bg-white"
+                    value={data.preco_unitario}
+                    onValueChange={(val) => handleUpdateItem(id, 'preco_unitario', val)}
+                    onBlur={() => {
+                      let parsed = parseFloat(String(data.preco_unitario))
+                      if (isNaN(parsed)) parsed = 0
+                      handleUpdateItem(id, 'preco_unitario', parsed.toString())
+                      handlePriceBlur(record.recordId, parsed)
+                    }}
+                  />
                 </TableCell>
                 <TableCell className="py-1 text-xs font-semibold text-right whitespace-nowrap">
                   {formatCurrency(total)}

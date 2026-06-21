@@ -47,6 +47,7 @@ export type SelectedItemData = {
 
 export type SelectedItemRecord = {
   id: string
+  recordId?: string
   data: SelectedItemData
 }
 
@@ -148,37 +149,65 @@ export default function AddItemsToPotential() {
     })
   }
 
-  const handleQuickAdd = (item: Item) => {
-    setSelectedItems((prev) => {
-      const idx = prev.findIndex((si) => si.id === item.id)
-      if (idx >= 0) {
+  const handleQuickAdd = async (item: Item) => {
+    const existing = selectedItems.find((si) => si.id === item.id)
+    const unidadeObj = unidades.find((u) => u.id === item.unidade_id)
+    const unidadeNome = unidadeObj ? unidadeObj.nome : item.unidade || 'Pcs'
+
+    if (existing) {
+      const newQty = Number(existing.data.quantidade || 0) + 1
+
+      setSelectedItems((prev) => {
         const next = [...prev]
-        next[idx] = {
-          ...next[idx],
-          data: { ...next[idx].data, quantidade: Number(next[idx].data.quantidade || 0) + 1 },
-        }
-        toast.success(`Quantidade do item ${item.sku} atualizada.`)
+        const idx = next.findIndex((si) => si.id === item.id)
+        next[idx] = { ...next[idx], data: { ...next[idx].data, quantidade: newQty } }
         return next
+      })
+
+      if (currentPotential && existing.recordId) {
+        try {
+          await pb.collection('potencial_itens').update(existing.recordId, { quantidade: newQty })
+          toast.success(`Quantidade do item ${item.sku} atualizada.`)
+        } catch (error: any) {
+          toast.error(`Erro ao atualizar quantidade no banco de dados.`)
+        }
       } else {
-        const unidadeObj = unidades.find((u) => u.id === item.unidade_id)
-        const unidadeNome = unidadeObj ? unidadeObj.nome : item.unidade || 'Pcs'
-        toast.success(`Item ${item.sku} adicionado à cotação.`)
-        return [
-          ...prev,
-          {
-            id: item.id,
-            data: {
-              item,
-              quantidade: 1,
-              unidade_medida: unidadeNome,
-              preco_unitario: item.preco_venda !== undefined ? item.preco_venda : '',
-              observacoes: '',
-              ordem: prev.length + 1,
-            },
-          },
-        ]
+        toast.success(`Quantidade do item ${item.sku} atualizada.`)
       }
-    })
+    } else {
+      const newItemData: SelectedItemData = {
+        item,
+        quantidade: 1,
+        unidade_medida: unidadeNome,
+        preco_unitario: item.preco_venda !== undefined ? item.preco_venda : '',
+        observacoes: '',
+        ordem: selectedItems.length + 1,
+      }
+
+      if (currentPotential) {
+        try {
+          const created = await pb.collection('potencial_itens').create({
+            potencial_id: currentPotential.id,
+            item_id: item.id,
+            quantidade: 1,
+            unidade_medida: unidadeNome,
+            preco_unitario: Number(item.preco_venda) || 0,
+            observacoes: '',
+            ordem: selectedItems.length + 1,
+          })
+          setSelectedItems((prev) => [
+            ...prev,
+            { id: item.id, recordId: created.id, data: newItemData },
+          ])
+          toast.success(`Item ${item.sku} adicionado à cotação.`)
+        } catch (error: any) {
+          toast.error(`Erro ao salvar item no banco: ${error.message}`)
+        }
+      } else {
+        setSelectedItems((prev) => [...prev, { id: item.id, data: newItemData }])
+        toast.success(`Item ${item.sku} adicionado (rascunho).`)
+      }
+    }
   }
 
   const handleUpdateItem = (id: string, field: keyof SelectedItemData, value: string) => {
@@ -196,8 +225,17 @@ export default function AddItemsToPotential() {
     )
   }
 
-  const handleRemoveItem = (id: string) => {
+  const handleRemoveItem = async (id: string) => {
+    const existing = selectedItems.find((si) => si.id === id)
     setSelectedItems((prev) => prev.filter((si) => si.id !== id))
+
+    if (existing?.recordId) {
+      try {
+        await pb.collection('potencial_itens').delete(existing.recordId)
+      } catch (err) {
+        console.error('Failed to remove from DB', err)
+      }
+    }
   }
 
   const handleMoveUp = (index: number) => {
@@ -270,6 +308,9 @@ export default function AddItemsToPotential() {
         navigate('/potenciais')
       } else if (!currentPotential) {
         navigate(`/potenciais/adicionar?id=${saved.id}`, { replace: true })
+        handleQuoteSelected(saved)
+      } else {
+        handleQuoteSelected(saved)
       }
     } catch (error) {
       toast.error('Erro ao salvar a cotação.')
@@ -312,6 +353,7 @@ export default function AddItemsToPotential() {
       const items = await getPotencialItens(quote.id)
       const formattedItems = items.map((pi) => ({
         id: pi.item_id,
+        recordId: pi.id,
         data: {
           item: pi.expand?.item_id || ({ id: pi.item_id } as any),
           quantidade: pi.quantidade,
@@ -609,7 +651,13 @@ export default function AddItemsToPotential() {
             <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
               Valor Total Estimado
             </span>
-            <span className="text-lg font-bold text-primary">$ {totalValue.toFixed(2)}</span>
+            <span className="text-lg font-bold text-primary">
+              ${' '}
+              {totalValue.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </span>
           </div>
         </div>
       </div>
