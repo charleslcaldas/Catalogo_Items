@@ -187,7 +187,7 @@ export function QuotationNotes({
                 <p className="whitespace-pre-wrap mt-1">{note.conteudo}</p>
               )}
 
-              {(user?.id === note.user_id || true) && editingId !== note.id && (
+              {user?.id === note.user_id && editingId !== note.id && (
                 <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex bg-background/80 backdrop-blur rounded border shadow-sm">
                   <Button
                     variant="ghost"

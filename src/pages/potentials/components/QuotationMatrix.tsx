@@ -57,20 +57,16 @@ export default function QuotationMatrix() {
     if (!potencialId) return
     try {
       const [pItens, cF, cI, forn] = await Promise.all([
-        pb
-          .collection('potencial_itens')
-          .getFullList({
-            filter: `potencial_id="${potencialId}"`,
-            expand: 'item_id',
-            sort: 'ordem',
-          }),
-        pb
-          .collection('cotacoes_fornecedor')
-          .getFullList({
-            filter: `potencial_id="${potencialId}"`,
-            expand: 'fornecedor_id',
-            sort: 'created',
-          }),
+        pb.collection('potencial_itens').getFullList({
+          filter: `potencial_id="${potencialId}"`,
+          expand: 'item_id',
+          sort: 'ordem',
+        }),
+        pb.collection('cotacoes_fornecedor').getFullList({
+          filter: `potencial_id="${potencialId}"`,
+          expand: 'fornecedor_id',
+          sort: 'created',
+        }),
         pb
           .collection('cotacoes_itens')
           .getFullList({ filter: `cotacao_fornecedor_id.potencial_id="${potencialId}"` }),
@@ -113,7 +109,9 @@ export default function QuotationMatrix() {
   const handleSelectAllFor = async (cfId: string) => {
     try {
       const itemsToSelect = potencialItens.filter((pi) => {
-        const ci = cotacoesI.find((c) => c.cotacao_fornecedor_id === cfId && c.item_id === pi.item_id)
+        const ci = cotacoesI.find(
+          (c) => c.cotacao_fornecedor_id === cfId && c.item_id === pi.item_id,
+        )
         const draft = draftPrices[`${cfId}_${pi.item_id}`]
         return (ci && ci.preco_ofertado > 0) || (draft && draft > 0)
       })
@@ -122,12 +120,17 @@ export default function QuotationMatrix() {
       for (const pi of itemsToSelect) {
         const currentWinner = cotacoesI.find((c) => c.item_id === pi.item_id && c.vencedor)
         if (currentWinner && currentWinner.cotacao_fornecedor_id !== cfId) {
-          promises.push(pb.collection('cotacoes_itens').update(currentWinner.id, { vencedor: false }))
+          promises.push(
+            pb.collection('cotacoes_itens').update(currentWinner.id, { vencedor: false }),
+          )
         }
 
-        const ci = cotacoesI.find((c) => c.cotacao_fornecedor_id === cfId && c.item_id === pi.item_id)
+        const ci = cotacoesI.find(
+          (c) => c.cotacao_fornecedor_id === cfId && c.item_id === pi.item_id,
+        )
         if (ci) {
-          if (!ci.vencedor) promises.push(pb.collection('cotacoes_itens').update(ci.id, { vencedor: true }))
+          if (!ci.vencedor)
+            promises.push(pb.collection('cotacoes_itens').update(ci.id, { vencedor: true }))
         } else {
           promises.push(
             pb.collection('cotacoes_itens').create({
@@ -161,13 +164,17 @@ export default function QuotationMatrix() {
         const [sku, priceStr] = rows[i]
         if (!sku || !priceStr) continue
 
-        const pi = potencialItens.find((p) => p.expand?.item_id?.sku === sku.trim().replace(/"/g, ''))
+        const pi = potencialItens.find(
+          (p) => p.expand?.item_id?.sku === sku.trim().replace(/"/g, ''),
+        )
         if (!pi) continue
 
         const price = parseFloat(priceStr.replace(/"/g, '').replace(',', '.'))
         if (isNaN(price)) continue
 
-        const ci = cotacoesI.find((c) => c.cotacao_fornecedor_id === cfId && c.item_id === pi.item_id)
+        const ci = cotacoesI.find(
+          (c) => c.cotacao_fornecedor_id === cfId && c.item_id === pi.item_id,
+        )
         if (ci) {
           promises.push(pb.collection('cotacoes_itens').update(ci.id, { preco_ofertado: price }))
         } else {
@@ -295,14 +302,12 @@ export default function QuotationMatrix() {
               Math.abs(h.preco - w.preco_ofertado) < 0.01,
           )
           if (!existing) {
-            await pb
-              .collection('historico_precos')
-              .create({
-                item_id: w.item_id,
-                preco: w.preco_ofertado,
-                fornecedor: fornecedorNome,
-                data_cotacao: new Date().toISOString(),
-              })
+            await pb.collection('historico_precos').create({
+              item_id: w.item_id,
+              preco: w.preco_ofertado,
+              fornecedor: fornecedorNome,
+              data_cotacao: new Date().toISOString(),
+            })
           }
         }),
       )
@@ -330,8 +335,11 @@ export default function QuotationMatrix() {
           const winner = cotacoesI.find((c) => c.item_id === pi.item_id && c.vencedor)
           const priceToUse = winner
             ? (draftPrices[`${winner.cotacao_fornecedor_id}_${pi.item_id}`] ??
-              (winner.preco_contraproposta > 0 ? winner.preco_contraproposta : winner.preco_ofertado))
-            : 0          if (priceToUse > 0 && pi.preco_unitario !== priceToUse) {
+              (winner.preco_contraproposta > 0
+                ? winner.preco_contraproposta
+                : winner.preco_ofertado))
+            : 0
+          if (priceToUse > 0 && pi.preco_unitario !== priceToUse) {
             updatedCount++
             await pb.collection('potencial_itens').update(pi.id, { preco_unitario: priceToUse })
           }
@@ -392,9 +400,14 @@ export default function QuotationMatrix() {
       vendaTotal += qtd * (pi.preco_unitario || 0)
       const winner = cotacoesI.find((c) => c.item_id === pi.item_id && c.vencedor)
       if (winner) {
-        let draftP = draftPrices[`${winner.cotacao_fornecedor_id}_${pi.item_id}`];
-        let p = draftP !== undefined ? draftP : (winner.preco_contraproposta > 0 ? winner.preco_contraproposta : winner.preco_ofertado) ?? 0;
-        custoTotal += qtd * p;
+        let draftP = draftPrices[`${winner.cotacao_fornecedor_id}_${pi.item_id}`]
+        let p =
+          draftP !== undefined
+            ? draftP
+            : ((winner.preco_contraproposta > 0
+                ? winner.preco_contraproposta
+                : winner.preco_ofertado) ?? 0)
+        custoTotal += qtd * p
       }
     })
     return {
@@ -565,52 +578,75 @@ export default function QuotationMatrix() {
                           {cf.expand?.fornecedor_id?.nome}
                         </span>
                         {cf.expand?.fornecedor_id?.auditado && (
-                          <Badge variant="outline" className="text-[8px] h-4 px-1 bg-blue-50 text-blue-700 border-blue-200">
+                          <Badge
+                            variant="outline"
+                            className="text-[8px] h-4 px-1 bg-blue-50 text-blue-700 border-blue-200"
+                          >
                             Auditado
                           </Badge>
                         )}
                         <Popover>
                           <PopoverTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover:opacity-100">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5 opacity-0 group-hover:opacity-100"
+                            >
                               <Settings2 className="w-3 h-3" />
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-64 p-3" align="center">
-                             <div className="space-y-3">
-                               <h4 className="font-medium text-sm">Opções do Fabricante</h4>
-                               <div className="space-y-1">
-                                 <Label className="text-xs">Incoterm</Label>
-                                 <Input 
-                                   className="h-7 text-xs" 
-                                   defaultValue={cf.incoterm} 
-                                   onBlur={(e) => handleUpdateCf(cf.id, { incoterm: e.target.value })} 
-                                 />
-                               </div>
-                               <div className="space-y-1">
-                                 <Label className="text-xs">Tempo de Fabricação</Label>
-                                 <Input 
-                                   className="h-7 text-xs" 
-                                   defaultValue={cf.tempo_fabricacao} 
-                                   onBlur={(e) => handleUpdateCf(cf.id, { tempo_fabricacao: e.target.value })} 
-                                 />
-                               </div>
-                               <div className="pt-2 border-t flex flex-col gap-2">
-                                 <Button variant="outline" size="sm" className="w-full justify-start text-xs h-7" onClick={() => handleSelectAllFor(cf.id)}>
-                                    <CheckSquare className="w-3 h-3 mr-2" /> Selecionar Todos
-                                 </Button>
-                                 <div className="relative w-full">
-                                   <Input 
-                                     type="file" 
-                                     accept=".csv" 
-                                     className="absolute inset-0 opacity-0 cursor-pointer" 
-                                     onChange={(e) => e.target.files?.[0] && handleImportCSVFor(cf.id, e.target.files[0])}
-                                   />
-                                   <Button variant="outline" size="sm" className="w-full justify-start text-xs h-7 pointer-events-none">
-                                      <FileUp className="w-3 h-3 mr-2" /> Importar Preços (CSV)
-                                   </Button>
-                                 </div>
-                               </div>
-                             </div>
+                            <div className="space-y-3">
+                              <h4 className="font-medium text-sm">Opções do Fabricante</h4>
+                              <div className="space-y-1">
+                                <Label className="text-xs">Incoterm</Label>
+                                <Input
+                                  className="h-7 text-xs"
+                                  defaultValue={cf.incoterm}
+                                  onBlur={(e) =>
+                                    handleUpdateCf(cf.id, { incoterm: e.target.value })
+                                  }
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs">Tempo de Fabricação</Label>
+                                <Input
+                                  className="h-7 text-xs"
+                                  defaultValue={cf.tempo_fabricacao}
+                                  onBlur={(e) =>
+                                    handleUpdateCf(cf.id, { tempo_fabricacao: e.target.value })
+                                  }
+                                />
+                              </div>
+                              <div className="pt-2 border-t flex flex-col gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full justify-start text-xs h-7"
+                                  onClick={() => handleSelectAllFor(cf.id)}
+                                >
+                                  <CheckSquare className="w-3 h-3 mr-2" /> Selecionar Todos
+                                </Button>
+                                <div className="relative w-full">
+                                  <Input
+                                    type="file"
+                                    accept=".csv"
+                                    className="absolute inset-0 opacity-0 cursor-pointer"
+                                    onChange={(e) =>
+                                      e.target.files?.[0] &&
+                                      handleImportCSVFor(cf.id, e.target.files[0])
+                                    }
+                                  />
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-full justify-start text-xs h-7 pointer-events-none"
+                                  >
+                                    <FileUp className="w-3 h-3 mr-2" /> Importar Preços (CSV)
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
                           </PopoverContent>
                         </Popover>
                       </div>
@@ -632,8 +668,16 @@ export default function QuotationMatrix() {
                       )}
 
                       <div className="flex gap-1 mt-1 text-[9px] text-muted-foreground">
-                        {cf.incoterm && <span className="bg-muted px-1 rounded truncate max-w-[60px]">{cf.incoterm}</span>}
-                        {cf.tempo_fabricacao && <span className="bg-muted px-1 rounded truncate max-w-[60px]">{cf.tempo_fabricacao}</span>}
+                        {cf.incoterm && (
+                          <span className="bg-muted px-1 rounded truncate max-w-[60px]">
+                            {cf.incoterm}
+                          </span>
+                        )}
+                        {cf.tempo_fabricacao && (
+                          <span className="bg-muted px-1 rounded truncate max-w-[60px]">
+                            {cf.tempo_fabricacao}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </TableHead>
@@ -756,7 +800,12 @@ export default function QuotationMatrix() {
                       (c) => c.cotacao_fornecedor_id === cf.id && c.item_id === pi.item_id,
                     )
                     const draft = draftPrices[`${cf.id}_${pi.item_id}`]
-                    const price = draft !== undefined ? draft : (ci?.preco_contraproposta > 0 ? ci.preco_contraproposta : ci?.preco_ofertado) ?? 0;
+                    const price =
+                      draft !== undefined
+                        ? draft
+                        : ((ci?.preco_contraproposta > 0
+                            ? ci.preco_contraproposta
+                            : ci?.preco_ofertado) ?? 0)
                     total += price * (pi.quantidade || 0)
                   })
                   return (
