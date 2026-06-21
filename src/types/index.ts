@@ -126,6 +126,15 @@ export type StatusPotencial = {
   updated: string
 }
 
+export type EstagioPotencial = {
+  id: string
+  nome: string
+  cor_hex?: string
+  ordem?: number
+  created: string
+  updated: string
+}
+
 export type Potencial = {
   id: string
   numero_potencial: string
@@ -133,13 +142,16 @@ export type Potencial = {
   status: string
   nome_potencial?: string
   proprietario?: string
-  estagio?: string
+  estagio_id?: string
   observacoes?: string
   nome_comprador?: string
   notas?: string
   anexos?: string[]
   created: string
   updated: string
+  expand?: {
+    estagio_id?: EstagioPotencial
+  }
 }
 
 export type PotencialItem = {

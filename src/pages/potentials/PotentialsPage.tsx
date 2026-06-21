@@ -23,7 +23,7 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
 import pb from '@/lib/pocketbase/client'
-import type { Potencial } from '@/types'
+import type { Potencial, EstagioPotencial } from '@/types'
 import { useRealtime } from '@/hooks/use-realtime'
 import type { StatusPotencial } from '@/types'
 import { getContrastColor } from '@/lib/utils'
@@ -44,6 +44,7 @@ export default function PotentialsPage() {
   const [filterDateStart, setFilterDateStart] = useState('')
   const [filterDateEnd, setFilterDateEnd] = useState('')
   const [statuses, setStatuses] = useState<StatusPotencial[]>([])
+  const [estagios, setEstagios] = useState<EstagioPotencial[]>([])
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
@@ -53,7 +54,19 @@ export default function PotentialsPage() {
       .getFullList<StatusPotencial>()
       .then(setStatuses)
       .catch(() => {})
+
+    pb.collection('estagios_potencial')
+      .getFullList<EstagioPotencial>({ sort: 'ordem,nome' })
+      .then(setEstagios)
+      .catch(() => {})
   }, [])
+
+  useRealtime('estagios_potencial', () => {
+    pb.collection('estagios_potencial')
+      .getFullList<EstagioPotencial>({ sort: 'ordem,nome' })
+      .then(setEstagios)
+      .catch(() => {})
+  })
 
   const loadPotentials = async () => {
     setLoading(true)
@@ -81,10 +94,23 @@ export default function PotentialsPage() {
         )
       }
       if (selectedEstagios.length > 0) {
-        const estagioFilter = selectedEstagios
-          .map((e) => (e === 'Sem Estágio' ? `estagio = ""` : `estagio = "${e}"`))
-          .join(' || ')
-        filters.push(`(${estagioFilter})`)
+        const selectedIds = selectedEstagios
+          .map((nome) => estagios.find((e) => e.nome === nome)?.id)
+          .filter(Boolean)
+
+        const estagioFilterParts = []
+        if (selectedIds.length > 0) {
+          estagioFilterParts.push(selectedIds.map((id) => `estagio_id = "${id}"`).join(' || '))
+        }
+        if (selectedEstagios.includes('Sem Estágio')) {
+          estagioFilterParts.push(`estagio_id = ""`)
+        }
+
+        if (estagioFilterParts.length > 0) {
+          filters.push(`(${estagioFilterParts.join(' || ')})`)
+        } else {
+          filters.push(`(1=0)`) // Force no results if filter matches no IDs
+        }
       }
       if (filterStatus !== 'all') {
         filters.push(`status = "${filterStatus}"`)
@@ -102,6 +128,7 @@ export default function PotentialsPage() {
       const res = await pb.collection<Potencial>('potenciais').getList(1, 50, {
         filter: filters.join(' && '),
         sort: '-created',
+        expand: 'estagio_id',
       })
 
       const ids = res.items.map((p) => p.id)
@@ -184,18 +211,31 @@ export default function PotentialsPage() {
     e.preventDefault()
   }
 
-  const onDrop = async (e: React.DragEvent, targetStage: string) => {
+  const onDrop = async (e: React.DragEvent, targetStageNome: string) => {
     const potencialId = e.dataTransfer.getData('potencialId')
     if (potencialId) {
-      const newStage = targetStage === 'Sem Estágio' ? '' : targetStage
+      const estagioObj = estagios.find((est) => est.nome === targetStageNome)
+      const newEstagioId = targetStageNome === 'Sem Estágio' || !estagioObj ? '' : estagioObj.id
 
       // Optimistic update
       setPotentials((prev) =>
-        prev.map((p) => (p.id === potencialId ? { ...p, estagio: newStage } : p)),
+        prev.map((p) => {
+          if (p.id === potencialId) {
+            return {
+              ...p,
+              estagio_id: newEstagioId,
+              expand: {
+                ...p.expand,
+                estagio_id: estagioObj || undefined,
+              },
+            }
+          }
+          return p
+        }),
       )
 
       try {
-        await pb.collection('potenciais').update(potencialId, { estagio: newStage })
+        await pb.collection('potenciais').update(potencialId, { estagio_id: newEstagioId })
       } catch (err) {
         console.error('Error updating stage:', err)
         loadPotentials()
@@ -215,11 +255,11 @@ export default function PotentialsPage() {
     setSelectedIds(next)
   }
 
-  const dynamicStages = statuses.map((s) => s.nome)
+  const allStagesNames = estagios.map((e) => e.nome)
   const uniqueExistingStages = Array.from(
-    new Set(potentials.map((p) => p.estagio || 'Sem Estágio')),
+    new Set(potentials.map((p) => p.expand?.estagio_id?.nome || 'Sem Estágio')),
   )
-  const allStages = Array.from(new Set([...dynamicStages, ...uniqueExistingStages]))
+  const allStages = Array.from(new Set([...allStagesNames, ...uniqueExistingStages]))
   if (!allStages.includes('Sem Estágio')) allStages.push('Sem Estágio')
 
   const displayedEstagios =
@@ -417,34 +457,34 @@ export default function PotentialsPage() {
 
         {viewMode === 'board' ? (
           <div className="flex-1 overflow-x-auto overflow-y-hidden p-4 flex gap-4 bg-slate-50/50">
-            {displayedEstagios.map((estagio) => {
+            {displayedEstagios.map((estagioNome) => {
               const stagePotentials = potentials.filter(
-                (p) => (p.estagio || 'Sem Estágio') === estagio,
+                (p) => (p.expand?.estagio_id?.nome || 'Sem Estágio') === estagioNome,
               )
               const stageTotal = stagePotentials.reduce(
                 (acc, p) => acc + (itemTotals[p.id] || 0),
                 0,
               )
 
-              const statusObj = statuses.find((s) => s.nome === estagio)
-              const bgColor = statusObj?.cor_hex || '#f1f5f9'
-              const textColor = statusObj ? getContrastColor(statusObj.cor_hex) : '#334155'
-              const borderColor = statusObj?.cor_hex || '#e2e8f0'
+              const estagioObj = estagios.find((e) => e.nome === estagioNome)
+              const bgColor = estagioObj?.cor_hex || '#f1f5f9'
+              const textColor = estagioObj ? getContrastColor(estagioObj.cor_hex) : '#334155'
+              const borderColor = estagioObj?.cor_hex || '#e2e8f0'
 
               return (
                 <div
-                  key={estagio}
+                  key={estagioNome}
                   className="flex-shrink-0 w-80 bg-slate-100/50 rounded-xl border flex flex-col max-h-full shadow-sm"
                   style={{ borderColor }}
                   onDragOver={onDragOver}
-                  onDrop={(e) => onDrop(e, estagio)}
+                  onDrop={(e) => onDrop(e, estagioNome)}
                 >
                   <div
                     className="p-3 border-b flex items-center justify-between rounded-t-xl shrink-0"
                     style={{ backgroundColor: bgColor, color: textColor, borderColor }}
                   >
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm">{estagio}</span>
+                      <span className="font-semibold text-sm">{estagioNome}</span>
                       <Badge
                         className="px-1.5 py-0 text-[10px] h-5 border-0 font-medium shadow-none"
                         style={{ backgroundColor: textColor, color: bgColor }}
@@ -569,7 +609,7 @@ export default function PotentialsPage() {
                         {p.proprietario || '-'}
                       </TableCell>
                       <TableCell className="py-1 text-[11px] text-muted-foreground">
-                        {p.estagio || '-'}
+                        {p.expand?.estagio_id?.nome || '-'}
                       </TableCell>
                       <TableCell className="py-1">{getStatusBadge(p)}</TableCell>
                       <TableCell className="py-1 text-[11px] text-right font-medium">

@@ -2,7 +2,9 @@ import pb from '@/lib/pocketbase/client'
 import type { Potencial, PotencialItem } from '@/types'
 
 export const getPotenciais = () => {
-  return pb.collection<Potencial>('potenciais').getFullList({ sort: '-created' })
+  return pb
+    .collection<Potencial>('potenciais')
+    .getFullList({ sort: '-created', expand: 'estagio_id' })
 }
 
 export const searchPotenciais = (term: string) => {
@@ -14,6 +16,7 @@ export const searchPotenciais = (term: string) => {
   return pb.collection<Potencial>('potenciais').getList(1, 50, {
     filter,
     sort: '-created',
+    expand: 'estagio_id',
   })
 }
 
@@ -74,6 +77,7 @@ export const duplicatePotencial = async (potencialId: string) => {
   delete (duplicatedData as any).created
   delete (duplicatedData as any).updated
   delete (duplicatedData as any).anexos
+  delete (duplicatedData as any).expand
 
   const newPotencial = await pb.collection('potenciais').create(duplicatedData)
 

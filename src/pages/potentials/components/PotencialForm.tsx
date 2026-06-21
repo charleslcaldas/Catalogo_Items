@@ -1,8 +1,11 @@
+import { useState, useEffect } from 'react'
 import { Settings } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import type { Potencial, StatusPotencial } from '@/types'
+import pb from '@/lib/pocketbase/client'
+import { EstagiosManagementModal } from './EstagiosManagementModal'
+import type { Potencial, StatusPotencial, EstagioPotencial } from '@/types'
 
 interface PotencialFormProps {
   formData: any
@@ -20,6 +23,19 @@ export function PotencialForm({
   statuses,
   onManageStatuses,
 }: PotencialFormProps) {
+  const [estagios, setEstagios] = useState<EstagioPotencial[]>([])
+  const [isEstagiosModalOpen, setIsEstagiosModalOpen] = useState(false)
+
+  const loadEstagios = () => {
+    pb.collection('estagios_potencial')
+      .getFullList<EstagioPotencial>({ sort: 'ordem,nome' })
+      .then(setEstagios)
+      .catch(() => {})
+  }
+
+  useEffect(() => {
+    loadEstagios()
+  }, [])
   return (
     <div className="bg-white p-3 rounded-lg shadow-sm border shrink-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3 items-start">
       <div className="flex items-center gap-2">
@@ -64,10 +80,34 @@ export function PotencialForm({
       </div>
       <div className="flex items-center gap-2">
         <Label className="w-20 text-right shrink-0 text-xs text-muted-foreground">Estágio:</Label>
-        <Input
-          className="h-7 text-xs"
-          value={formData.estagio}
-          onChange={(e) => setFormData({ ...formData, estagio: e.target.value })}
+        <div className="flex items-center gap-2 flex-1">
+          <select
+            className="flex-1 h-7 rounded-md border border-input bg-white px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+            value={formData.estagio_id || ''}
+            onChange={(e) => setFormData({ ...formData, estagio_id: e.target.value })}
+          >
+            <option value="">Sem Estágio</option>
+            {estagios.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.nome}
+              </option>
+            ))}
+          </select>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 shrink-0 text-muted-foreground hover:text-slate-900"
+            onClick={() => setIsEstagiosModalOpen(true)}
+            title="Gerenciar Estágios"
+            type="button"
+          >
+            <Settings className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+        <EstagiosManagementModal
+          open={isEstagiosModalOpen}
+          onOpenChange={setIsEstagiosModalOpen}
+          onSaved={loadEstagios}
         />
       </div>
       <div className="flex items-center gap-2">

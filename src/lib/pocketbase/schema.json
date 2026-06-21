@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-21T09:03:47.722Z",
+  "generatedAt": "2026-06-21T09:12:00.219Z",
   "collections": [
     {
       "name": "users",
@@ -665,12 +665,6 @@
           "system": false
         },
         {
-          "name": "estagio",
-          "type": "text",
-          "required": false,
-          "system": false
-        },
-        {
           "name": "nome_comprador",
           "type": "text",
           "required": false,
@@ -687,13 +681,20 @@
           "type": "file",
           "required": false,
           "system": false
+        },
+        {
+          "name": "estagio_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "estagios_potencial"
         }
       ],
       "indexes": [
         "CREATE UNIQUE INDEX idx_potenciais_numero ON potenciais (numero_potencial)",
         "CREATE INDEX `idx_potenciais_nome` ON `potenciais` (nome_potencial)",
         "CREATE INDEX `idx_potenciais_proprietario` ON `potenciais` (proprietario)",
-        "CREATE INDEX `idx_potenciais_estagio` ON `potenciais` (estagio)"
+        "CREATE INDEX `idx_potenciais_estagio_id` ON `potenciais` (estagio_id)"
       ]
     },
     {
@@ -1204,6 +1205,52 @@
           "name": "cor_hex",
           "type": "text",
           "required": true,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "estagios_potencial",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "nome",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "cor_hex",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ordem",
+          "type": "number",
+          "required": false,
           "system": false
         },
         {
