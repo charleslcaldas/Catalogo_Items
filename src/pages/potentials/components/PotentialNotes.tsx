@@ -19,7 +19,7 @@ export function PotentialNotes({ potencialId }: { potencialId: string }) {
   const loadNotes = async () => {
     try {
       const records = await pb.collection('potencial_notas').getFullList({
-        filter: `potencial_id = "${potencialId}"`,
+        filter: `potencial_id = "${potencialId}" && (categoria = "" || categoria = null || categoria = "geral")`,
         sort: '-created',
         expand: 'user_id',
       })
@@ -43,6 +43,7 @@ export function PotentialNotes({ potencialId }: { potencialId: string }) {
         potencial_id: potencialId,
         user_id: user?.id,
         conteudo: newNote,
+        categoria: 'geral',
       })
       setNewNote('')
       loadNotes()
