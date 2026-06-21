@@ -183,9 +183,38 @@ export default function QuotationMatrix() {
     const reader = new FileReader()
     reader.onload = (e) => {
       const text = e.target?.result as string
-      const rows = text
-        .split('\n')
-        .map((r) => r.split(',').map((c) => c.trim().replace(/^"|"$/g, '')))
+      const rows: string[][] = []
+      let row: string[] = []
+      let inQuotes = false
+      let val = ''
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i]
+        if (char === '"') {
+          if (inQuotes && text[i + 1] === '"') {
+            val += '"'
+            i++
+          } else {
+            inQuotes = !inQuotes
+          }
+        } else if ((char === ',' || char === ';') && !inQuotes) {
+          row.push(val.trim())
+          val = ''
+        } else if (char === '\n' && !inQuotes) {
+          row.push(val.trim())
+          rows.push(row)
+          row = []
+          val = ''
+        } else if (char === '\r' && !inQuotes) {
+          // ignore
+        } else {
+          val += char
+        }
+      }
+      if (val !== '' || row.length > 0) {
+        row.push(val.trim())
+        rows.push(row)
+      }
+
       const validRows = rows.filter((r) => r.length > 0 && r.some((c) => c !== ''))
       if (validRows.length > 0) {
         setImportState({ cfId, file, rows: validRows, headers: validRows[0], open: true })
@@ -354,7 +383,7 @@ export default function QuotationMatrix() {
         delete next[`${cotacaoFId}_${itemId}`]
         return next
       })
-      toast({ title: 'Sucesso', description: 'Contraproposta aceita e preço atualizado.' })
+      toast({ title: 'Sucesso', description: 'Aceite aplicado. Preço atualizado com sucesso.' })
     } catch (err: any) {
       toast({ title: 'Erro', description: err.message, variant: 'destructive' })
     }
@@ -641,15 +670,11 @@ export default function QuotationMatrix() {
               <TableRow>
                 <TableHead className="min-w-[180px] font-semibold py-2">Item</TableHead>
                 <TableHead className="font-semibold text-center w-16 py-2">Qtd</TableHead>
-                <TableHead className="font-semibold text-right min-w-[90px] py-2">
+                <TableHead className="font-semibold text-right min-w-[90px] py-2 border-r">
                   Preço{' '}
                   <span className="text-[9px] font-normal text-muted-foreground block">
                     (Cliente)
                   </span>
-                </TableHead>
-                <TableHead className="font-semibold text-right min-w-[90px] py-2 border-r">
-                  Preço{' '}
-                  <span className="text-[9px] font-normal text-muted-foreground block">(Alvo)</span>
                 </TableHead>
                 {cotacoesF.map((cf) => (
                   <TableHead
@@ -769,6 +794,10 @@ export default function QuotationMatrix() {
                     </div>
                   </TableHead>
                 ))}
+                <TableHead className="font-semibold text-right min-w-[90px] py-2 border-l">
+                  Preço{' '}
+                  <span className="text-[9px] font-normal text-muted-foreground block">(Alvo)</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -808,19 +837,10 @@ export default function QuotationMatrix() {
                           {pi.unidade_medida || 'UN'}
                         </span>
                       </TableCell>
-                      <TableCell className="align-top py-1.5 px-2 text-right">
+                      <TableCell className="align-top py-1.5 px-2 text-right border-r">
                         {pi.preco_unitario ? (
                           <span className="font-mono text-xs font-bold text-foreground">
                             $ {formatCurrency(pi.preco_unitario)}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="align-top py-1.5 px-2 text-right border-r bg-muted/5">
-                        {pi.expand?.item_id?.preco_compra ? (
-                          <span className="font-mono text-xs text-blue-600 font-bold">
-                            $ {formatCurrency(pi.expand.item_id.preco_compra)}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">-</span>
@@ -857,6 +877,15 @@ export default function QuotationMatrix() {
                           </TableCell>
                         )
                       })}
+                      <TableCell className="align-top py-1.5 px-2 text-right border-l bg-muted/5">
+                        {pi.expand?.item_id?.preco_compra ? (
+                          <span className="font-mono text-xs text-blue-600 font-bold">
+                            $ {formatCurrency(pi.expand.item_id.preco_compra)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   )
                 })
@@ -864,7 +893,7 @@ export default function QuotationMatrix() {
             </TableBody>
             <TableFooter className="bg-muted/30 border-t">
               <TableRow>
-                <TableCell colSpan={4} className="text-right font-semibold py-2 border-r text-xs">
+                <TableCell colSpan={3} className="text-right font-semibold py-2 border-r text-xs">
                   Total do Fornecedor:
                 </TableCell>
                 {cotacoesF.map((cf) => {
@@ -891,6 +920,7 @@ export default function QuotationMatrix() {
                     </TableCell>
                   )
                 })}
+                <TableCell className="border-l bg-muted/5" />
               </TableRow>
             </TableFooter>
           </Table>
