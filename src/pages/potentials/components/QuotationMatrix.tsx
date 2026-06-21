@@ -194,7 +194,7 @@ export default function QuotationMatrix() {
     reader.readAsText(file)
   }
 
-  const handleConfirmImport = async (skuIdx: number, priceIdx: number) => {
+  const handleConfirmImport = async (skuIdx: number, priceIdx: number, moqIdx: number) => {
     if (!importState) return
     const { cfId, rows } = importState
     let updated = 0
@@ -216,16 +216,23 @@ export default function QuotationMatrix() {
       const price = parseFloat(priceStr.replace(',', '.'))
       if (isNaN(price)) continue
 
+      let moq = 0
+      if (moqIdx >= 0 && row[moqIdx]) {
+        moq = parseInt(row[moqIdx], 10) || 0
+      }
+
       const ci = cotacoesI.find((c) => c.cotacao_fornecedor_id === cfId && c.item_id === pi.item_id)
       if (ci) {
-        promises.push(pb.collection('cotacoes_itens').update(ci.id, { preco_ofertado: price }))
+        const updateData: any = { preco_ofertado: price }
+        if (moqIdx >= 0) updateData.quantidade_minima = moq
+        promises.push(pb.collection('cotacoes_itens').update(ci.id, updateData))
       } else {
         promises.push(
           pb.collection('cotacoes_itens').create({
             cotacao_fornecedor_id: cfId,
             item_id: pi.item_id,
             preco_ofertado: price,
-            quantidade_minima: 0,
+            quantidade_minima: moq,
             vencedor: false,
           }),
         )
@@ -331,11 +338,21 @@ export default function QuotationMatrix() {
     }
   }
 
-  const handleAcceptCounter = async (cotacaoIId: string, newPrice: number) => {
+  const handleAcceptCounter = async (
+    cotacaoFId: string,
+    itemId: string,
+    cotacaoIId: string,
+    newPrice: number,
+  ) => {
     try {
       await pb.collection('cotacoes_itens').update(cotacaoIId, {
         preco_ofertado: newPrice,
         preco_contraproposta: 0,
+      })
+      setDraftPrices((prev) => {
+        const next = { ...prev }
+        delete next[`${cotacaoFId}_${itemId}`]
+        return next
       })
       toast({ title: 'Sucesso', description: 'Contraproposta aceita e preço atualizado.' })
     } catch (err: any) {
@@ -625,22 +642,14 @@ export default function QuotationMatrix() {
                 <TableHead className="min-w-[180px] font-semibold py-2">Item</TableHead>
                 <TableHead className="font-semibold text-center w-16 py-2">Qtd</TableHead>
                 <TableHead className="font-semibold text-right min-w-[90px] py-2">
-                  Último{' '}
+                  Preço{' '}
                   <span className="text-[9px] font-normal text-muted-foreground block">
-                    (Hist.)
-                  </span>
-                </TableHead>
-                <TableHead className="font-semibold text-right min-w-[90px] py-2">
-                  Menor{' '}
-                  <span className="text-[9px] font-normal text-muted-foreground block">
-                    (Hist.)
+                    (Cliente)
                   </span>
                 </TableHead>
                 <TableHead className="font-semibold text-right min-w-[90px] py-2 border-r">
-                  Menor{' '}
-                  <span className="text-[9px] font-normal text-muted-foreground block">
-                    (Atual)
-                  </span>
+                  Preço{' '}
+                  <span className="text-[9px] font-normal text-muted-foreground block">(Alvo)</span>
                 </TableHead>
                 {cotacoesF.map((cf) => (
                   <TableHead
@@ -766,7 +775,7 @@ export default function QuotationMatrix() {
               {potencialItens.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={5 + cotacoesF.length}
+                    colSpan={4 + cotacoesF.length}
                     className="h-32 text-center text-muted-foreground"
                   >
                     Nenhum item adicionado a este potencial.
@@ -774,11 +783,6 @@ export default function QuotationMatrix() {
                 </TableRow>
               ) : (
                 potencialItens.map((pi) => {
-                  const itemHist = historico.filter((h) => h.item_id === pi.item_id)
-                  const lastPrice = itemHist[0]?.preco
-                  const historicalMinPrice =
-                    itemHist.length > 0 ? Math.min(...itemHist.map((h) => h.preco)) : undefined
-
                   const currentPrices = cotacoesF.map((cf) => {
                     const ci = cotacoesI.find(
                       (c) => c.cotacao_fornecedor_id === cf.id && c.item_id === pi.item_id,
@@ -805,27 +809,18 @@ export default function QuotationMatrix() {
                         </span>
                       </TableCell>
                       <TableCell className="align-top py-1.5 px-2 text-right">
-                        {lastPrice ? (
-                          <span className="font-mono text-xs text-muted-foreground">
-                            $ {formatCurrency(lastPrice)}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="align-top py-1.5 px-2 text-right">
-                        {historicalMinPrice ? (
-                          <span className="font-mono text-xs text-muted-foreground">
-                            $ {formatCurrency(historicalMinPrice)}
+                        {pi.preco_unitario ? (
+                          <span className="font-mono text-xs font-bold text-foreground">
+                            $ {formatCurrency(pi.preco_unitario)}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
                       <TableCell className="align-top py-1.5 px-2 text-right border-r bg-muted/5">
-                        {lowestCurrentPrice ? (
-                          <span className="font-mono text-xs text-green-600 font-bold">
-                            $ {formatCurrency(lowestCurrentPrice)}
+                        {pi.expand?.item_id?.preco_compra ? (
+                          <span className="font-mono text-xs text-blue-600 font-bold">
+                            $ {formatCurrency(pi.expand.item_id.preco_compra)}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">-</span>
@@ -869,7 +864,7 @@ export default function QuotationMatrix() {
             </TableBody>
             <TableFooter className="bg-muted/30 border-t">
               <TableRow>
-                <TableCell colSpan={5} className="text-right font-semibold py-2 border-r text-xs">
+                <TableCell colSpan={4} className="text-right font-semibold py-2 border-r text-xs">
                   Total do Fornecedor:
                 </TableCell>
                 {cotacoesF.map((cf) => {

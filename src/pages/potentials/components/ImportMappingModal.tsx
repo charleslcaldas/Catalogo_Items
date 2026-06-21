@@ -19,6 +19,7 @@ import { Label } from '@/components/ui/label'
 export function ImportMappingModal({ open, onOpenChange, headers, onConfirm, summary }: any) {
   const [skuIndex, setSkuIndex] = useState<string>('0')
   const [priceIndex, setPriceIndex] = useState<string>('1')
+  const [moqIndex, setMoqIndex] = useState<string>('-1')
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -43,12 +44,28 @@ export function ImportMappingModal({ open, onOpenChange, headers, onConfirm, sum
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Coluna Preço</Label>
+            <Label>Coluna Preço (Ofertado)</Label>
             <Select value={priceIndex} onValueChange={setPriceIndex}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                {headers.map((h: string, i: number) => (
+                  <SelectItem key={i} value={i.toString()}>
+                    {h || `Coluna ${i + 1}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Coluna Quantidade Mínima (MOQ) - Opcional</Label>
+            <Select value={moqIndex} onValueChange={setMoqIndex}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="-1">Não importar MOQ</SelectItem>
                 {headers.map((h: string, i: number) => (
                   <SelectItem key={i} value={i.toString()}>
                     {h || `Coluna ${i + 1}`}
@@ -67,7 +84,9 @@ export function ImportMappingModal({ open, onOpenChange, headers, onConfirm, sum
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={() => onConfirm(parseInt(skuIndex), parseInt(priceIndex))}>
+          <Button
+            onClick={() => onConfirm(parseInt(skuIndex), parseInt(priceIndex), parseInt(moqIndex))}
+          >
             Importar Dados
           </Button>
         </DialogFooter>

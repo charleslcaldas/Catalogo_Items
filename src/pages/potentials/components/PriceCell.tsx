@@ -21,7 +21,7 @@ export function PriceCell({
   const counterPrice = cotacaoI?.preco_contraproposta || 0
 
   return (
-    <div className="flex flex-col gap-1 min-w-[120px]">
+    <div className="flex flex-col gap-1 min-w-[120px] group">
       <div className="flex items-center gap-1">
         <span className="text-muted-foreground font-semibold text-[10px] w-4 text-center">$</span>
         <Input
@@ -60,7 +60,14 @@ export function PriceCell({
         </Button>
       </div>
 
-      <div className="flex items-center gap-1">
+      <div
+        className={cn(
+          'flex items-center gap-1 transition-opacity',
+          currentMoq > 0
+            ? 'opacity-100'
+            : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100',
+        )}
+      >
         <span
           className="text-muted-foreground font-medium text-[9px] w-4 text-center"
           title="Minimum Order Quantity"
@@ -102,7 +109,7 @@ export function PriceCell({
             variant="ghost"
             size="icon"
             className="h-4 w-4 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 rounded-sm"
-            onClick={() => onAcceptCounter(cotacaoI.id, counterPrice)}
+            onClick={() => onAcceptCounter(cotacaoF.id, item.item_id, cotacaoI.id, counterPrice)}
             title="Aceitar Target"
           >
             <Check className="w-3 h-3" />
