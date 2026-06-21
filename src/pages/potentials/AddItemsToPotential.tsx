@@ -593,8 +593,10 @@ export default function AddItemsToPotential() {
                           value={item.sku}
                           onSelect={() => {
                             handleQuickAdd(item)
-                            setQuickSearchOpen(false)
-                            setQuickSearchQuery('')
+                            setTimeout(() => {
+                              setQuickSearchOpen(false)
+                              setQuickSearchQuery('')
+                            }, 0)
                           }}
                         >
                           <Check className="mr-2 h-4 w-4 opacity-0" />

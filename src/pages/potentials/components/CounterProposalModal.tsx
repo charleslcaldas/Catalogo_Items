@@ -20,20 +20,40 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Badge } from '@/components/ui/badge'
 import pb from '@/lib/pocketbase/client'
 import { useToast } from '@/hooks/use-toast'
 
-export function CounterProposalModal({ open, onOpenChange, cotacoesI, potencialItens }: any) {
+export function CounterProposalModal({
+  open,
+  onOpenChange,
+  cotacoesI,
+  potencialItens,
+  cotacoesF,
+}: any) {
   const { toast } = useToast()
   const [items, setItems] = useState<any[]>([])
   const [action, setAction] = useState('discount')
   const [discountVal, setDiscountVal] = useState('5')
+  const [selectedFornecedores, setSelectedFornecedores] = useState<string[]>([])
 
   useEffect(() => {
     if (open) {
-      const winners = cotacoesI.filter((c: any) => c.vencedor && c.preco_ofertado > 0)
-      const formatted = winners.map((w: any) => {
+      const allFornecedores = cotacoesF?.map((cf: any) => cf.id) || []
+      setSelectedFornecedores(allFornecedores)
+    }
+  }, [open, cotacoesF])
+
+  useEffect(() => {
+    if (open) {
+      const targetCotacoes = cotacoesI.filter(
+        (c: any) => selectedFornecedores.includes(c.cotacao_fornecedor_id) && c.preco_ofertado > 0,
+      )
+
+      const formatted = targetCotacoes.map((w: any) => {
         const pi = potencialItens.find((p: any) => p.item_id === w.item_id)
+        const cf = cotacoesF?.find((f: any) => f.id === w.cotacao_fornecedor_id)
+
         const allPrices = cotacoesI
           .filter((c: any) => c.item_id === w.item_id && c.preco_ofertado > 0)
           .map((c: any) => c.preco_ofertado)
@@ -42,6 +62,7 @@ export function CounterProposalModal({ open, onOpenChange, cotacoesI, potencialI
         return {
           id: w.id,
           sku: pi?.expand?.item_id?.sku || 'N/A',
+          fornecedor: cf?.expand?.fornecedor_id?.nome || 'Desconhecido',
           currentPrice: w.preco_ofertado,
           bestPrice,
           newPrice: w.preco_contraproposta > 0 ? w.preco_contraproposta : w.preco_ofertado,
@@ -50,7 +71,7 @@ export function CounterProposalModal({ open, onOpenChange, cotacoesI, potencialI
       })
       setItems(formatted)
     }
-  }, [open, cotacoesI, potencialItens])
+  }, [open, cotacoesI, potencialItens, selectedFornecedores, cotacoesF])
 
   const applyLogic = () => {
     const d = parseFloat(discountVal.replace(',', '.'))
@@ -94,8 +115,10 @@ export function CounterProposalModal({ open, onOpenChange, cotacoesI, potencialI
     }
   }
 
-  const handleSelectAll = (checked: boolean) => {
-    setItems((prev) => prev.map((i) => ({ ...i, selected: checked })))
+  const toggleFornecedor = (cfId: string) => {
+    setSelectedFornecedores((prev) =>
+      prev.includes(cfId) ? prev.filter((id) => id !== cfId) : [...prev, cfId],
+    )
   }
 
   return (
@@ -107,35 +130,53 @@ export function CounterProposalModal({ open, onOpenChange, cotacoesI, potencialI
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-wrap items-end gap-4 bg-muted/50 p-4 rounded-lg mt-2">
-          <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
-            <Label>Estratégia</Label>
-            <Select value={action} onValueChange={setAction}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="discount">Desconto sobre o preço vencedor</SelectItem>
-                <SelectItem value="match_best">Igualar ao menor preço geral</SelectItem>
-                <SelectItem value="discount_best">Desconto sobre o menor preço geral</SelectItem>
-                <SelectItem value="manual">Definição Manual</SelectItem>
-              </SelectContent>
-            </Select>
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap gap-2 pt-2">
+            <Label className="w-full text-xs text-muted-foreground uppercase tracking-wider">
+              Fornecedores Alvo
+            </Label>
+            {cotacoesF?.map((cf: any) => (
+              <Badge
+                key={cf.id}
+                variant={selectedFornecedores.includes(cf.id) ? 'default' : 'outline'}
+                className="cursor-pointer"
+                onClick={() => toggleFornecedor(cf.id)}
+              >
+                {cf.expand?.fornecedor_id?.nome}
+              </Badge>
+            ))}
           </div>
-          {action !== 'match_best' && action !== 'manual' && (
-            <div className="flex flex-col gap-1.5 w-32">
-              <Label>Desconto (%)</Label>
-              <Input
-                type="number"
-                step="0.1"
-                value={discountVal}
-                onChange={(e) => setDiscountVal(e.target.value)}
-              />
+
+          <div className="flex flex-wrap items-end gap-4 bg-muted/50 p-4 rounded-lg">
+            <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
+              <Label>Estratégia</Label>
+              <Select value={action} onValueChange={setAction}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="discount">Desconto sobre o preço atual</SelectItem>
+                  <SelectItem value="match_best">Igualar ao menor preço geral</SelectItem>
+                  <SelectItem value="discount_best">Desconto sobre o menor preço geral</SelectItem>
+                  <SelectItem value="manual">Definição Manual</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          )}
-          <Button variant="secondary" onClick={applyLogic} disabled={action === 'manual'}>
-            Simular
-          </Button>
+            {action !== 'match_best' && action !== 'manual' && (
+              <div className="flex flex-col gap-1.5 w-32">
+                <Label>Desconto (%)</Label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={discountVal}
+                  onChange={(e) => setDiscountVal(e.target.value)}
+                />
+              </div>
+            )}
+            <Button variant="secondary" onClick={applyLogic} disabled={action === 'manual'}>
+              Simular
+            </Button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-auto border rounded-md mt-4">
@@ -145,27 +186,28 @@ export function CounterProposalModal({ open, onOpenChange, cotacoesI, potencialI
                 <TableHead className="w-[40px] text-center">
                   <Checkbox
                     checked={items.length > 0 && items.every((i) => i.selected)}
-                    onCheckedChange={handleSelectAll}
+                    onCheckedChange={(c) =>
+                      setItems((prev) => prev.map((i) => ({ ...i, selected: !!c })))
+                    }
                   />
                 </TableHead>
                 <TableHead>SKU</TableHead>
+                <TableHead>Fornecedor</TableHead>
                 <TableHead className="text-right">Preço Atual</TableHead>
                 <TableHead className="text-right">Menor Oferta</TableHead>
-                <TableHead className="text-right w-32 text-amber-600">
-                  Alvo (Contraproposta)
-                </TableHead>
+                <TableHead className="text-right w-32 text-amber-600">Alvo (C.Proposta)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {items.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                    Nenhum item vencedor selecionado.
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    Nenhum item selecionado para os fabricantes escolhidos.
                   </TableCell>
                 </TableRow>
               ) : (
                 items.map((item, idx) => (
-                  <TableRow key={item.id}>
+                  <TableRow key={`${item.id}-${idx}`}>
                     <TableCell className="text-center">
                       <Checkbox
                         checked={item.selected}
@@ -177,6 +219,9 @@ export function CounterProposalModal({ open, onOpenChange, cotacoesI, potencialI
                       />
                     </TableCell>
                     <TableCell className="font-medium text-xs">{item.sku}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {item.fornecedor}
+                    </TableCell>
                     <TableCell className="text-right font-mono text-xs">
                       $ {item.currentPrice.toFixed(4)}
                     </TableCell>

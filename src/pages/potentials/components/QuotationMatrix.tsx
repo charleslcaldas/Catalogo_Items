@@ -36,6 +36,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Label } from '@/components/ui/label'
@@ -45,6 +51,7 @@ import { useToast } from '@/hooks/use-toast'
 import { CounterProposalModal } from './CounterProposalModal'
 import { QuotationNotes } from './QuotationNotes'
 import { PriceCell } from './PriceCell'
+import { ImportMappingModal } from './ImportMappingModal'
 
 export default function QuotationMatrix() {
   const [searchParams] = useSearchParams()
@@ -64,6 +71,14 @@ export default function QuotationMatrix() {
 
   const [draftPrices, setDraftPrices] = useState<Record<string, number>>({})
   const [draftMoqs, setDraftMoqs] = useState<Record<string, number>>({})
+
+  const [importState, setImportState] = useState<{
+    cfId: string
+    file: File
+    rows: string[][]
+    headers: string[]
+    open: boolean
+  } | null>(null)
 
   const loadData = async () => {
     if (!potencialId) return
@@ -164,48 +179,65 @@ export default function QuotationMatrix() {
     }
   }
 
-  const handleImportCSVFor = async (cfId: string, file: File) => {
+  const handleFileSelect = (cfId: string, file: File) => {
     const reader = new FileReader()
-    reader.onload = async (e) => {
+    reader.onload = (e) => {
       const text = e.target?.result as string
-      const rows = text.split('\n').map((r) => r.split(','))
-      let updated = 0
-
-      const promises = []
-      for (let i = 1; i < rows.length; i++) {
-        const [sku, priceStr] = rows[i]
-        if (!sku || !priceStr) continue
-
-        const pi = potencialItens.find(
-          (p) => p.expand?.item_id?.sku === sku.trim().replace(/"/g, ''),
-        )
-        if (!pi) continue
-
-        const price = parseFloat(priceStr.replace(/"/g, '').replace(',', '.'))
-        if (isNaN(price)) continue
-
-        const ci = cotacoesI.find(
-          (c) => c.cotacao_fornecedor_id === cfId && c.item_id === pi.item_id,
-        )
-        if (ci) {
-          promises.push(pb.collection('cotacoes_itens').update(ci.id, { preco_ofertado: price }))
-        } else {
-          promises.push(
-            pb.collection('cotacoes_itens').create({
-              cotacao_fornecedor_id: cfId,
-              item_id: pi.item_id,
-              preco_ofertado: price,
-              quantidade_minima: 0,
-              vencedor: false,
-            }),
-          )
-        }
-        updated++
+      const rows = text
+        .split('\n')
+        .map((r) => r.split(',').map((c) => c.trim().replace(/^"|"$/g, '')))
+      const validRows = rows.filter((r) => r.length > 0 && r.some((c) => c !== ''))
+      if (validRows.length > 0) {
+        setImportState({ cfId, file, rows: validRows, headers: validRows[0], open: true })
       }
-      await Promise.all(promises)
-      toast({ title: `Importação concluída: ${updated} preços atualizados` })
     }
     reader.readAsText(file)
+  }
+
+  const handleConfirmImport = async (skuIdx: number, priceIdx: number) => {
+    if (!importState) return
+    const { cfId, rows } = importState
+    let updated = 0
+    let notFound = 0
+    const promises = []
+
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i]
+      const sku = row[skuIdx]
+      const priceStr = row[priceIdx]
+      if (!sku || !priceStr) continue
+
+      const pi = potencialItens.find((p) => p.expand?.item_id?.sku === sku)
+      if (!pi) {
+        notFound++
+        continue
+      }
+
+      const price = parseFloat(priceStr.replace(',', '.'))
+      if (isNaN(price)) continue
+
+      const ci = cotacoesI.find((c) => c.cotacao_fornecedor_id === cfId && c.item_id === pi.item_id)
+      if (ci) {
+        promises.push(pb.collection('cotacoes_itens').update(ci.id, { preco_ofertado: price }))
+      } else {
+        promises.push(
+          pb.collection('cotacoes_itens').create({
+            cotacao_fornecedor_id: cfId,
+            item_id: pi.item_id,
+            preco_ofertado: price,
+            quantidade_minima: 0,
+            vencedor: false,
+          }),
+        )
+      }
+      updated++
+    }
+    await Promise.all(promises)
+    toast({
+      title: `Importação concluída`,
+      description: `${updated} preços atualizados. ${notFound} SKUs não encontrados.`,
+    })
+    setImportState(null)
   }
 
   const handleAddFornecedor = async () => {
@@ -299,6 +331,18 @@ export default function QuotationMatrix() {
     }
   }
 
+  const handleAcceptCounter = async (cotacaoIId: string, newPrice: number) => {
+    try {
+      await pb.collection('cotacoes_itens').update(cotacaoIId, {
+        preco_ofertado: newPrice,
+        preco_contraproposta: 0,
+      })
+      toast({ title: 'Sucesso', description: 'Contraproposta aceita e preço atualizado.' })
+    } catch (err: any) {
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
+    }
+  }
+
   const handleFinalize = async () => {
     try {
       const winners = cotacoesI.filter((c) => c.vencedor && c.preco_ofertado > 0)
@@ -363,11 +407,15 @@ export default function QuotationMatrix() {
     }
   }
 
-  const handleExportExcel = () => {
-    let csv = 'SKU,Descricao,Qtd,Unidade,Menor Preco Historico,Menor Preco Atual'
+  const handleExportExcel = (lang: 'pt' | 'en') => {
+    let csv =
+      lang === 'pt'
+        ? 'SKU,Descricao,Qtd,Unidade,Menor Preco Historico,Menor Preco Atual'
+        : 'SKU,Description,Qty,Unit,Min Hist Price,Min Current Price'
+
     cotacoesF.forEach((cf) => {
       const nome = cf.expand?.fornecedor_id?.nome || 'Fornecedor'
-      csv += `,${nome} - Preco,${nome} - MOQ`
+      csv += lang === 'pt' ? `,${nome} - Preco,${nome} - MOQ` : `,${nome} - Price,${nome} - MOQ`
     })
     csv += '\n'
 
@@ -384,7 +432,13 @@ export default function QuotationMatrix() {
       const validCurr = currentPrices.filter((p) => p > 0)
       const minCurr = validCurr.length > 0 ? Math.min(...validCurr) : ''
 
-      csv += `"${(pi.expand?.item_id?.sku || '').replace(/"/g, '""')}","${(pi.expand?.item_id?.descricao_curta || '').replace(/"/g, '""')}",${pi.quantidade},"${pi.unidade_medida || 'UN'}",${minHist},${minCurr}`
+      const itemNode = pi.expand?.item_id
+      const desc =
+        lang === 'pt'
+          ? itemNode?.descricao_curta || itemNode?.descr_pt || ''
+          : itemNode?.descricao_curta_en || itemNode?.descr_en || ''
+
+      csv += `"${(itemNode?.sku || '').replace(/"/g, '""')}","${desc.replace(/"/g, '""')}",${pi.quantidade},"${pi.unidade_medida || 'UN'}",${minHist},${minCurr}`
 
       cotacoesF.forEach((cf) => {
         const ci = cotacoesI.find(
@@ -399,7 +453,7 @@ export default function QuotationMatrix() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `Cotacao_${potencialId}.csv`
+    a.download = `Cotacao_${potencialId}_${lang.toUpperCase()}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -527,9 +581,21 @@ export default function QuotationMatrix() {
             <TrendingDown className="w-4 h-4 mr-2" /> Contraproposta
           </Button>
 
-          <Button variant="outline" size="sm" onClick={handleExportExcel}>
-            <Download className="w-4 h-4 mr-2" /> Excel
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Download className="w-4 h-4 mr-2" /> Exportar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleExportExcel('pt')}>
+                Português (PT-BR)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExportExcel('en')}>
+                English (EN)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <Button
             variant="outline"
@@ -646,7 +712,7 @@ export default function QuotationMatrix() {
                                     className="absolute inset-0 opacity-0 cursor-pointer"
                                     onChange={(e) =>
                                       e.target.files?.[0] &&
-                                      handleImportCSVFor(cf.id, e.target.files[0])
+                                      handleFileSelect(cf.id, e.target.files[0])
                                     }
                                   />
                                   <Button
@@ -791,6 +857,7 @@ export default function QuotationMatrix() {
                               }
                               onBlur={handleBlur}
                               onToggleWinner={handleToggleWinner}
+                              onAcceptCounter={handleAcceptCounter}
                             />
                           </TableCell>
                         )
@@ -837,11 +904,23 @@ export default function QuotationMatrix() {
           <QuotationNotes potencialId={potencialId} cotacoesF={cotacoesF} />
         </div>
       </div>
+
       <CounterProposalModal
         open={isCounterOpen}
         onOpenChange={setIsCounterOpen}
         cotacoesI={cotacoesI}
         potencialItens={potencialItens}
+        cotacoesF={cotacoesF}
+      />
+
+      <ImportMappingModal
+        open={importState?.open || false}
+        onOpenChange={(open: boolean) =>
+          setImportState((prev) => (prev ? { ...prev, open } : null))
+        }
+        headers={importState?.headers || []}
+        summary={{ total: importState ? importState.rows.length - 1 : 0 }}
+        onConfirm={handleConfirmImport}
       />
     </div>
   )
