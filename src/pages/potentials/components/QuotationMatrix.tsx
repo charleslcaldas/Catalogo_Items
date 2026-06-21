@@ -1,6 +1,15 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Plus, Check, TrendingDown, RefreshCw, Download } from 'lucide-react'
+import {
+  Plus,
+  Check,
+  TrendingDown,
+  RefreshCw,
+  Download,
+  Settings2,
+  CheckSquare,
+  FileUp,
+} from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 import { Button } from '@/components/ui/button'
@@ -28,6 +37,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { CounterProposalModal } from './CounterProposalModal'
