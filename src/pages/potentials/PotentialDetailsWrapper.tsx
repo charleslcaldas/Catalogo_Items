@@ -11,11 +11,17 @@ export default function PotentialDetailsWrapper() {
     <div className="h-full flex flex-col bg-background relative z-0">
       <div className="px-6 pt-4 border-b">
         <Tabs value={tab} onValueChange={setTab} className="w-full">
-          <TabsList className="mb-[-1px]">
-            <TabsTrigger value="items" className="rounded-b-none px-6">
+          <TabsList className="mb-[-1px] bg-muted/40 p-1">
+            <TabsTrigger
+              value="items"
+              className="rounded-b-none px-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
               Itens do Potencial
             </TabsTrigger>
-            <TabsTrigger value="quotations" className="rounded-b-none px-6">
+            <TabsTrigger
+              value="quotations"
+              className="rounded-b-none px-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
               Cotação de Fabricantes
             </TabsTrigger>
           </TabsList>
