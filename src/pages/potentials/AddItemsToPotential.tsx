@@ -10,6 +10,8 @@ import { QuickItemModal } from './components/QuickItemModal'
 import { SearchQuoteModal } from './components/SearchQuoteModal'
 import { PotencialForm } from './components/PotencialForm'
 import { SelectedItemsTable } from './components/SelectedItemsTable'
+import { PotentialNotes } from './components/PotentialNotes'
+import { PotentialAttachments } from './components/PotentialAttachments'
 import { savePotencialFull, getPotencialItens } from '@/services/potenciais'
 import pb from '@/lib/pocketbase/client'
 import type { Potencial, Item, UnidadeMedida } from '@/types'
@@ -168,10 +170,18 @@ export default function AddItemsToPotential() {
         { ...formData, status: statusToSave },
         itemsData,
       )
+
+      setCurrentPotential(saved)
+
       toast.success(`Cotação ${saved.numero_potencial} salva com sucesso!`, {
         className: 'bg-green-500 text-white border-none',
       })
-      navigate('/potenciais')
+
+      if (statusOverride === 'Completo') {
+        navigate('/potenciais')
+      } else if (!currentPotential) {
+        navigate(`/potenciais/adicionar?id=${saved.id}`, { replace: true })
+      }
     } catch (error) {
       toast.error('Erro ao salvar a cotação.')
     } finally {
@@ -386,6 +396,9 @@ export default function AddItemsToPotential() {
           setIsSelecting={setIsSelecting}
         />
       </div>
+
+      <PotentialNotes potencialId={currentPotential?.id || ''} />
+      <PotentialAttachments potencial={currentPotential} onUpdate={setCurrentPotential} />
 
       <SearchQuoteModal
         open={isSearchQuoteOpen}

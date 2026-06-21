@@ -89,7 +89,6 @@ export function SelectedItemsTable({
             <TableHead className="w-16 text-[11px] text-center">Unidade</TableHead>
             <TableHead className="w-24 text-[11px]">Quant.</TableHead>
             <TableHead className="w-28 text-[11px]">Preço Unit.</TableHead>
-            <TableHead className="w-24 text-[11px]">Data de Validade do Preço</TableHead>
             <TableHead className="w-24 text-[11px] text-right">Total</TableHead>
             <TableHead className="w-10 text-center text-[11px]">Ação</TableHead>
           </TableRow>
@@ -214,11 +213,6 @@ export function SelectedItemsTable({
                     />
                   </div>
                 </TableCell>
-                <TableCell className="py-1 text-[11px] whitespace-nowrap text-muted-foreground">
-                  {data.item.validade_preco
-                    ? data.item.validade_preco.split('T')[0].split('-').reverse().join('/')
-                    : '-'}
-                </TableCell>
                 <TableCell className="py-1 text-xs font-semibold text-right whitespace-nowrap">
                   {formatCurrency(total)}
                 </TableCell>
@@ -237,7 +231,7 @@ export function SelectedItemsTable({
           })}
           <TableRow className="bg-slate-50/80 hover:bg-slate-50/80 border-t-2">
             <TableCell
-              colSpan={9}
+              colSpan={8}
               className="py-2 text-xs font-bold text-right text-muted-foreground uppercase tracking-wider"
             >
               Valor Total Geral
