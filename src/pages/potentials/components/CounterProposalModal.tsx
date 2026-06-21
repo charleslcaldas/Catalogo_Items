@@ -61,6 +61,7 @@ export function CounterProposalModal({
 
         return {
           id: w.id,
+          item_id: w.item_id,
           sku: pi?.expand?.item_id?.sku || 'N/A',
           fornecedor: cf?.expand?.fornecedor_id?.nome || 'Desconhecido',
           currentPrice: w.preco_ofertado,
@@ -110,6 +111,93 @@ export function CounterProposalModal({
       toast({
         title: 'Sucesso',
         description: `${promises.length} itens atualizados na contraproposta.`,
+      })
+      onOpenChange(false)
+    } catch (err: any) {
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
+    }
+  }
+
+  const handleAccept = async (item: any) => {
+    try {
+      const promises = []
+      const finalPrice = item.newPrice
+
+      promises.push(
+        pb.collection('cotacoes_itens').update(item.id, {
+          preco_ofertado: finalPrice,
+          preco_contraproposta: 0,
+          vencedor: true,
+        }),
+      )
+
+      const currentWinners = cotacoesI.filter(
+        (c: any) => c.item_id === item.item_id && c.vencedor && c.id !== item.id,
+      )
+      for (const cw of currentWinners) {
+        promises.push(pb.collection('cotacoes_itens').update(cw.id, { vencedor: false }))
+      }
+
+      promises.push(pb.collection('itens').update(item.item_id, { preco_compra: finalPrice }))
+
+      promises.push(
+        pb.collection('historico_precos').create({
+          item_id: item.item_id,
+          preco: finalPrice,
+          fornecedor: item.fornecedor,
+          data_cotacao: new Date().toISOString(),
+        }),
+      )
+
+      await Promise.all(promises)
+      toast({
+        title: 'Item aceito',
+        description: `Preço de compra atualizado para $ ${finalPrice.toFixed(4)}.`,
+      })
+    } catch (err: any) {
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
+    }
+  }
+
+  const handleAcceptAll = async () => {
+    const selectedItems = items.filter((i) => i.selected)
+    if (selectedItems.length === 0) return
+
+    try {
+      const promises = []
+      for (const item of selectedItems) {
+        const finalPrice = item.newPrice
+
+        promises.push(
+          pb.collection('cotacoes_itens').update(item.id, {
+            preco_ofertado: finalPrice,
+            preco_contraproposta: 0,
+            vencedor: true,
+          }),
+        )
+
+        const currentWinners = cotacoesI.filter(
+          (c: any) => c.item_id === item.item_id && c.vencedor && c.id !== item.id,
+        )
+        for (const cw of currentWinners) {
+          promises.push(pb.collection('cotacoes_itens').update(cw.id, { vencedor: false }))
+        }
+
+        promises.push(pb.collection('itens').update(item.item_id, { preco_compra: finalPrice }))
+
+        promises.push(
+          pb.collection('historico_precos').create({
+            item_id: item.item_id,
+            preco: finalPrice,
+            fornecedor: item.fornecedor,
+            data_cotacao: new Date().toISOString(),
+          }),
+        )
+      }
+      await Promise.all(promises)
+      toast({
+        title: 'Sucesso',
+        description: `${selectedItems.length} itens aceitos com sucesso.`,
       })
       onOpenChange(false)
     } catch (err: any) {
@@ -199,12 +287,13 @@ export function CounterProposalModal({
                 <TableHead className="text-right">Preço Atual</TableHead>
                 <TableHead className="text-right">Menor Oferta</TableHead>
                 <TableHead className="text-right w-32 text-amber-600">Alvo (C.Proposta)</TableHead>
+                <TableHead className="text-center w-24">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {items.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     Nenhum item selecionado para os fabricantes escolhidos.
                   </TableCell>
                 </TableRow>
@@ -243,6 +332,16 @@ export function CounterProposalModal({
                         }}
                       />
                     </TableCell>
+                    <TableCell className="text-center">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleAccept(item)}
+                        className="h-7 text-xs bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 border-green-200"
+                      >
+                        Aceitar
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -250,13 +349,20 @@ export function CounterProposalModal({
           </Table>
         </div>
 
-        <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancelar
+        <div className="flex justify-between items-center mt-4 pt-4 border-t">
+          <Button
+            variant="outline"
+            onClick={handleAcceptAll}
+            className="bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 border-green-200"
+          >
+            <Check className="w-4 h-4 mr-2" /> Aceitar Selecionados
           </Button>
-          <Button onClick={handleApply}>
-            <Check className="w-4 h-4 mr-2" /> Salvar Target
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleApply}>Salvar Target</Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

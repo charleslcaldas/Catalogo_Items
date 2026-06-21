@@ -27,7 +27,9 @@ export function PriceCell({
         'p-1.5 rounded flex flex-col gap-1.5 relative group min-h-[44px] cursor-pointer transition-colors',
         cotacaoI?.vencedor
           ? 'bg-green-50/50 ring-1 ring-green-500 hover:bg-green-100/50'
-          : 'hover:bg-muted/50',
+          : isLowest
+            ? 'bg-blue-50/50 ring-1 ring-blue-400 hover:bg-blue-100/50'
+            : 'hover:bg-muted/50',
       )}
     >
       <div className="flex items-center gap-1">
@@ -87,12 +89,6 @@ export function PriceCell({
             + MOQ
           </button>
         </div>
-      )}
-
-      {isLowest && !cotacaoI?.vencedor && (
-        <Badge className="absolute -top-2 -right-2 text-[8px] h-4 px-1 bg-blue-100 text-blue-700 border-none hover:bg-blue-100 shadow-sm pointer-events-none z-10">
-          Menor
-        </Badge>
       )}
     </div>
   )
