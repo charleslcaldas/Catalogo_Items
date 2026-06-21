@@ -38,7 +38,7 @@ export function StatusManagementModal({
         .getFullList<StatusPotencial>({ sort: 'created' })
       setStatuses(res)
     } catch (err) {
-      toast.error('Erro ao carregar status')
+      toast.error('Erro ao carregar estágios')
     } finally {
       setLoading(false)
     }
@@ -53,29 +53,29 @@ export function StatusManagementModal({
     try {
       if (editingId) {
         await pb.collection('status_potencial').update(editingId, formData)
-        toast.success('Status atualizado')
+        toast.success('Estágio atualizado')
       } else {
         await pb.collection('status_potencial').create(formData)
-        toast.success('Status criado')
+        toast.success('Estágio criado')
       }
       setEditingId(null)
       setFormData({ nome: '', cor_hex: '#10b981' })
       loadStatuses()
       onSaved()
     } catch (err) {
-      toast.error('Erro ao salvar status')
+      toast.error('Erro ao salvar estágio')
     }
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Deseja realmente excluir este status?')) return
+    if (!confirm('Deseja realmente excluir este estágio?')) return
     try {
       await pb.collection('status_potencial').delete(id)
-      toast.success('Status excluído')
+      toast.success('Estágio excluído')
       loadStatuses()
       onSaved()
     } catch (err) {
-      toast.error('Erro ao excluir status')
+      toast.error('Erro ao excluir estágio')
     }
   }
 
@@ -88,12 +88,12 @@ export function StatusManagementModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>Gerenciar Status</DialogTitle>
+          <DialogTitle>Gerenciar Estágios</DialogTitle>
         </DialogHeader>
 
         <div className="flex gap-2 items-end mb-4 bg-slate-50 p-3 rounded-lg border">
           <div className="flex-1 space-y-1">
-            <Label className="text-xs">Nome do Status</Label>
+            <Label className="text-xs">Nome do Estágio</Label>
             <Input
               value={formData.nome}
               onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
@@ -134,7 +134,7 @@ export function StatusManagementModal({
           <Table>
             <TableHeader className="bg-slate-50 sticky top-0">
               <TableRow className="h-8">
-                <TableHead className="py-1 text-xs">Nome</TableHead>
+                <TableHead className="py-1 text-xs">Nome do Estágio</TableHead>
                 <TableHead className="py-1 w-24 text-xs">Cor</TableHead>
                 <TableHead className="py-1 w-20 text-right text-xs">Ações</TableHead>
               </TableRow>
@@ -149,7 +149,7 @@ export function StatusManagementModal({
               ) : statuses.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={3} className="text-center py-4 text-xs text-muted-foreground">
-                    Nenhum status configurado
+                    Nenhum estágio configurado
                   </TableCell>
                 </TableRow>
               ) : (

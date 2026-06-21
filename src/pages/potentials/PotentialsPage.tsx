@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Search, Loader2, LayoutGrid, LayoutList } from 'lucide-react'
+import { Plus, Search, Loader2, LayoutGrid, LayoutList, Settings2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Table,
   TableBody,
@@ -26,17 +27,7 @@ import type { Potencial } from '@/types'
 import { useRealtime } from '@/hooks/use-realtime'
 import type { StatusPotencial } from '@/types'
 import { getContrastColor } from '@/lib/utils'
-
-const ESTAGIOS = [
-  'Qualificação',
-  'Proposta',
-  'Negociação',
-  'Aguardando Cotação Fornecedor',
-  'Cotação Recebida',
-  'Fechado Ganho',
-  'Fechado Perdido',
-  'Sem Estágio',
-]
+import { StatusManagementModal } from './components/StatusManagementModal'
 
 export default function PotentialsPage() {
   const [potentials, setPotentials] = useState<Potencial[]>([])
@@ -53,6 +44,9 @@ export default function PotentialsPage() {
   const [filterDateStart, setFilterDateStart] = useState('')
   const [filterDateEnd, setFilterDateEnd] = useState('')
   const [statuses, setStatuses] = useState<StatusPotencial[]>([])
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
 
   useEffect(() => {
     pb.collection('status_potencial')
@@ -209,46 +203,47 @@ export default function PotentialsPage() {
     }
   }
 
-  const displayedEstagios =
-    selectedEstagios.length > 0 ? ESTAGIOS.filter((e) => selectedEstagios.includes(e)) : ESTAGIOS
+  const toggleSelectAll = () => {
+    if (selectedIds.size === potentials.length) setSelectedIds(new Set())
+    else setSelectedIds(new Set(potentials.map((p) => p.id)))
+  }
 
-  const totalGeral = potentials.reduce((acc, p) => acc + (itemTotals[p.id] || 0), 0)
+  const toggleSelect = (id: string) => {
+    const next = new Set(selectedIds)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setSelectedIds(next)
+  }
+
+  const dynamicStages = statuses.map((s) => s.nome)
+  const uniqueExistingStages = Array.from(
+    new Set(potentials.map((p) => p.estagio || 'Sem Estágio')),
+  )
+  const allStages = Array.from(new Set([...dynamicStages, ...uniqueExistingStages]))
+  if (!allStages.includes('Sem Estágio')) allStages.push('Sem Estágio')
+
+  const displayedEstagios =
+    selectedEstagios.length > 0 ? allStages.filter((e) => selectedEstagios.includes(e)) : allStages
 
   const getStatusBadge = (p: Potencial) => {
     const status = p.status || 'Sem Itens'
+    const lowered = status.toLowerCase()
 
-    // Attempt dynamic status matching
-    const dynamicStatus = statuses.find((s) => s.nome === status)
-    if (dynamicStatus && dynamicStatus.cor_hex) {
-      return (
-        <Badge
-          style={{
-            backgroundColor: dynamicStatus.cor_hex,
-            color: getContrastColor(dynamicStatus.cor_hex),
-          }}
-          className="border-0 font-normal h-5 text-[10px] px-2 rounded-full shadow-none whitespace-nowrap"
-        >
-          {status}
-        </Badge>
-      )
-    }
-
-    // Fallbacks
-    if (status === 'Completo') {
+    if (lowered === 'completo') {
       return (
         <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-emerald-200 font-normal h-5 text-[10px] px-2 rounded-full">
           Completo
         </Badge>
       )
     }
-    if (status === 'Incompleto' || status === 'rascunho') {
+    if (lowered === 'incompleto' || lowered === 'rascunho') {
       return (
         <Badge className="bg-amber-50 text-amber-700 hover:bg-amber-50 border-amber-200 font-normal h-5 text-[10px] px-2 rounded-full">
           Itens incompletos
         </Badge>
       )
     }
-    if (status === 'Sem Itens') {
+    if (lowered === 'sem itens') {
       return (
         <Badge
           variant="secondary"
@@ -278,11 +273,34 @@ export default function PotentialsPage() {
             Gerencie as cotações e potenciais de vendas
           </p>
         </div>
-        <Button asChild>
-          <Link to="/potenciais/adicionar">
-            <Plus className="mr-2 h-4 w-4" /> Nova Cotação
-          </Link>
-        </Button>
+
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1 p-1 bg-slate-200/50 rounded-lg">
+            <Button
+              variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('list')}
+              className="h-7 text-xs px-3 shadow-none bg-transparent data-[state=active]:bg-white data-[state=active]:shadow-sm"
+              data-state={viewMode === 'list' ? 'active' : 'inactive'}
+            >
+              <LayoutList className="w-4 h-4 mr-2" /> Lista
+            </Button>
+            <Button
+              variant={viewMode === 'board' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('board')}
+              className="h-7 text-xs px-3 shadow-none bg-transparent data-[state=active]:bg-white data-[state=active]:shadow-sm"
+              data-state={viewMode === 'board' ? 'active' : 'inactive'}
+            >
+              <LayoutGrid className="w-4 h-4 mr-2" /> Kanban
+            </Button>
+          </div>
+          <Button asChild>
+            <Link to="/potenciais/adicionar">
+              <Plus className="mr-2 h-4 w-4" /> Nova Cotação
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg border shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden">
@@ -300,50 +318,62 @@ export default function PotentialsPage() {
                 />
               </div>
 
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 text-xs rounded-full bg-white flex gap-2"
-                  >
-                    Estágios{' '}
-                    {selectedEstagios.length > 0 && (
-                      <Badge variant="secondary" className="h-5 px-1.5 rounded-full font-medium">
-                        {selectedEstagios.length}
-                      </Badge>
-                    )}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-64">
-                  <DropdownMenuLabel>Filtrar Estágios</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {ESTAGIOS.map((e) => (
-                    <DropdownMenuCheckboxItem
-                      key={e}
-                      checked={selectedEstagios.includes(e)}
-                      onCheckedChange={(checked) => {
-                        setSelectedEstagios((prev) =>
-                          checked ? [...prev, e] : prev.filter((x) => x !== e),
-                        )
-                      }}
+              <div className="flex items-center gap-1">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs rounded-full bg-white flex gap-2"
                     >
-                      {e}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-                  {selectedEstagios.length > 0 && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onSelect={() => setSelectedEstagios([])}
-                        className="text-muted-foreground"
+                      Estágios{' '}
+                      {selectedEstagios.length > 0 && (
+                        <Badge variant="secondary" className="h-5 px-1.5 rounded-full font-medium">
+                          {selectedEstagios.length}
+                        </Badge>
+                      )}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-64">
+                    <DropdownMenuLabel>Filtrar Estágios</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {allStages.map((e) => (
+                      <DropdownMenuCheckboxItem
+                        key={e}
+                        checked={selectedEstagios.includes(e)}
+                        onCheckedChange={(checked) => {
+                          setSelectedEstagios((prev) =>
+                            checked ? [...prev, e] : prev.filter((x) => x !== e),
+                          )
+                        }}
                       >
-                        Limpar Filtros
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                        {e}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                    {selectedEstagios.length > 0 && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onSelect={() => setSelectedEstagios([])}
+                          className="text-muted-foreground"
+                        >
+                          Limpar Filtros
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 rounded-full bg-white ml-1"
+                  onClick={() => setIsStatusModalOpen(true)}
+                  title="Gerenciar Estágios"
+                >
+                  <Settings2 className="h-4 w-4 text-slate-600" />
+                </Button>
+              </div>
 
               <Input
                 type="text"
@@ -360,11 +390,9 @@ export default function PotentialsPage() {
               >
                 <option value="all">Todos Status</option>
                 <option value="Sem Itens">Sem Itens</option>
-                {statuses.map((s) => (
-                  <option key={s.id} value={s.nome}>
-                    {s.nome}
-                  </option>
-                ))}
+                <option value="Completo">Completo</option>
+                <option value="Incompleto">Incompleto</option>
+                <option value="rascunho">Rascunho</option>
               </select>
 
               <div className="flex items-center gap-2 bg-white rounded-full border px-3 h-8">
@@ -384,27 +412,6 @@ export default function PotentialsPage() {
                 />
               </div>
             </div>
-
-            <div className="flex gap-1 p-1 bg-slate-200/50 rounded-lg">
-              <Button
-                variant={viewMode === 'list' ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('list')}
-                className="h-7 text-xs px-3 shadow-none bg-transparent data-[state=active]:bg-white data-[state=active]:shadow-sm"
-                data-state={viewMode === 'list' ? 'active' : 'inactive'}
-              >
-                <LayoutList className="w-4 h-4 mr-2" /> Lista
-              </Button>
-              <Button
-                variant={viewMode === 'board' ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('board')}
-                className="h-7 text-xs px-3 shadow-none bg-transparent data-[state=active]:bg-white data-[state=active]:shadow-sm"
-                data-state={viewMode === 'board' ? 'active' : 'inactive'}
-              >
-                <LayoutGrid className="w-4 h-4 mr-2" /> Kanban
-              </Button>
-            </div>
           </div>
         </div>
 
@@ -419,21 +426,33 @@ export default function PotentialsPage() {
                 0,
               )
 
+              const statusObj = statuses.find((s) => s.nome === estagio)
+              const bgColor = statusObj?.cor_hex || '#f1f5f9'
+              const textColor = statusObj ? getContrastColor(statusObj.cor_hex) : '#334155'
+              const borderColor = statusObj?.cor_hex || '#e2e8f0'
+
               return (
                 <div
                   key={estagio}
-                  className="flex-shrink-0 w-80 bg-slate-100/50 rounded-xl border border-slate-200 flex flex-col max-h-full"
+                  className="flex-shrink-0 w-80 bg-slate-100/50 rounded-xl border flex flex-col max-h-full shadow-sm"
+                  style={{ borderColor }}
                   onDragOver={onDragOver}
                   onDrop={(e) => onDrop(e, estagio)}
                 >
-                  <div className="p-3 border-b border-slate-200 flex items-center justify-between bg-white/60 rounded-t-xl shrink-0">
+                  <div
+                    className="p-3 border-b flex items-center justify-between rounded-t-xl shrink-0"
+                    style={{ backgroundColor: bgColor, color: textColor, borderColor }}
+                  >
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm text-slate-700">{estagio}</span>
-                      <Badge variant="secondary" className="px-1.5 py-0 text-[10px] h-5">
+                      <span className="font-semibold text-sm">{estagio}</span>
+                      <Badge
+                        className="px-1.5 py-0 text-[10px] h-5 border-0 font-medium shadow-none"
+                        style={{ backgroundColor: textColor, color: bgColor }}
+                      >
                         {formatNumber(stagePotentials.length)}
                       </Badge>
                     </div>
-                    <span className="text-xs font-medium text-slate-500">
+                    <span className="text-xs font-semibold opacity-90">
                       {formatCurrency(stageTotal)}
                     </span>
                   </div>
@@ -468,7 +487,7 @@ export default function PotentialsPage() {
                       </div>
                     ))}
                     {stagePotentials.length === 0 && (
-                      <div className="text-xs text-center text-slate-400 py-8 border-2 border-dashed border-slate-200 rounded-lg">
+                      <div className="text-xs text-center text-slate-400 py-8 border-2 border-dashed border-slate-200/60 rounded-lg">
                         Arraste cotações para cá
                       </div>
                     )}
@@ -482,6 +501,13 @@ export default function PotentialsPage() {
             <Table>
               <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
                 <TableRow className="h-8">
+                  <TableHead className="w-10 text-center py-1">
+                    <Checkbox
+                      checked={potentials.length > 0 && selectedIds.size === potentials.length}
+                      onCheckedChange={toggleSelectAll}
+                      className="rounded-full data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+                    />
+                  </TableHead>
                   <TableHead className="text-[11px] py-1">Número Potencial</TableHead>
                   <TableHead className="text-[11px] py-1">Cliente</TableHead>
                   <TableHead className="text-[11px] py-1">Nome Potencial</TableHead>
@@ -494,7 +520,7 @@ export default function PotentialsPage() {
               <TableBody>
                 {loading && potentials.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                    <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
                       <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
                       <span className="text-sm">Carregando...</span>
                     </TableCell>
@@ -502,7 +528,7 @@ export default function PotentialsPage() {
                 ) : potentials.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={7}
+                      colSpan={8}
                       className="h-32 text-center text-muted-foreground text-sm"
                     >
                       Nenhuma cotação encontrada.
@@ -511,6 +537,13 @@ export default function PotentialsPage() {
                 ) : (
                   potentials.map((p) => (
                     <TableRow key={p.id} className="h-9 py-0 hover:bg-slate-50/50">
+                      <TableCell className="text-center py-1">
+                        <Checkbox
+                          checked={selectedIds.has(p.id)}
+                          onCheckedChange={() => toggleSelect(p.id)}
+                          className="rounded-full data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+                        />
+                      </TableCell>
                       <TableCell className="py-1 text-[11px] font-medium">
                         <Link
                           to={`/potenciais/adicionar?id=${p.id}`}
@@ -550,6 +583,14 @@ export default function PotentialsPage() {
           </div>
         )}
       </div>
+
+      <StatusManagementModal
+        open={isStatusModalOpen}
+        onOpenChange={setIsStatusModalOpen}
+        onSaved={() => {
+          pb.collection('status_potencial').getFullList<StatusPotencial>().then(setStatuses)
+        }}
+      />
     </div>
   )
 }
