@@ -128,6 +128,8 @@ export type Potencial = {
   estagio?: string
   observacoes?: string
   nome_comprador?: string
+  notas?: string
+  anexos?: string[]
   created: string
   updated: string
 }

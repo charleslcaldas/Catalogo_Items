@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-21T04:08:44.021Z",
+  "generatedAt": "2026-06-21T04:34:20.585Z",
   "collections": [
     {
       "name": "users",
@@ -673,6 +673,18 @@
         {
           "name": "nome_comprador",
           "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "notas",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "anexos",
+          "type": "file",
           "required": false,
           "system": false
         }

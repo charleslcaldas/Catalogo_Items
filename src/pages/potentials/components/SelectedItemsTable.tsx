@@ -89,7 +89,6 @@ export function SelectedItemsTable({
             <TableHead className="w-16 text-[11px] text-center">Unidade</TableHead>
             <TableHead className="w-24 text-[11px]">Quant.</TableHead>
             <TableHead className="w-28 text-[11px]">Preço Unit.</TableHead>
-            <TableHead className="w-32 text-[11px]">Fornecedor</TableHead>
             <TableHead className="w-24 text-[11px]">Data de Validade do Preço</TableHead>
             <TableHead className="w-24 text-[11px] text-right">Total</TableHead>
             <TableHead className="w-10 text-center text-[11px]">Ação</TableHead>
@@ -215,26 +214,6 @@ export function SelectedItemsTable({
                     />
                   </div>
                 </TableCell>
-                <TableCell className="py-1">
-                  <Input
-                    type="text"
-                    placeholder="Fornecedor"
-                    className="h-7 w-32 px-2 text-xs bg-white"
-                    value={data.observacoes || ''}
-                    onChange={(e) => handleUpdateItem(id, 'observacoes', e.target.value)}
-                    onBlur={async () => {
-                      if (id && id.length === 15) {
-                        try {
-                          await pb
-                            .collection('potencial_itens')
-                            .update(id, { observacoes: data.observacoes || '' })
-                        } catch (err) {
-                          console.error('Auto-save fornecedor failed', err)
-                        }
-                      }
-                    }}
-                  />
-                </TableCell>
                 <TableCell className="py-1 text-[11px] whitespace-nowrap text-muted-foreground">
                   {data.item.validade_preco
                     ? data.item.validade_preco.split('T')[0].split('-').reverse().join('/')
@@ -258,7 +237,7 @@ export function SelectedItemsTable({
           })}
           <TableRow className="bg-slate-50/80 hover:bg-slate-50/80 border-t-2">
             <TableCell
-              colSpan={10}
+              colSpan={9}
               className="py-2 text-xs font-bold text-right text-muted-foreground uppercase tracking-wider"
             >
               Valor Total Geral
