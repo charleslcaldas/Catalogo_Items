@@ -1,5 +1,4 @@
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
 export function PriceCell({
@@ -26,7 +25,7 @@ export function PriceCell({
       className={cn(
         'p-1.5 rounded flex flex-col gap-1.5 relative group min-h-[44px] cursor-pointer transition-colors',
         cotacaoI?.vencedor
-          ? 'bg-blue-50/50 ring-1 ring-blue-500 hover:bg-blue-100/50'
+          ? 'bg-blue-600 ring-2 ring-blue-700 shadow-md'
           : isLowest
             ? 'bg-green-50/50 ring-1 ring-green-400 hover:bg-green-100/50'
             : 'hover:bg-muted/50',
@@ -46,13 +45,20 @@ export function PriceCell({
           onClick={(e) => e.stopPropagation()}
           className={cn(
             'h-7 text-xs text-right font-mono flex-1 min-w-0',
-            isLowest ? 'text-green-700 font-bold' : '',
+            cotacaoI?.vencedor
+              ? 'bg-blue-700 text-white border-blue-500 focus-visible:ring-blue-300 placeholder:text-blue-300'
+              : isLowest
+                ? 'text-green-700 font-bold'
+                : '',
           )}
           placeholder="Preço"
         />
         {hasCounter && (
           <span
-            className="font-mono text-[10px] font-bold text-amber-500 whitespace-nowrap pl-1"
+            className={cn(
+              'font-mono text-[10px] font-bold whitespace-nowrap pl-1',
+              cotacaoI?.vencedor ? 'text-amber-300' : 'text-amber-500',
+            )}
             title="Proposta"
           >
             $ {counterPrice.toFixed(4)}
@@ -62,7 +68,12 @@ export function PriceCell({
 
       {currentMoq > 0 || (draftMoq !== undefined && draftMoq !== 0) ? (
         <div className="flex items-center gap-2">
-          <span className="text-[9px] text-muted-foreground uppercase font-bold w-6 shrink-0">
+          <span
+            className={cn(
+              'text-[9px] uppercase font-bold w-6 shrink-0',
+              cotacaoI?.vencedor ? 'text-blue-100' : 'text-muted-foreground',
+            )}
+          >
             MOQ
           </span>
           <Input
@@ -76,14 +87,24 @@ export function PriceCell({
               onBlur(cotacaoF.id, item.item_id, currentPrice, currentMoq, cotacaoI?.id)
             }
             onClick={(e) => e.stopPropagation()}
-            className="h-6 text-[10px] text-right font-mono flex-1 min-w-0"
+            className={cn(
+              'h-6 text-[10px] text-right font-mono flex-1 min-w-0',
+              cotacaoI?.vencedor
+                ? 'bg-blue-700 text-white border-blue-500 focus-visible:ring-blue-300 placeholder:text-blue-300'
+                : '',
+            )}
             placeholder="MOQ"
           />
         </div>
       ) : (
         <div className="hidden group-hover:flex justify-end">
           <button
-            className="text-[9px] text-muted-foreground hover:text-foreground underline pr-1"
+            className={cn(
+              'text-[9px] underline pr-1',
+              cotacaoI?.vencedor
+                ? 'text-blue-200 hover:text-white'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
             onClick={(e) => {
               e.stopPropagation()
               onDraftMoqChange(cotacaoF.id, item.item_id, 1)

@@ -1,15 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import {
-  Plus,
-  Check,
-  TrendingDown,
-  RefreshCw,
-  Download,
-  Settings2,
-  CheckSquare,
-  FileUp,
-} from 'lucide-react'
+import { Plus, Check, TrendingDown, Download, Settings2, CheckSquare, FileUp } from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 import { Button } from '@/components/ui/button'
@@ -71,6 +62,11 @@ export default function QuotationMatrix() {
 
   const [draftPrices, setDraftPrices] = useState<Record<string, number>>({})
   const [draftMoqs, setDraftMoqs] = useState<Record<string, number>>({})
+
+  const [moqValidation, setMoqValidation] = useState<{
+    warnings: any[]
+    action: 'accept' | 'finalize'
+  } | null>(null)
 
   const [importState, setImportState] = useState<{
     cfId: string
@@ -153,17 +149,13 @@ export default function QuotationMatrix() {
         }
 
         let priceToSet = draftPrices[`${cfId}_${pi.item_id}`]
-
         const ci = cotacoesI.find(
           (c) => c.cotacao_fornecedor_id === cfId && c.item_id === pi.item_id,
         )
+
         if (ci) {
           if (!ci.vencedor)
             promises.push(pb.collection('cotacoes_itens').update(ci.id, { vencedor: true }))
-
-          if (priceToSet === undefined) {
-            priceToSet = ci.preco_contraproposta > 0 ? ci.preco_contraproposta : ci.preco_ofertado
-          }
         } else {
           priceToSet = priceToSet || 0
           promises.push(
@@ -174,13 +166,6 @@ export default function QuotationMatrix() {
               quantidade_minima: draftMoqs[`${cfId}_${pi.item_id}`] || 0,
               vencedor: true,
             }),
-          )
-        }
-
-        if (priceToSet > 0) {
-          promises.push(pb.collection('itens').update(pi.item_id, { preco_compra: priceToSet }))
-          promises.push(
-            pb.collection('potencial_itens').update(pi.id, { preco_unitario: priceToSet }),
           )
         }
       }
@@ -366,35 +351,17 @@ export default function QuotationMatrix() {
 
       if (cotacaoIId) {
         promises.push(pb.collection('cotacoes_itens').update(cotacaoIId, { vencedor: true }))
-        if (priceToSet === undefined) {
-          const ci = cotacoesI.find((c) => c.id === cotacaoIId)
-          if (ci) {
-            priceToSet = ci.preco_contraproposta > 0 ? ci.preco_contraproposta : ci.preco_ofertado
-          } else {
-            priceToSet = 0
-          }
-        }
       } else {
         priceToSet = priceToSet || 0
-        const created = await pb.collection('cotacoes_itens').create({
-          cotacao_fornecedor_id: cotacaoFId,
-          item_id: itemId,
-          preco_ofertado: priceToSet,
-          quantidade_minima: draftMoqs[`${cotacaoFId}_${itemId}`] || 0,
-          vencedor: true,
-        })
-        priceToSet = created.preco_ofertado
-      }
-
-      if (priceToSet > 0) {
-        promises.push(pb.collection('itens').update(itemId, { preco_compra: priceToSet }))
-
-        const pItems = potencialItens.filter((pi: any) => pi.item_id === itemId)
-        for (const pi of pItems) {
-          promises.push(
-            pb.collection('potencial_itens').update(pi.id, { preco_unitario: priceToSet }),
-          )
-        }
+        promises.push(
+          pb.collection('cotacoes_itens').create({
+            cotacao_fornecedor_id: cotacaoFId,
+            item_id: itemId,
+            preco_ofertado: priceToSet,
+            quantidade_minima: draftMoqs[`${cotacaoFId}_${itemId}`] || 0,
+            vencedor: true,
+          }),
+        )
       }
 
       await Promise.all(promises)
@@ -403,75 +370,141 @@ export default function QuotationMatrix() {
     }
   }
 
-  const handleFinalize = async () => {
+  const handleAcceptSelected = async () => {
+    const winners = cotacoesI.filter((c) => c.vencedor && c.preco_ofertado > 0)
+    if (winners.length === 0) {
+      toast({ title: 'Nenhum item selecionado como vencedor' })
+      return
+    }
+
+    const warnings = []
+    for (const w of winners) {
+      const pi = potencialItens.find((p) => p.item_id === w.item_id)
+      if (pi && w.quantidade_minima > 0 && pi.quantidade < w.quantidade_minima) {
+        warnings.push({ pi, ci: w })
+      }
+    }
+
+    if (warnings.length > 0) {
+      setMoqValidation({ warnings, action: 'accept' })
+      return
+    }
+
+    executeAcceptSelected(false)
+  }
+
+  const executeAcceptSelected = async (adjustMoq: boolean) => {
     try {
       const winners = cotacoesI.filter((c) => c.vencedor && c.preco_ofertado > 0)
-      await Promise.all(
-        winners.map(async (w) => {
-          const cf = cotacoesF.find((f) => f.id === w.cotacao_fornecedor_id)
-          if (!cf) return
-          const fornecedorNome = cf.expand?.fornecedor_id?.nome || 'Desconhecido'
-          const existing = historico.find(
-            (h) =>
-              h.item_id === w.item_id &&
-              h.fornecedor === fornecedorNome &&
-              Math.abs(h.preco - w.preco_ofertado) < 0.01,
+      const promises = []
+      let updatedCount = 0
+
+      for (const w of winners) {
+        const pi = potencialItens.find((p) => p.item_id === w.item_id)
+        if (!pi) continue
+
+        let priceToUse =
+          draftPrices[`${w.cotacao_fornecedor_id}_${w.item_id}`] ??
+          (w.preco_contraproposta > 0 ? w.preco_contraproposta : w.preco_ofertado)
+
+        promises.push(pb.collection('itens').update(w.item_id, { preco_compra: priceToUse }))
+
+        if (adjustMoq && w.quantidade_minima > 0 && pi.quantidade < w.quantidade_minima) {
+          promises.push(
+            pb.collection('potencial_itens').update(pi.id, { quantidade: w.quantidade_minima }),
           )
-          if (!existing) {
-            await pb.collection('historico_precos').create({
+        }
+        updatedCount++
+      }
+
+      await Promise.all(promises)
+      toast({ title: 'Sucesso', description: `${updatedCount} preços de compra atualizados.` })
+    } catch (err: any) {
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
+    } finally {
+      setMoqValidation(null)
+    }
+  }
+
+  const handleFinalizeWithValidation = async () => {
+    const winners = cotacoesI.filter((c) => c.vencedor && c.preco_ofertado > 0)
+    const warnings = []
+    for (const w of winners) {
+      const pi = potencialItens.find((p) => p.item_id === w.item_id)
+      if (pi && w.quantidade_minima > 0 && pi.quantidade < w.quantidade_minima) {
+        warnings.push({ pi, ci: w })
+      }
+    }
+    if (warnings.length > 0) {
+      setMoqValidation({ warnings, action: 'finalize' })
+      return
+    }
+    executeFinalize(false)
+  }
+
+  const executeFinalize = async (adjustMoq: boolean) => {
+    try {
+      const winners = cotacoesI.filter((c) => c.vencedor && c.preco_ofertado > 0)
+      const promises = []
+
+      for (const w of winners) {
+        const pi = potencialItens.find((p) => p.item_id === w.item_id)
+        let qty = pi?.quantidade || 0
+
+        if (adjustMoq && pi && w.quantidade_minima > 0 && pi.quantidade < w.quantidade_minima) {
+          qty = w.quantidade_minima
+          promises.push(pb.collection('potencial_itens').update(pi.id, { quantidade: qty }))
+        }
+
+        let priceToUse =
+          draftPrices[`${w.cotacao_fornecedor_id}_${w.item_id}`] ??
+          (w.preco_contraproposta > 0 ? w.preco_contraproposta : w.preco_ofertado)
+
+        promises.push(pb.collection('itens').update(w.item_id, { preco_compra: priceToUse }))
+
+        const cf = cotacoesF.find((f) => f.id === w.cotacao_fornecedor_id)
+        if (!cf) continue
+        const fornecedorNome = cf.expand?.fornecedor_id?.nome || 'Desconhecido'
+        const existing = historico.find(
+          (h) =>
+            h.item_id === w.item_id &&
+            h.fornecedor === fornecedorNome &&
+            Math.abs(h.preco - w.preco_ofertado) < 0.01,
+        )
+        if (!existing) {
+          promises.push(
+            pb.collection('historico_precos').create({
               item_id: w.item_id,
               preco: w.preco_ofertado,
               fornecedor: fornecedorNome,
               data_cotacao: new Date().toISOString(),
-            })
-          }
-        }),
-      )
+            }),
+          )
+        }
+      }
+
       const pending = cotacoesF.filter((c) => c.status !== 'finalizada')
-      if (pending.length > 0)
-        await Promise.all(
-          pending.map((c) =>
-            pb.collection('cotacoes_fornecedor').update(c.id, { status: 'finalizada' }),
-          ),
-        )
+      for (const c of pending) {
+        promises.push(pb.collection('cotacoes_fornecedor').update(c.id, { status: 'finalizada' }))
+      }
+
+      await Promise.all(promises)
       toast({
         title: 'Histórico Salvo',
         description: 'Cotações finalizadas e histórico de preços atualizado.',
       })
     } catch (err: any) {
       toast({ title: 'Erro', description: err.message, variant: 'destructive' })
-    }
-  }
-
-  const handleUpdateClientPrices = async () => {
-    try {
-      let updatedCount = 0
-      await Promise.all(
-        potencialItens.map(async (pi) => {
-          const winner = cotacoesI.find((c) => c.item_id === pi.item_id && c.vencedor)
-          const priceToUse = winner
-            ? (draftPrices[`${winner.cotacao_fornecedor_id}_${pi.item_id}`] ??
-              (winner.preco_contraproposta > 0
-                ? winner.preco_contraproposta
-                : winner.preco_ofertado))
-            : 0
-          if (priceToUse > 0 && pi.preco_unitario !== priceToUse) {
-            updatedCount++
-            await pb.collection('potencial_itens').update(pi.id, { preco_unitario: priceToUse })
-          }
-        }),
-      )
-      toast({ title: 'Sucesso', description: `${updatedCount} preços atualizados no potencial.` })
-    } catch (err: any) {
-      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
+    } finally {
+      setMoqValidation(null)
     }
   }
 
   const handleExportExcel = (lang: 'pt' | 'en') => {
     let csv =
       lang === 'pt'
-        ? 'SKU,Descricao,Qtd,Unidade,Menor Preco Historico,Menor Preco Atual'
-        : 'SKU,Description,Qty,Unit,Min Hist Price,Min Current Price'
+        ? 'SKU,Descricao,Qtd,Unidade,Menor Preco Atual,Menor Preco Historico'
+        : 'SKU,Description,Qty,Unit,Min Current Price,Min Hist Price'
 
     cotacoesF.forEach((cf) => {
       const nome = cf.expand?.fornecedor_id?.nome || 'Fornecedor'
@@ -498,7 +531,7 @@ export default function QuotationMatrix() {
           ? itemNode?.descricao_curta || itemNode?.descr_pt || ''
           : itemNode?.descricao_curta_en || itemNode?.descr_en || ''
 
-      csv += `"${(itemNode?.sku || '').replace(/"/g, '""')}","${desc.replace(/"/g, '""')}",${pi.quantidade},"${pi.unidade_medida || 'UN'}",${minHist},${minCurr}`
+      csv += `"${(itemNode?.sku || '').replace(/"/g, '""')}","${desc.replace(/"/g, '""')}",${pi.quantidade},"${pi.unidade_medida || 'UN'}",${minCurr},${minHist}`
 
       cotacoesF.forEach((cf) => {
         const ci = cotacoesI.find(
@@ -660,15 +693,15 @@ export default function QuotationMatrix() {
           <Button
             variant="outline"
             size="sm"
-            onClick={handleUpdateClientPrices}
+            onClick={handleAcceptSelected}
             className="border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 hover:text-blue-800"
           >
-            <RefreshCw className="w-4 h-4 mr-2" /> Sync. Venda
+            <CheckSquare className="w-4 h-4 mr-2" /> Aceitar Selecionados
           </Button>
 
           <Button
             size="sm"
-            onClick={handleFinalize}
+            onClick={handleFinalizeWithValidation}
             className="bg-emerald-600 hover:bg-emerald-700 text-white"
             disabled={cotacoesF.length === 0}
           >
@@ -685,15 +718,15 @@ export default function QuotationMatrix() {
                 <TableHead className="min-w-[180px] font-semibold py-2">Item</TableHead>
                 <TableHead className="font-semibold text-center w-16 py-2">Qtd</TableHead>
                 <TableHead className="font-semibold text-right min-w-[90px] py-2 bg-muted/10">
-                  Último Hist.
-                  <span className="text-[9px] font-normal text-muted-foreground block">
-                    (Salvo)
-                  </span>
-                </TableHead>
-                <TableHead className="font-semibold text-right min-w-[90px] py-2 border-r bg-muted/10">
                   Menor Cotação
                   <span className="text-[9px] font-normal text-muted-foreground block">
                     (Atual)
+                  </span>
+                </TableHead>
+                <TableHead className="font-semibold text-right min-w-[90px] py-2 border-r bg-muted/10">
+                  Último Hist.
+                  <span className="text-[9px] font-normal text-muted-foreground block">
+                    (Salvo)
                   </span>
                 </TableHead>
                 <TableHead className="font-semibold text-right min-w-[90px] py-2 border-r">
@@ -823,7 +856,7 @@ export default function QuotationMatrix() {
               {potencialItens.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={4 + cotacoesF.length}
+                    colSpan={5 + cotacoesF.length}
                     className="h-32 text-center text-muted-foreground"
                   >
                     Nenhum item adicionado a este potencial.
@@ -836,13 +869,13 @@ export default function QuotationMatrix() {
                       (c) => c.cotacao_fornecedor_id === cf.id && c.item_id === pi.item_id,
                     )
                     const draft = draftPrices[`${cf.id}_${pi.item_id}`]
-                    return (
-                      draft ??
-                      (ci?.preco_contraproposta > 0
-                        ? ci.preco_contraproposta
-                        : ci?.preco_ofertado) ??
-                      0
-                    )
+
+                    if (draft !== undefined) return draft
+                    if (ci) {
+                      if (ci.vencedor && ci.preco_contraproposta > 0) return ci.preco_contraproposta
+                      return ci.preco_ofertado
+                    }
+                    return 0
                   })
 
                   const validCurrentPrices = currentPrices.filter((p) => p > 0)
@@ -867,18 +900,18 @@ export default function QuotationMatrix() {
                         </span>
                       </TableCell>
                       <TableCell className="align-top py-1.5 px-2 text-right bg-muted/5">
-                        {lastHist ? (
-                          <span className="font-mono text-xs text-muted-foreground font-medium">
-                            $ {formatCurrency(lastHist)}
+                        {lowestCurrentPrice ? (
+                          <span className="font-mono text-xs text-green-600 font-bold">
+                            $ {formatCurrency(lowestCurrentPrice)}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
                       <TableCell className="align-top py-1.5 px-2 text-right border-r bg-muted/5">
-                        {lowestCurrentPrice ? (
-                          <span className="font-mono text-xs text-green-600 font-bold">
-                            $ {formatCurrency(lowestCurrentPrice)}
+                        {lastHist ? (
+                          <span className="font-mono text-xs text-muted-foreground font-medium">
+                            $ {formatCurrency(lastHist)}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">-</span>
@@ -901,9 +934,10 @@ export default function QuotationMatrix() {
                         const currentPrice =
                           draft !== undefined
                             ? draft
-                            : (ci?.preco_contraproposta > 0
+                            : (ci?.vencedor && ci?.preco_contraproposta > 0
                                 ? ci.preco_contraproposta
                                 : ci?.preco_ofertado) || 0
+
                         return (
                           <TableCell
                             key={cf.id}
@@ -936,7 +970,7 @@ export default function QuotationMatrix() {
             <TableFooter className="bg-muted/30 border-t">
               <TableRow>
                 <TableCell colSpan={5} className="text-right font-semibold py-2 border-r text-xs">
-                  Total do Fornecedor:
+                  Valor Total:
                 </TableCell>
                 {cotacoesF.map((cf) => {
                   let total = 0
@@ -955,10 +989,44 @@ export default function QuotationMatrix() {
                   })
                   return (
                     <TableCell
-                      key={cf.id}
+                      key={`tot-${cf.id}`}
                       className="text-center font-mono font-bold py-2 border-r text-foreground bg-background/50 text-xs"
                     >
                       $ {formatCurrency(total)}
+                    </TableCell>
+                  )
+                })}
+              </TableRow>
+              <TableRow className="bg-amber-50/50">
+                <TableCell
+                  colSpan={5}
+                  className="text-right font-semibold py-2 border-r text-xs text-amber-700"
+                >
+                  Total Selecionado (Parcial):
+                </TableCell>
+                {cotacoesF.map((cf) => {
+                  let selectedTotal = 0
+                  potencialItens.forEach((pi) => {
+                    const ci = cotacoesI.find(
+                      (c) => c.cotacao_fornecedor_id === cf.id && c.item_id === pi.item_id,
+                    )
+                    if (ci?.vencedor) {
+                      const draft = draftPrices[`${cf.id}_${pi.item_id}`]
+                      const price =
+                        draft !== undefined
+                          ? draft
+                          : ((ci.preco_contraproposta > 0
+                              ? ci.preco_contraproposta
+                              : ci.preco_ofertado) ?? 0)
+                      selectedTotal += price * (pi.quantidade || 0)
+                    }
+                  })
+                  return (
+                    <TableCell
+                      key={`sel-${cf.id}`}
+                      className="text-center font-mono font-bold py-2 border-r text-amber-700 bg-amber-50/50 text-xs"
+                    >
+                      $ {formatCurrency(selectedTotal)}
                     </TableCell>
                   )
                 })}
@@ -988,6 +1056,63 @@ export default function QuotationMatrix() {
         summary={{ total: importState ? importState.rows.length - 1 : 0 }}
         onConfirm={handleConfirmImport}
       />
+
+      <Dialog open={!!moqValidation} onOpenChange={(val) => !val && setMoqValidation(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-amber-600 flex items-center gap-2">
+              <TrendingDown className="w-5 h-5" /> Aviso de MOQ
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            <p className="text-sm text-muted-foreground mb-4">
+              A quantidade solicitada de alguns itens está abaixo do exigido pelo fabricante (MOQ).
+              Deseja ajustar a quantidade para o mínimo exigido ou prosseguir assim mesmo?
+            </p>
+            <div className="max-h-48 overflow-y-auto space-y-2 border rounded p-3 bg-muted/20">
+              {moqValidation?.warnings.map((w: any) => (
+                <div
+                  key={w.pi.id}
+                  className="text-xs flex items-center justify-between border-b pb-2 last:border-0 last:pb-0"
+                >
+                  <span className="font-semibold truncate pr-2 max-w-[200px]">
+                    {w.pi.expand?.item_id?.sku}
+                  </span>
+                  <div className="shrink-0 flex items-center gap-3">
+                    <span>
+                      Qtde: <span className="text-red-600 font-bold">{w.pi.quantidade}</span>
+                    </span>
+                    <span>
+                      MOQ:{' '}
+                      <span className="text-amber-600 font-bold">{w.ci.quantidade_minima}</span>
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (moqValidation?.action === 'accept') executeAcceptSelected(false)
+                else executeFinalize(false)
+              }}
+            >
+              Prosseguir Mesmo Assim
+            </Button>
+            <Button
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+              onClick={() => {
+                if (moqValidation?.action === 'accept') executeAcceptSelected(true)
+                else executeFinalize(true)
+              }}
+            >
+              Ajustar para MOQ
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
