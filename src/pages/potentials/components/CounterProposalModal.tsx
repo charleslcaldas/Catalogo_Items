@@ -140,11 +140,16 @@ export function CounterProposalModal({
 
       promises.push(pb.collection('itens').update(item.item_id, { preco_compra: finalPrice }))
 
+      const cw = cotacoesI.find((c: any) => c.id === item.id)
+      const moq = cw?.quantidade_minima || 0
+
       const pItems = potencialItens.filter((pi: any) => pi.item_id === item.item_id)
       for (const pi of pItems) {
-        promises.push(
-          pb.collection('potencial_itens').update(pi.id, { preco_unitario: finalPrice }),
-        )
+        const updateData: any = { preco_unitario: finalPrice }
+        if (moq > 0 && pi.quantidade < moq) {
+          updateData.quantidade = moq
+        }
+        promises.push(pb.collection('potencial_itens').update(pi.id, updateData))
       }
 
       promises.push(
@@ -192,11 +197,16 @@ export function CounterProposalModal({
 
         promises.push(pb.collection('itens').update(item.item_id, { preco_compra: finalPrice }))
 
+        const cw = cotacoesI.find((c: any) => c.id === item.id)
+        const moq = cw?.quantidade_minima || 0
+
         const pItems = potencialItens.filter((pi: any) => pi.item_id === item.item_id)
         for (const pi of pItems) {
-          promises.push(
-            pb.collection('potencial_itens').update(pi.id, { preco_unitario: finalPrice }),
-          )
+          const updateData: any = { preco_unitario: finalPrice }
+          if (moq > 0 && pi.quantidade < moq) {
+            updateData.quantidade = moq
+          }
+          promises.push(pb.collection('potencial_itens').update(pi.id, updateData))
         }
 
         promises.push(

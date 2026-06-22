@@ -380,8 +380,9 @@ export default function QuotationMatrix() {
     const warnings = []
     for (const w of winners) {
       const pi = potencialItens.find((p) => p.item_id === w.item_id)
-      if (pi && w.quantidade_minima > 0 && pi.quantidade < w.quantidade_minima) {
-        warnings.push({ pi, ci: w })
+      const moqToUse = draftMoqs[`${w.cotacao_fornecedor_id}_${w.item_id}`] ?? w.quantidade_minima
+      if (pi && moqToUse > 0 && pi.quantidade < moqToUse) {
+        warnings.push({ pi, ci: { ...w, quantidade_minima: moqToUse } })
       }
     }
 
@@ -407,12 +408,12 @@ export default function QuotationMatrix() {
           draftPrices[`${w.cotacao_fornecedor_id}_${w.item_id}`] ??
           (w.preco_contraproposta > 0 ? w.preco_contraproposta : w.preco_ofertado)
 
+        const moqToUse = draftMoqs[`${w.cotacao_fornecedor_id}_${w.item_id}`] ?? w.quantidade_minima
+
         promises.push(pb.collection('itens').update(w.item_id, { preco_compra: priceToUse }))
 
-        if (adjustMoq && w.quantidade_minima > 0 && pi.quantidade < w.quantidade_minima) {
-          promises.push(
-            pb.collection('potencial_itens').update(pi.id, { quantidade: w.quantidade_minima }),
-          )
+        if (adjustMoq && moqToUse > 0 && pi.quantidade < moqToUse) {
+          promises.push(pb.collection('potencial_itens').update(pi.id, { quantidade: moqToUse }))
         }
         updatedCount++
       }
@@ -431,8 +432,9 @@ export default function QuotationMatrix() {
     const warnings = []
     for (const w of winners) {
       const pi = potencialItens.find((p) => p.item_id === w.item_id)
-      if (pi && w.quantidade_minima > 0 && pi.quantidade < w.quantidade_minima) {
-        warnings.push({ pi, ci: w })
+      const moqToUse = draftMoqs[`${w.cotacao_fornecedor_id}_${w.item_id}`] ?? w.quantidade_minima
+      if (pi && moqToUse > 0 && pi.quantidade < moqToUse) {
+        warnings.push({ pi, ci: { ...w, quantidade_minima: moqToUse } })
       }
     }
     if (warnings.length > 0) {
@@ -450,9 +452,10 @@ export default function QuotationMatrix() {
       for (const w of winners) {
         const pi = potencialItens.find((p) => p.item_id === w.item_id)
         let qty = pi?.quantidade || 0
+        const moqToUse = draftMoqs[`${w.cotacao_fornecedor_id}_${w.item_id}`] ?? w.quantidade_minima
 
-        if (adjustMoq && pi && w.quantidade_minima > 0 && pi.quantidade < w.quantidade_minima) {
-          qty = w.quantidade_minima
+        if (adjustMoq && pi && moqToUse > 0 && pi.quantidade < moqToUse) {
+          qty = moqToUse
           promises.push(pb.collection('potencial_itens').update(pi.id, { quantidade: qty }))
         }
 
