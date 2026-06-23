@@ -466,7 +466,7 @@ export default function QuotationMatrix() {
         promises.push(pb.collection('itens').update(w.item_id, { preco_compra: priceToUse }))
 
         const margin = pi.expand?.item_id?.expand?.linha_id?.margem_padrao ?? 7.5
-        const newSellingPrice = priceToUse * (1 + margin / 100)
+        const newSellingPrice = margin < 100 ? priceToUse / (1 - margin / 100) : priceToUse
 
         let qtdeToUpdate = pi.quantidade
         if (adjustMoq && moqToUse > 0 && pi.quantidade < moqToUse) {
