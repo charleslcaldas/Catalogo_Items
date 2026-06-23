@@ -16,14 +16,6 @@ onRecordCreate((e) => {
       e.record.set('referencia_preco', history.get('preco'))
       e.record.set('referencia_fornecedor', history.get('fornecedor'))
       e.record.set('referencia_data', history.get('data_cotacao'))
-    } else {
-      // Fallback to item cost if no history exists
-      const item = $app.findRecordById('itens', itemId)
-      if (item && item.get('preco_compra')) {
-        e.record.set('referencia_preco', item.get('preco_compra'))
-        e.record.set('referencia_fornecedor', item.get('fornecedor_ultima_atualizacao'))
-        e.record.set('referencia_data', item.get('data_atualizacao') || item.get('created'))
-      }
     }
   } catch (err) {
     console.log('Error fetching history for reference snapshot:', err.message)

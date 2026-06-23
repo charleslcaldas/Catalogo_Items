@@ -60,7 +60,6 @@ export default function QuotationMatrix() {
   const [potencialItens, setPotencialItens] = useState<any[]>([])
   const [cotacoesF, setCotacoesF] = useState<any[]>([])
   const [cotacoesI, setCotacoesI] = useState<any[]>([])
-  const [historico, setHistorico] = useState<any[]>([])
   const [fornecedores, setFornecedores] = useState<any[]>([])
 
   const [isAddOpen, setIsAddOpen] = useState(false)
@@ -118,15 +117,6 @@ export default function QuotationMatrix() {
 
       const anyFinalizada = cF.some((c) => c.status === 'finalizada')
       if (anyFinalizada && !isFrozen) setIsFrozen(true)
-
-      const itemIds = pItens.map((i) => i.item_id)
-      if (itemIds.length > 0) {
-        const hist = await pb.collection('historico_precos').getFullList({
-          filter: itemIds.map((id) => `item_id="${id}"`).join(' || '),
-          sort: '-data_cotacao',
-        })
-        setHistorico(hist)
-      }
 
       const linhaIds = Array.from(
         new Set(pItens.map((i) => i.expand?.item_id?.linha_id).filter(Boolean)),
@@ -631,9 +621,8 @@ export default function QuotationMatrix() {
     potencialItens.forEach((pi) => {
       const qty = pi.quantidade || 0
 
-      const lastHist = historico.find((h) => h.item_id === pi.item_id)
-      const lastPrice = lastHist ? lastHist.preco : pi.expand?.item_id?.preco_compra || 0
-      custoUltimoPreco += qty * lastPrice
+      const refPrice = typeof pi.referencia_preco === 'number' ? pi.referencia_preco : 0
+      custoUltimoPreco += qty * refPrice
 
       const winner = cotacoesI.find((c) => c.item_id === pi.item_id && c.vencedor)
       let selectedPrice = 0
@@ -657,7 +646,7 @@ export default function QuotationMatrix() {
       rentabilidadeAbsoluta,
       rentabilidadePercentual,
     }
-  }, [potencialItens, cotacoesI, draftPrices, historico])
+  }, [potencialItens, cotacoesI, draftPrices])
 
   const formatCurrency = (val: number) =>
     val.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
@@ -868,9 +857,9 @@ export default function QuotationMatrix() {
                 <TableHead className="min-w-[160px] font-semibold py-2">Item</TableHead>
                 <TableHead className="font-semibold text-center w-16 py-2">Qtd</TableHead>
                 <TableHead className="font-semibold text-right min-w-[90px] py-2 bg-muted/10 border-r">
-                  Último Preço
+                  Custo Referência
                   <span className="text-[9px] font-normal text-muted-foreground block">
-                    (Histórico)
+                    (Snapshot)
                   </span>
                 </TableHead>
                 <TableHead className="font-semibold text-right min-w-[90px] py-2 border-r bg-muted/5">
@@ -1075,10 +1064,11 @@ export default function QuotationMatrix() {
                     }
                   }
 
-                  const lastHist = historico.find((h) => h.item_id === pi.item_id)
-                  const lastPrice = lastHist
-                    ? lastHist.preco
-                    : pi.expand?.item_id?.preco_compra || 0
+                  const hasSnapshot =
+                    typeof pi.referencia_preco === 'number' && pi.referencia_preco > 0
+                  const refPrice = hasSnapshot ? pi.referencia_preco : null
+                  const refSupplier = pi.referencia_fornecedor
+                  const refDate = pi.referencia_data
 
                   return (
                     <TableRow key={pi.id} className="group hover:bg-transparent">
@@ -1107,39 +1097,25 @@ export default function QuotationMatrix() {
                           isCompact ? 'py-1' : 'py-1.5',
                         )}
                       >
-                        {lastPrice > 0 ? (
+                        {refPrice ? (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <span className="font-mono text-xs text-amber-600 font-bold cursor-help underline decoration-dashed underline-offset-2">
-                                $ {formatCurrency(lastPrice)}
+                                $ {formatCurrency(refPrice)}
                               </span>
                             </TooltipTrigger>
                             <TooltipContent>
                               <p className="font-semibold">
-                                Último Fornecedor:{' '}
-                                {lastHist
-                                  ? lastHist.fornecedor
-                                  : pi.expand?.item_id?.fornecedor_ultima_atualizacao ||
-                                    'Não informado'}
+                                Fornecedor: {refSupplier || 'Não informado'}
                               </p>
                               <p className="text-xs text-muted-foreground">
                                 Data do Preço:{' '}
-                                {(
-                                  lastHist
-                                    ? lastHist.data_cotacao
-                                    : pi.expand?.item_id?.data_atualizacao
-                                )
-                                  ? new Date(
-                                      lastHist
-                                        ? lastHist.data_cotacao
-                                        : pi.expand?.item_id?.data_atualizacao,
-                                    ).toLocaleDateString()
-                                  : 'Não informada'}
+                                {refDate ? new Date(refDate).toLocaleDateString() : 'Não informada'}
                               </p>
                             </TooltipContent>
                           </Tooltip>
                         ) : (
-                          <span className="font-mono text-xs text-amber-600 font-bold">-</span>
+                          <span className="font-mono text-xs text-amber-600 font-bold">N/A</span>
                         )}
                       </TableCell>
 
@@ -1270,7 +1246,7 @@ export default function QuotationMatrix() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-2">
             <div className="border rounded-xl p-4 bg-card shadow-sm flex flex-col justify-center">
               <span className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">
-                Custo Último Preço
+                Custo Referência
               </span>
               <span className="text-lg font-mono font-bold text-amber-600 mt-1">
                 $ {formatCurrency(costSummary.custoUltimoPreco)}

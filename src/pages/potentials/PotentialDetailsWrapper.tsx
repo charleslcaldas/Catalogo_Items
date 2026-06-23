@@ -21,7 +21,6 @@ export default function PotentialDetailsWrapper() {
   const [searchParams] = useSearchParams()
   const potencialId =
     searchParams.get('id') || searchParams.get('potencialId') || searchParams.get('potencial_id')
-  const [acceptedPrices, setAcceptedPrices] = useState<Record<string, number>>({})
 
   const handleTabChange = (v: string) => {
     setTab(v)
@@ -31,32 +30,16 @@ export default function PotentialDetailsWrapper() {
   const loadTotals = async () => {
     if (!potencialId) return
     try {
-      const [items, cotacoes] = await Promise.all([
-        pb.collection('potencial_itens').getFullList({
-          filter: `potencial_id="${potencialId}"`,
-          expand: 'item_id',
-        }),
-        pb
-          .collection('cotacoes_itens')
-          .getFullList({
-            filter: `cotacao_fornecedor_id.potencial_id="${potencialId}" && vencedor=true`,
-          })
-          .catch(() => []),
-      ])
-
-      const accMap: Record<string, number> = {}
-      cotacoes.forEach((ci) => {
-        accMap[ci.item_id] =
-          ci.preco_contraproposta > 0 ? ci.preco_contraproposta : ci.preco_ofertado
+      const items = await pb.collection('potencial_itens').getFullList({
+        filter: `potencial_id="${potencialId}"`,
+        expand: 'item_id',
       })
-      setAcceptedPrices(accMap)
 
       let totalPurchase = 0
       let totalSale = 0
       items.forEach((item) => {
         const q = item.quantidade || 0
-        const accepted = accMap[item.item_id]
-        const p = accepted ?? item.referencia_preco ?? (item.expand?.item_id?.preco_compra || 0)
+        const p = typeof item.referencia_preco === 'number' ? item.referencia_preco : 0
         const v = item.preco_unitario || 0
         totalPurchase += q * p
         totalSale += q * v
@@ -92,9 +75,8 @@ export default function PotentialDetailsWrapper() {
         expand: 'item_id',
       })
       const promises = items.map((item) => {
-        const accepted = acceptedPrices[item.item_id]
-        const cost = accepted ?? item.referencia_preco ?? (item.expand?.item_id?.preco_compra || 0)
-        const salePrice = cost / (1 - margin / 100)
+        const cost = typeof item.referencia_preco === 'number' ? item.referencia_preco : 0
+        const salePrice = cost > 0 ? cost / (1 - margin / 100) : item.preco_unitario
         return pb.collection('potencial_itens').update(item.id, { preco_unitario: salePrice })
       })
       await Promise.all(promises)
