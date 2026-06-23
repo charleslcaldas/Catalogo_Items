@@ -43,6 +43,9 @@ export type SelectedItemData = {
   preco_unitario: number | ''
   observacoes: string
   ordem?: number
+  referencia_preco?: number
+  referencia_fornecedor?: string
+  referencia_data?: string
 }
 
 export type SelectedItemRecord = {
@@ -197,7 +200,16 @@ export default function AddItemsToPotential() {
           })
           setSelectedItems((prev) => [
             ...prev,
-            { id: item.id, recordId: created.id, data: newItemData },
+            {
+              id: item.id,
+              recordId: created.id,
+              data: {
+                ...newItemData,
+                referencia_preco: created.referencia_preco,
+                referencia_fornecedor: created.referencia_fornecedor,
+                referencia_data: created.referencia_data,
+              },
+            },
           ])
           toast.success(`Item ${item.sku} adicionado à cotação.`)
         } catch (error: any) {
@@ -361,6 +373,9 @@ export default function AddItemsToPotential() {
           preco_unitario: pi.preco_unitario !== undefined ? pi.preco_unitario : '',
           observacoes: pi.observacoes || '',
           ordem: pi.ordem || 0,
+          referencia_preco: pi.referencia_preco,
+          referencia_fornecedor: pi.referencia_fornecedor,
+          referencia_data: pi.referencia_data,
         },
       }))
 

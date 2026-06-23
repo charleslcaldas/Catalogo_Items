@@ -38,7 +38,7 @@ export default function PotentialDetailsWrapper() {
       let totalSale = 0
       items.forEach((item) => {
         const q = item.quantidade || 0
-        const p = item.expand?.item_id?.preco_compra || 0
+        const p = item.referencia_preco ?? (item.expand?.item_id?.preco_compra || 0)
         const v = item.preco_unitario || 0
         totalPurchase += q * p
         totalSale += q * v
@@ -74,7 +74,7 @@ export default function PotentialDetailsWrapper() {
         expand: 'item_id',
       })
       const promises = items.map((item) => {
-        const cost = item.expand?.item_id?.preco_compra || 0
+        const cost = item.referencia_preco ?? (item.expand?.item_id?.preco_compra || 0)
         const salePrice = cost / (1 - margin / 100)
         return pb.collection('potencial_itens').update(item.id, { preco_unitario: salePrice })
       })

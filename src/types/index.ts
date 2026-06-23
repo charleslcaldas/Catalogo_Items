@@ -163,6 +163,9 @@ export type PotencialItem = {
   preco_unitario: number
   observacoes: string
   ordem?: number
+  referencia_preco?: number
+  referencia_fornecedor?: string
+  referencia_data?: string
   created: string
   updated: string
   expand?: {

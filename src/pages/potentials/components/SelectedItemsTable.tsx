@@ -234,10 +234,17 @@ export function SelectedItemsTable({
                 </TableCell>
                 <TableCell className="py-1 text-xs text-right font-mono text-amber-600 font-semibold whitespace-nowrap">
                   {(() => {
+                    const hasSnapshot = typeof data.referencia_preco === 'number'
                     const hist = historyMap[id]
-                    const refPrice = hist?.preco ?? data.item.preco_compra ?? 0
-                    const refSupplier = hist?.fornecedor ?? data.item.fornecedor_ultima_atualizacao
-                    const refDate = hist?.data_cotacao ?? data.item.data_atualizacao
+                    const refPrice = hasSnapshot
+                      ? data.referencia_preco
+                      : (hist?.preco ?? data.item.preco_compra ?? 0)
+                    const refSupplier = hasSnapshot
+                      ? data.referencia_fornecedor
+                      : (hist?.fornecedor ?? data.item.fornecedor_ultima_atualizacao)
+                    const refDate = hasSnapshot
+                      ? data.referencia_data
+                      : (hist?.data_cotacao ?? data.item.data_atualizacao)
 
                     return (
                       <Tooltip>
@@ -258,6 +265,9 @@ export function SelectedItemsTable({
                           <p className="text-xs text-muted-foreground">
                             Data: {refDate ? new Date(refDate).toLocaleDateString() : '-'}
                           </p>
+                          {hasSnapshot && (
+                            <p className="text-[10px] text-amber-500 mt-1">Snapshot salvo</p>
+                          )}
                         </TooltipContent>
                       </Tooltip>
                     )
@@ -266,21 +276,22 @@ export function SelectedItemsTable({
                 <TableCell className="py-1 text-right">
                   <FormattedInput
                     className="h-7 w-16 px-2 text-right text-xs bg-white ml-auto"
-                    value={
-                      Number(data.preco_unitario) > 0 &&
-                      ((historyMap[id]?.preco ?? data.item.preco_compra) || 0) > 0
-                        ? (
-                            (1 -
-                              ((historyMap[id]?.preco ?? data.item.preco_compra) || 0) /
-                                Number(data.preco_unitario)) *
-                            100
-                          ).toFixed(3)
+                    value={(() => {
+                      const hasSnapshot = typeof data.referencia_preco === 'number'
+                      const custo = hasSnapshot
+                        ? Number(data.referencia_preco)
+                        : (historyMap[id]?.preco ?? data.item.preco_compra) || 0
+                      return Number(data.preco_unitario) > 0 && custo > 0
+                        ? ((1 - custo / Number(data.preco_unitario)) * 100).toFixed(3)
                         : '0.000'
-                    }
+                    })()}
                     onValueChange={(val) => {
                       const m = parseFloat(val) || 0
                       if (m >= 100) return
-                      const custo = (historyMap[id]?.preco ?? data.item.preco_compra) || 0
+                      const hasSnapshot = typeof data.referencia_preco === 'number'
+                      const custo = hasSnapshot
+                        ? Number(data.referencia_preco)
+                        : (historyMap[id]?.preco ?? data.item.preco_compra) || 0
                       const newVenda = custo / (1 - m / 100)
                       handleUpdateItem(id, 'preco_unitario', newVenda.toFixed(3))
                     }}
