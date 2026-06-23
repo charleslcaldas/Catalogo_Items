@@ -35,6 +35,40 @@ export function SelectedItemsTable({
   setIsSelecting,
 }: SelectedItemsTableProps) {
   const [historyMap, setHistoryMap] = useState<Record<string, any>>({})
+  const [acceptedPrices, setAcceptedPrices] = useState<
+    Record<string, { preco: number; fornecedor: string; data: string }>
+  >({})
+
+  useEffect(() => {
+    const fetchAcceptedPrices = async () => {
+      const searchParams = new URLSearchParams(window.location.search)
+      const potencialId =
+        searchParams.get('id') ||
+        searchParams.get('potencialId') ||
+        searchParams.get('potencial_id')
+      if (!potencialId) return
+
+      try {
+        const res = await pb.collection('cotacoes_itens').getFullList({
+          filter: `cotacao_fornecedor_id.potencial_id="${potencialId}" && vencedor=true`,
+          expand: 'cotacao_fornecedor_id.fornecedor_id',
+        })
+        const map: Record<string, any> = {}
+        res.forEach((ci) => {
+          const f = ci.expand?.cotacao_fornecedor_id?.expand?.fornecedor_id
+          map[ci.item_id] = {
+            preco: ci.preco_contraproposta > 0 ? ci.preco_contraproposta : ci.preco_ofertado,
+            fornecedor: f?.nome || 'Fornecedor Vencedor',
+            data: ci.updated,
+          }
+        })
+        setAcceptedPrices(map)
+      } catch (err) {
+        console.error('Failed to fetch accepted prices', err)
+      }
+    }
+    fetchAcceptedPrices()
+  }, [selectedItems.map((si) => si.id).join(',')])
 
   useEffect(() => {
     const itemIds = Array.from(new Set(selectedItems.map((si) => si.id)))
@@ -135,7 +169,19 @@ export function SelectedItemsTable({
             <TableHead className="w-24 text-[11px]">Acabamento</TableHead>
             <TableHead className="w-16 text-[11px] text-center">Unidade</TableHead>
             <TableHead className="w-20 text-[11px]">Quant.</TableHead>
-            <TableHead className="w-20 text-[11px] text-right text-amber-600">Custo Ref.</TableHead>
+            <TableHead className="w-20 text-[11px] text-right text-amber-600">
+              <Tooltip>
+                <TooltipTrigger className="cursor-help underline decoration-dashed underline-offset-2">
+                  Custo Ref.
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs font-semibold">Custo de Referência</p>
+                  <p className="text-[10px] text-muted-foreground mt-1 max-w-[150px] leading-tight">
+                    Prioriza o Preço Aceito pelo Fabricante para este potencial.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TableHead>
             <TableHead className="w-20 text-[11px] text-right">Margem %</TableHead>
             <TableHead className="w-28 text-[11px] text-right">Preço Venda</TableHead>
             <TableHead className="w-24 text-[11px] text-right">Total</TableHead>
@@ -234,17 +280,25 @@ export function SelectedItemsTable({
                 </TableCell>
                 <TableCell className="py-1 text-xs text-right font-mono text-amber-600 font-semibold whitespace-nowrap">
                   {(() => {
+                    const accepted = acceptedPrices[id]
                     const hasSnapshot = typeof data.referencia_preco === 'number'
                     const hist = historyMap[id]
-                    const refPrice = hasSnapshot
-                      ? data.referencia_preco
-                      : (hist?.preco ?? data.item.preco_compra ?? 0)
-                    const refSupplier = hasSnapshot
-                      ? data.referencia_fornecedor
-                      : (hist?.fornecedor ?? data.item.fornecedor_ultima_atualizacao)
-                    const refDate = hasSnapshot
-                      ? data.referencia_data
-                      : (hist?.data_cotacao ?? data.item.data_atualizacao)
+
+                    const refPrice =
+                      accepted?.preco ??
+                      (hasSnapshot
+                        ? data.referencia_preco
+                        : (hist?.preco ?? data.item.preco_compra ?? 0))
+                    const refSupplier =
+                      accepted?.fornecedor ??
+                      (hasSnapshot
+                        ? data.referencia_fornecedor
+                        : (hist?.fornecedor ?? data.item.fornecedor_ultima_atualizacao))
+                    const refDate =
+                      accepted?.data ??
+                      (hasSnapshot
+                        ? data.referencia_data
+                        : (hist?.data_cotacao ?? data.item.data_atualizacao))
 
                     return (
                       <Tooltip>
@@ -261,11 +315,20 @@ export function SelectedItemsTable({
                           </div>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p className="font-semibold">Último Fornecedor: {refSupplier || '-'}</p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="font-semibold">
+                            {accepted
+                              ? `Preço Aceito (${refSupplier})`
+                              : `Último Fornecedor: ${refSupplier || '-'}`}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
                             Data: {refDate ? new Date(refDate).toLocaleDateString() : '-'}
                           </p>
-                          {hasSnapshot && (
+                          {accepted && (
+                            <p className="text-[10px] text-green-600 mt-1 font-medium">
+                              Preço Aceito pelo Fabricante
+                            </p>
+                          )}
+                          {!accepted && hasSnapshot && (
                             <p className="text-[10px] text-amber-500 mt-1">Snapshot salvo</p>
                           )}
                         </TooltipContent>
@@ -277,10 +340,13 @@ export function SelectedItemsTable({
                   <FormattedInput
                     className="h-7 w-16 px-2 text-right text-xs bg-white ml-auto"
                     value={(() => {
+                      const accepted = acceptedPrices[id]
                       const hasSnapshot = typeof data.referencia_preco === 'number'
-                      const custo = hasSnapshot
-                        ? Number(data.referencia_preco)
-                        : (historyMap[id]?.preco ?? data.item.preco_compra) || 0
+                      const custo =
+                        accepted?.preco ??
+                        (hasSnapshot
+                          ? Number(data.referencia_preco)
+                          : (historyMap[id]?.preco ?? data.item.preco_compra) || 0)
                       return Number(data.preco_unitario) > 0 && custo > 0
                         ? ((1 - custo / Number(data.preco_unitario)) * 100).toFixed(3)
                         : '0.000'
@@ -288,10 +354,13 @@ export function SelectedItemsTable({
                     onValueChange={(val) => {
                       const m = parseFloat(val) || 0
                       if (m >= 100) return
+                      const accepted = acceptedPrices[id]
                       const hasSnapshot = typeof data.referencia_preco === 'number'
-                      const custo = hasSnapshot
-                        ? Number(data.referencia_preco)
-                        : (historyMap[id]?.preco ?? data.item.preco_compra) || 0
+                      const custo =
+                        accepted?.preco ??
+                        (hasSnapshot
+                          ? Number(data.referencia_preco)
+                          : (historyMap[id]?.preco ?? data.item.preco_compra) || 0)
                       const newVenda = custo / (1 - m / 100)
                       handleUpdateItem(id, 'preco_unitario', newVenda.toFixed(3))
                     }}
