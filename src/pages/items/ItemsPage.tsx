@@ -934,9 +934,26 @@ export default function ItemsPage() {
                               })()}
                             </TableCell>
                             <TableCell className="whitespace-nowrap py-1 px-2 text-xs overflow-hidden text-ellipsis">
-                              {typeof item.preco_venda === 'number'
-                                ? `$ ${item.preco_venda.toFixed(2)}`
-                                : '-'}
+                              {typeof item.preco_venda === 'number' ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="cursor-help decoration-dotted underline underline-offset-2 decoration-muted-foreground/50">
+                                      $ {item.preco_venda.toFixed(2)}
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="font-semibold">Preço de Venda</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      Margem aplicada:{' '}
+                                      {item.preco_compra && item.preco_compra > 0
+                                        ? `${((item.preco_venda / item.preco_compra - 1) * 100).toFixed(1)}%`
+                                        : `${item.expand?.linha_id?.margem_padrao ?? 7.5}% (Padrão)`}
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              ) : (
+                                '-'
+                              )}
                             </TableCell>
                             <TableCell className="py-1 px-2 overflow-hidden text-ellipsis whitespace-nowrap">
                               <div className="flex items-center gap-1.5">

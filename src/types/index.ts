@@ -41,6 +41,7 @@ export type Linha = {
   superlinha_pt: string
   superlinha_en: string
   color?: string
+  margem_padrao?: number
   created: string
   updated: string
   expand?: {

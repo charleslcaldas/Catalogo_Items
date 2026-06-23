@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useData } from '@/contexts/data-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, Trash2, ArrowRight, FilterX, Search, Settings } from 'lucide-react'
+import { Plus, Trash2, ArrowRight, FilterX, Search, Settings, Percent } from 'lucide-react'
 import { LineAttributesModal } from '@/components/LineAttributesModal'
 import { LineModal } from '@/components/MetadataModals'
 import { getContrastColor } from '@/lib/utils'
@@ -38,6 +38,9 @@ export default function Lines() {
   const [attrData, setAttrData] = useState<Linha | null>(null)
   const [lineToDelete, setLineToDelete] = useState<Linha | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [marginModalOpen, setMarginModalOpen] = useState(false)
+  const [marginData, setMarginData] = useState<Linha | null>(null)
+  const [tempMargin, setTempMargin] = useState('')
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -117,6 +120,7 @@ export default function Lines() {
                 <TableHead>Nome (PT)</TableHead>
                 <TableHead>Name (EN)</TableHead>
                 <TableHead>Categoria</TableHead>
+                <TableHead>Margem Padrão</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -158,8 +162,28 @@ export default function Lines() {
                       {getCatName(lin.categoria_id)}
                     </span>
                   </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">
+                        {lin.margem_padrao != null ? `${lin.margem_padrao}%` : '7.5% (Global)'}
+                      </span>
+                    </div>
+                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setMarginData(lin)
+                          setTempMargin(lin.margem_padrao?.toString() || '')
+                          setMarginModalOpen(true)
+                        }}
+                        title="Configurar Margem Padrão"
+                      >
+                        <Percent className="h-4 w-4" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -205,6 +229,45 @@ export default function Lines() {
 
       <LineModal open={modalOpen} onOpenChange={setModalOpen} initialData={editData} />
       <LineAttributesModal open={attrModalOpen} onOpenChange={setAttrModalOpen} linha={attrData} />
+
+      <AlertDialog open={marginModalOpen} onOpenChange={setMarginModalOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Configurar Margem Padrão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Defina a margem padrão para a linha <strong>{marginData?.nome_pt}</strong>. Deixe em
+              branco para usar o padrão global (7.5%).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <Input
+              type="number"
+              step="0.1"
+              placeholder="7.5"
+              value={tempMargin}
+              onChange={(e) => setTempMargin(e.target.value)}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!marginData) return
+                try {
+                  const val = tempMargin ? parseFloat(tempMargin) : null
+                  await pb.collection('linhas').update(marginData.id, { margem_padrao: val })
+                  toast.success('Margem atualizada com sucesso')
+                  setMarginModalOpen(false)
+                } catch (error: any) {
+                  toast.error('Erro ao atualizar margem', { description: error.message })
+                }
+              }}
+            >
+              Salvar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={!!lineToDelete}

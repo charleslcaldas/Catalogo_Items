@@ -319,12 +319,21 @@ export function ItemFormModal({
                   onValueChange={(v) => {
                     const db = descricoesBase.find((d) => d.id === v)
                     if (db) {
+                      let newPrecoVenda = formData.preco_venda
+                      if (formData.preco_compra != null) {
+                        const selectedLinha = linhas.find((l) => l.id === db.linha_id)
+                        const margin = selectedLinha?.margem_padrao ?? 7.5
+                        newPrecoVenda = Number(
+                          (formData.preco_compra * (1 + margin / 100)).toFixed(2),
+                        )
+                      }
                       setFormData({
                         ...formData,
                         descricao_base_id: v,
                         descricao_base_pt: db.nome_pt,
                         descricao_base_en: db.nome_en,
                         linha_id: db.linha_id,
+                        preco_venda: newPrecoVenda,
                       })
                     }
                   }}
@@ -366,7 +375,17 @@ export function ItemFormModal({
               <div className="flex gap-2">
                 <Select
                   value={formData.linha_id}
-                  onValueChange={(v) => setFormData({ ...formData, linha_id: v })}
+                  onValueChange={(v) => {
+                    let newPrecoVenda = formData.preco_venda
+                    if (formData.preco_compra != null) {
+                      const selectedLinha = linhas.find((l) => l.id === v)
+                      const margin = selectedLinha?.margem_padrao ?? 7.5
+                      newPrecoVenda = Number(
+                        (formData.preco_compra * (1 + margin / 100)).toFixed(2),
+                      )
+                    }
+                    setFormData({ ...formData, linha_id: v, preco_venda: newPrecoVenda })
+                  }}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Selecione..." />
@@ -505,7 +524,15 @@ export function ItemFormModal({
               <Label>{isPt ? 'Último Preço (Compra)' : 'Last Price (Purchase)'}</Label>
               <PriceInput
                 value={formData.preco_compra}
-                onChange={(val) => setFormData({ ...formData, preco_compra: val })}
+                onChange={(val) => {
+                  let newPrecoVenda = formData.preco_venda
+                  if (val != null) {
+                    const selectedLinha = linhas.find((l) => l.id === formData.linha_id)
+                    const margin = selectedLinha?.margem_padrao ?? 7.5
+                    newPrecoVenda = Number((val * (1 + margin / 100)).toFixed(2))
+                  }
+                  setFormData({ ...formData, preco_compra: val, preco_venda: newPrecoVenda })
+                }}
               />
             </div>
             <div className="col-span-12 sm:col-span-3 space-y-2">
@@ -531,6 +558,11 @@ export function ItemFormModal({
                 value={formData.preco_venda}
                 onChange={(val) => setFormData({ ...formData, preco_venda: val })}
               />
+              <p className="text-[10px] text-muted-foreground mt-1">
+                {formData.preco_compra && formData.preco_venda
+                  ? `Margem: ${((formData.preco_venda / formData.preco_compra - 1) * 100).toFixed(1)}%`
+                  : 'Auto-calculado pela linha'}
+              </p>
             </div>
 
             <div className="col-span-12 space-y-2">
