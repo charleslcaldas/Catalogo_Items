@@ -990,21 +990,27 @@ export default function QuotationMatrix() {
                         </Popover>
                       </div>
 
-                      {cf.status === 'finalizada' ? (
-                        <Badge
-                          variant="secondary"
-                          className="mt-0.5 text-[9px] h-3.5 bg-muted-foreground/10 text-muted-foreground"
-                        >
-                          Finalizada
-                        </Badge>
-                      ) : (
-                        <Badge
-                          variant="outline"
-                          className="mt-0.5 text-[9px] h-3.5 border-amber-300 text-amber-700 bg-amber-50"
-                        >
-                          Pendente
-                        </Badge>
-                      )}
+                      {(() => {
+                        const hasPrices = cotacoesI.some(
+                          (c) => c.cotacao_fornecedor_id === cf.id && c.preco_ofertado > 0,
+                        )
+                        const isFinalizada = cf.status === 'finalizada' || hasPrices
+                        return isFinalizada ? (
+                          <Badge
+                            variant="secondary"
+                            className="mt-0.5 text-[9px] h-3.5 bg-muted-foreground/10 text-muted-foreground"
+                          >
+                            Finalizada
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="outline"
+                            className="mt-0.5 text-[9px] h-3.5 border-amber-300 text-amber-700 bg-amber-50"
+                          >
+                            Pendente
+                          </Badge>
+                        )
+                      })()}
 
                       <div className="flex gap-1 mt-1 text-[9px] text-muted-foreground">
                         {cf.incoterm && (
@@ -1101,9 +1107,40 @@ export default function QuotationMatrix() {
                           isCompact ? 'py-1' : 'py-1.5',
                         )}
                       >
-                        <span className="font-mono text-xs text-amber-600 font-bold">
-                          {lastPrice > 0 ? `$ ${formatCurrency(lastPrice)}` : '-'}
-                        </span>
+                        {lastPrice > 0 ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="font-mono text-xs text-amber-600 font-bold cursor-help underline decoration-dashed underline-offset-2">
+                                $ {formatCurrency(lastPrice)}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="font-semibold">
+                                Último Fornecedor:{' '}
+                                {lastHist
+                                  ? lastHist.fornecedor
+                                  : pi.expand?.item_id?.fornecedor_ultima_atualizacao ||
+                                    'Não informado'}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Data do Preço:{' '}
+                                {(
+                                  lastHist
+                                    ? lastHist.data_cotacao
+                                    : pi.expand?.item_id?.data_atualizacao
+                                )
+                                  ? new Date(
+                                      lastHist
+                                        ? lastHist.data_cotacao
+                                        : pi.expand?.item_id?.data_atualizacao,
+                                    ).toLocaleDateString()
+                                  : 'Não informada'}
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <span className="font-mono text-xs text-amber-600 font-bold">-</span>
+                        )}
                       </TableCell>
 
                       <TableCell
@@ -1113,21 +1150,9 @@ export default function QuotationMatrix() {
                         )}
                       >
                         {lowestCurrentPrice ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="font-mono text-xs text-green-700 font-bold cursor-help underline decoration-dashed underline-offset-2">
-                                $ {formatCurrency(lowestCurrentPrice)}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="font-semibold">
-                                {lowestCurrentProviderName || 'Fornecedor'}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                Data: {lowestCurrentDate || 'Atual'}
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
+                          <span className="font-mono text-xs text-green-700 font-bold">
+                            $ {formatCurrency(lowestCurrentPrice)}
+                          </span>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}

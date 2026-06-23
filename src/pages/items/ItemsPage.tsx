@@ -117,8 +117,8 @@ export default function ItemsPage() {
       acabamento_id: 120,
       ncm_id: 100,
       descricao_base_id: 150,
+      preco_compra: 130,
       preco_venda: 100,
-      validade_preco: 120,
       status: 150,
     }),
     [],
@@ -673,20 +673,20 @@ export default function ItemsPage() {
                   {!selectedItemId && (
                     <>
                       <ResizableHeader
+                        width={colWidths.preco_compra}
+                        onResize={(w) => handleResize('preco_compra', w)}
+                        onResizeEnd={(w) => handleResizeEnd('preco_compra', w)}
+                        className="px-2"
+                      >
+                        Último Preço
+                      </ResizableHeader>
+                      <ResizableHeader
                         width={colWidths.preco_venda}
                         onResize={(w) => handleResize('preco_venda', w)}
                         onResizeEnd={(w) => handleResizeEnd('preco_venda', w)}
                         className="px-2"
                       >
                         Preço Venda
-                      </ResizableHeader>
-                      <ResizableHeader
-                        width={colWidths.validade_preco}
-                        onResize={(w) => handleResize('validade_preco', w)}
-                        onResizeEnd={(w) => handleResizeEnd('validade_preco', w)}
-                        className="px-2"
-                      >
-                        Validade do Preço
                       </ResizableHeader>
                       <ResizableHeader
                         width={colWidths.status}
@@ -865,14 +865,41 @@ export default function ItemsPage() {
                         </TableCell>
                         {!selectedItemId && (
                           <>
+                            <TableCell className="py-1 px-2 text-xs overflow-hidden text-ellipsis">
+                              {typeof item.preco_compra === 'number' && item.preco_compra > 0 ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="flex flex-col cursor-help">
+                                      <span className="font-semibold text-amber-600">
+                                        $ {item.preco_compra.toFixed(2)}
+                                      </span>
+                                      {item.fornecedor_ultima_atualizacao && (
+                                        <span className="text-[9px] text-muted-foreground truncate">
+                                          {item.fornecedor_ultima_atualizacao}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="font-semibold">
+                                      Último Fornecedor:{' '}
+                                      {item.fornecedor_ultima_atualizacao || 'Não informado'}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      Data do Preço:{' '}
+                                      {item.data_atualizacao
+                                        ? new Date(item.data_atualizacao).toLocaleDateString()
+                                        : 'Não informada'}
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              ) : (
+                                '-'
+                              )}
+                            </TableCell>
                             <TableCell className="whitespace-nowrap py-1 px-2 text-xs overflow-hidden text-ellipsis">
                               {typeof item.preco_venda === 'number'
                                 ? `$ ${item.preco_venda.toFixed(2)}`
-                                : '-'}
-                            </TableCell>
-                            <TableCell className="whitespace-nowrap py-1 px-2 text-xs overflow-hidden text-ellipsis">
-                              {item.validade_preco
-                                ? item.validade_preco.split('T')[0].split('-').reverse().join('/')
                                 : '-'}
                             </TableCell>
                             <TableCell className="py-1 px-2 overflow-hidden text-ellipsis whitespace-nowrap">

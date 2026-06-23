@@ -843,14 +843,14 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
               <h4 className="font-semibold text-xs border-b pb-1 mb-1">Preço e Texto</h4>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <Field label="Preço Compra" className="md:col-span-3">
+                <Field label="Último Preço (Compra)" className="md:col-span-3">
                   <PriceInput
                     disabled={!isEditing}
                     value={formData.preco_compra}
                     onChange={(val) => setFormData({ ...formData, preco_compra: val })}
                   />
                 </Field>
-                <Field label="Fornecedor Atual" className="md:col-span-3">
+                <Field label="Último Fornecedor" className="md:col-span-3">
                   <Input
                     className="h-8 text-xs"
                     disabled={!isEditing}
@@ -860,6 +860,17 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     }
                   />
                 </Field>
+                <Field label="Data do Preço" className="md:col-span-3">
+                  <Input
+                    type="date"
+                    className="h-8 text-xs"
+                    disabled={!isEditing}
+                    value={
+                      formData.data_atualizacao ? formData.data_atualizacao.substring(0, 10) : ''
+                    }
+                    onChange={(e) => setFormData({ ...formData, data_atualizacao: e.target.value })}
+                  />
+                </Field>
                 <Field label="Preço Venda" className="md:col-span-3">
                   <PriceInput
                     disabled={!isEditing}
@@ -867,7 +878,10 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     onChange={(val) => setFormData({ ...formData, preco_venda: val })}
                   />
                 </Field>
-                <Field label="Descrição Curta (PT) (Auto/Manual)" className="md:col-span-3">
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                <Field label="Descrição Curta (PT) (Auto/Manual)" className="md:col-span-12">
                   <Input
                     className="h-8 text-xs font-medium"
                     disabled={!isEditing}
@@ -1154,14 +1168,14 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
               <h4 className="font-semibold text-xs border-b pb-1 mb-1">Preço e Texto (EN)</h4>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <Field label="Purchase Price" className="md:col-span-3">
+                <Field label="Last Price (Purchase)" className="md:col-span-3">
                   <PriceInput
                     disabled={!isEditing}
                     value={formData.preco_compra}
                     onChange={(val) => setFormData({ ...formData, preco_compra: val })}
                   />
                 </Field>
-                <Field label="Current Supplier" className="md:col-span-3">
+                <Field label="Last Supplier" className="md:col-span-3">
                   <Input
                     className="h-8 text-xs"
                     disabled={!isEditing}
@@ -1171,14 +1185,28 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     }
                   />
                 </Field>
-                <Field label="Sale Price" className="md:col-span-3">
+                <Field label="Price Date" className="md:col-span-3">
+                  <Input
+                    type="date"
+                    className="h-8 text-xs"
+                    disabled={!isEditing}
+                    value={
+                      formData.data_atualizacao ? formData.data_atualizacao.substring(0, 10) : ''
+                    }
+                    onChange={(e) => setFormData({ ...formData, data_atualizacao: e.target.value })}
+                  />
+                </Field>
+                <Field label="Selling Price" className="md:col-span-3">
                   <PriceInput
                     disabled={!isEditing}
                     value={formData.preco_venda}
                     onChange={(val) => setFormData({ ...formData, preco_venda: val })}
                   />
                 </Field>
-                <Field label="Short Description (EN) (Auto/Manual)" className="md:col-span-3">
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                <Field label="Short Description (EN) (Auto/Manual)" className="md:col-span-12">
                   <Input
                     className="h-8 text-xs font-medium"
                     disabled={!isEditing}

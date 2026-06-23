@@ -502,38 +502,14 @@ export function ItemFormModal({
           </CardHeader>
           <CardContent className="p-4 grid grid-cols-12 gap-4">
             <div className="col-span-12 sm:col-span-3 space-y-2">
-              <Label>{isPt ? 'Preço de Venda' : 'Selling Price'}</Label>
-              <PriceInput
-                value={formData.preco_venda}
-                onChange={(val) => setFormData({ ...formData, preco_venda: val })}
-              />
-            </div>
-            <div className="col-span-12 sm:col-span-3 space-y-2">
-              <Label>{isPt ? 'Preço de Compra' : 'Purchase Price'}</Label>
+              <Label>{isPt ? 'Último Preço (Compra)' : 'Last Price (Purchase)'}</Label>
               <PriceInput
                 value={formData.preco_compra}
                 onChange={(val) => setFormData({ ...formData, preco_compra: val })}
               />
             </div>
             <div className="col-span-12 sm:col-span-3 space-y-2">
-              <Label>{isPt ? 'Data Atualização' : 'Update Date'}</Label>
-              <Input
-                type="date"
-                value={formData.data_atualizacao ? formData.data_atualizacao.substring(0, 10) : ''}
-                onChange={(e) => setFormData({ ...formData, data_atualizacao: e.target.value })}
-              />
-            </div>
-            <div className="col-span-12 sm:col-span-3 space-y-2">
-              <Label>{isPt ? 'Validade do Preço' : 'Price Validity'}</Label>
-              <Input
-                type="date"
-                value={formData.validade_preco ? formData.validade_preco.substring(0, 10) : ''}
-                onChange={(e) => setFormData({ ...formData, validade_preco: e.target.value })}
-              />
-            </div>
-
-            <div className="col-span-12 sm:col-span-6 space-y-2">
-              <Label>{isPt ? 'Fornecedor' : 'Supplier'}</Label>
+              <Label>{isPt ? 'Último Fornecedor' : 'Last Supplier'}</Label>
               <Input
                 value={formData.fornecedor_ultima_atualizacao || ''}
                 onChange={(e) =>
@@ -541,7 +517,23 @@ export function ItemFormModal({
                 }
               />
             </div>
-            <div className="col-span-12 sm:col-span-6 space-y-2">
+            <div className="col-span-12 sm:col-span-3 space-y-2">
+              <Label>{isPt ? 'Data do Preço' : 'Price Date'}</Label>
+              <Input
+                type="date"
+                value={formData.data_atualizacao ? formData.data_atualizacao.substring(0, 10) : ''}
+                onChange={(e) => setFormData({ ...formData, data_atualizacao: e.target.value })}
+              />
+            </div>
+            <div className="col-span-12 sm:col-span-3 space-y-2">
+              <Label>{isPt ? 'Preço de Venda' : 'Selling Price'}</Label>
+              <PriceInput
+                value={formData.preco_venda}
+                onChange={(val) => setFormData({ ...formData, preco_venda: val })}
+              />
+            </div>
+
+            <div className="col-span-12 space-y-2">
               <Label>{isPt ? 'Descrição Curta' : 'Short Description'}</Label>
               <Input
                 placeholder={isPt ? autoDescCurtaPt : autoDescCurtaEn}
