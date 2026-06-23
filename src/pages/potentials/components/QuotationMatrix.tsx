@@ -263,6 +263,7 @@ export default function QuotationMatrix() {
           row = []
           val = ''
         } else if (char === '\r' && !inQuotes) {
+          // Ignore carriage return character
         } else {
           val += char
         }
