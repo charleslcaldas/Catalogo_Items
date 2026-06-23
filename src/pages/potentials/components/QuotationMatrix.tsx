@@ -505,12 +505,12 @@ export default function QuotationMatrix() {
   }
 
   const handleExportExcel = () => {
-    let csv = 'SKU,Description,Quantity,Unit,'
+    let csv = 'SKU;Description;Quantity;Unit;'
 
     cotacoesF.forEach((cf) => {
-      csv += `"${(cf.expand?.fornecedor_id?.nome || '').replace(/"/g, '""')} Price",`
+      csv += `"${(cf.expand?.fornecedor_id?.nome || '').replace(/"/g, '""')} Price";`
     })
-    csv += 'Lowest Price,Target Price\n'
+    csv += 'Lowest Price;Target Price\n'
 
     potencialItens.forEach((pi) => {
       const itemNode = pi.expand?.item_id
@@ -519,7 +519,7 @@ export default function QuotationMatrix() {
       const qty = pi.quantidade || 0
       const unit = pi.unidade_medida || 'UN'
 
-      let row = `"${sku}","${desc.replace(/"/g, '""')}",${qty},"${unit}",`
+      let row = `"${sku}";"${desc.replace(/"/g, '""')}";${qty};"${unit}";`
 
       let currentPrices: number[] = []
 
@@ -530,7 +530,7 @@ export default function QuotationMatrix() {
         )
         const price = draft !== undefined ? draft : ci?.preco_ofertado || 0
         if (price > 0) currentPrices.push(price)
-        row += price > 0 ? `${price.toFixed(3)},` : `"",`
+        row += price > 0 ? `"${price.toFixed(3).replace('.', ',')}";` : `"";`
       })
 
       const offeredPrice = currentPrices.length > 0 ? Math.min(...currentPrices) : 0
@@ -546,7 +546,7 @@ export default function QuotationMatrix() {
         targetPrice = offeredPrice
       }
 
-      row += `"${offeredPrice > 0 ? offeredPrice.toFixed(3) : ''}","${targetPrice > 0 ? targetPrice.toFixed(3) : ''}"\n`
+      row += `"${offeredPrice > 0 ? offeredPrice.toFixed(3).replace('.', ',') : ''}";"${targetPrice > 0 ? targetPrice.toFixed(3).replace('.', ',') : ''}"\n`
       csv += row
     })
 
@@ -560,7 +560,7 @@ export default function QuotationMatrix() {
   }
 
   const handleExportCounterProposal = (cf: any) => {
-    let csv = 'SKU,Description,Quantity,Unit,Current Offered Price,Target Price\n'
+    let csv = 'SKU;Description;Quantity;Unit;MOQ;Current Offered Price;Target Price\n'
     potencialItens.forEach((pi) => {
       const itemNode = pi.expand?.item_id
       const desc = itemNode?.descr_en || itemNode?.descricao_curta_en || ''
@@ -573,8 +573,12 @@ export default function QuotationMatrix() {
       )
       const offered = ci?.preco_ofertado || 0
       const target = ci?.preco_contraproposta > 0 ? ci.preco_contraproposta : offered
+      const moq = ci?.quantidade_minima || 0
 
-      csv += `"${sku}","${desc.replace(/"/g, '""')}",${qty},"${unit}",${offered > 0 ? offered.toFixed(3) : ''},${target > 0 ? target.toFixed(3) : ''}\n`
+      const offeredStr = offered > 0 ? offered.toFixed(3).replace('.', ',') : ''
+      const targetStr = target > 0 ? target.toFixed(3).replace('.', ',') : ''
+
+      csv += `"${sku}";"${desc.replace(/"/g, '""')}";${qty};"${unit}";${moq};"${offeredStr}";"${targetStr}"\n`
     })
 
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
@@ -587,11 +591,11 @@ export default function QuotationMatrix() {
   }
 
   const handleExportForSupplier = (cf: any) => {
-    let csv = 'SKU,Description,Quantity,Unit,Offered Price,Target Price\n'
+    let csv = 'SKU;Description;Quantity;Unit;MOQ;Offered Price;Target Price\n'
     potencialItens.forEach((pi) => {
       const itemNode = pi.expand?.item_id
       const desc = itemNode?.descr_en || itemNode?.descricao_curta_en || ''
-      csv += `"${(itemNode?.sku || '').replace(/"/g, '""')}","${desc.replace(/"/g, '""')}",${pi.quantidade},"${pi.unidade_medida || 'UN'}","",""\n`
+      csv += `"${(itemNode?.sku || '').replace(/"/g, '""')}";"${desc.replace(/"/g, '""')}";${pi.quantidade};"${pi.unidade_medida || 'UN'}";"";"";""\n`
     })
 
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
@@ -610,12 +614,7 @@ export default function QuotationMatrix() {
       const winner = cotacoesI.find((c) => c.item_id === pi.item_id && c.vencedor)
       if (winner) {
         let draftP = draftPrices[`${winner.cotacao_fornecedor_id}_${pi.item_id}`]
-        let p =
-          draftP !== undefined
-            ? draftP
-            : ((winner.preco_contraproposta > 0
-                ? winner.preco_contraproposta
-                : winner.preco_ofertado) ?? 0)
+        let p = draftP !== undefined ? draftP : (winner.preco_ofertado ?? 0)
         custoTotal += qtd * p
       }
     })
@@ -640,12 +639,7 @@ export default function QuotationMatrix() {
       let selectedPrice = 0
       if (winner) {
         const draftP = draftPrices[`${winner.cotacao_fornecedor_id}_${pi.item_id}`]
-        selectedPrice =
-          draftP !== undefined
-            ? draftP
-            : ((winner.preco_contraproposta > 0
-                ? winner.preco_contraproposta
-                : winner.preco_ofertado) ?? 0)
+        selectedPrice = draftP !== undefined ? draftP : (winner.preco_ofertado ?? 0)
       }
       custoSelecionado += qty * selectedPrice
 
@@ -1200,12 +1194,7 @@ export default function QuotationMatrix() {
                       (c) => c.cotacao_fornecedor_id === cf.id && c.item_id === pi.item_id,
                     )
                     const draft = draftPrices[`${cf.id}_${pi.item_id}`]
-                    const price =
-                      draft !== undefined
-                        ? draft
-                        : ((ci?.preco_contraproposta > 0
-                            ? ci.preco_contraproposta
-                            : ci?.preco_ofertado) ?? 0)
+                    const price = draft !== undefined ? draft : (ci?.preco_ofertado ?? 0)
                     total += price * (pi.quantidade || 0)
                   })
                   return (
@@ -1233,12 +1222,7 @@ export default function QuotationMatrix() {
                     )
                     if (ci?.vencedor) {
                       const draft = draftPrices[`${cf.id}_${pi.item_id}`]
-                      const price =
-                        draft !== undefined
-                          ? draft
-                          : ((ci.preco_contraproposta > 0
-                              ? ci.preco_contraproposta
-                              : ci.preco_ofertado) ?? 0)
+                      const price = draft !== undefined ? draft : (ci.preco_ofertado ?? 0)
                       selectedTotal += price * (pi.quantidade || 0)
                     }
                   })

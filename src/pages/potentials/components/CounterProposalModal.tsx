@@ -42,7 +42,8 @@ export function CounterProposalModal({
       const allFornecedores = cotacoesF?.map((cf: any) => cf.id) || []
       setSelectedFornecedores(allFornecedores)
     }
-  }, [open, cotacoesF])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   useEffect(() => {
     if (open) {
@@ -50,27 +51,35 @@ export function CounterProposalModal({
         (c: any) => selectedFornecedores.includes(c.cotacao_fornecedor_id) && c.preco_ofertado > 0,
       )
 
-      const formatted = targetCotacoes.map((w: any) => {
-        const pi = potencialItens.find((p: any) => p.item_id === w.item_id)
-        const cf = cotacoesF?.find((f: any) => f.id === w.cotacao_fornecedor_id)
+      setItems((prevItems) => {
+        const prevMap = new Map(prevItems.map((i) => [i.id, i]))
 
-        const allPrices = cotacoesI
-          .filter((c: any) => c.item_id === w.item_id && c.preco_ofertado > 0)
-          .map((c: any) => c.preco_ofertado)
-        const bestPrice = allPrices.length > 0 ? Math.min(...allPrices) : w.preco_ofertado
+        return targetCotacoes.map((w: any) => {
+          const prevItem = prevMap.get(w.id)
+          const pi = potencialItens.find((p: any) => p.item_id === w.item_id)
+          const cf = cotacoesF?.find((f: any) => f.id === w.cotacao_fornecedor_id)
 
-        return {
-          id: w.id,
-          item_id: w.item_id,
-          sku: pi?.expand?.item_id?.sku || 'N/A',
-          fornecedor: cf?.expand?.fornecedor_id?.nome || 'Desconhecido',
-          currentPrice: w.preco_ofertado,
-          bestPrice,
-          newPrice: w.preco_contraproposta > 0 ? w.preco_contraproposta : w.preco_ofertado,
-          selected: true,
-        }
+          const allPrices = cotacoesI
+            .filter((c: any) => c.item_id === w.item_id && c.preco_ofertado > 0)
+            .map((c: any) => c.preco_ofertado)
+          const bestPrice = allPrices.length > 0 ? Math.min(...allPrices) : w.preco_ofertado
+
+          return {
+            id: w.id,
+            item_id: w.item_id,
+            sku: pi?.expand?.item_id?.sku || 'N/A',
+            fornecedor: cf?.expand?.fornecedor_id?.nome || 'Desconhecido',
+            currentPrice: w.preco_ofertado,
+            bestPrice,
+            newPrice: prevItem
+              ? prevItem.newPrice
+              : w.preco_contraproposta > 0
+                ? w.preco_contraproposta
+                : w.preco_ofertado,
+            selected: prevItem ? prevItem.selected : true,
+          }
+        })
       })
-      setItems(formatted)
     }
   }, [open, cotacoesI, potencialItens, selectedFornecedores, cotacoesF])
 
