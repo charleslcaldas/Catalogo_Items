@@ -1,8 +1,23 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Plus, Check, TrendingDown, Download, Settings2, CheckSquare, FileUp } from 'lucide-react'
+import {
+  Plus,
+  Check,
+  TrendingDown,
+  Download,
+  Settings2,
+  CheckSquare,
+  FileUp,
+  ShieldCheck,
+  History,
+  Maximize2,
+  Minimize2,
+  Lock,
+  Unlock,
+} from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
+import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import {
   Table,
@@ -13,20 +28,7 @@ import {
   TableRow,
   TableFooter,
 } from '@/components/ui/table'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,6 +39,15 @@ import { Badge } from '@/components/ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { CounterProposalModal } from './CounterProposalModal'
@@ -49,6 +60,7 @@ export default function QuotationMatrix() {
   const potencialId =
     searchParams.get('id') || searchParams.get('potencialId') || searchParams.get('potencial_id')
   const { toast } = useToast()
+  const { user } = useAuth()
 
   const [potencialItens, setPotencialItens] = useState<any[]>([])
   const [cotacoesF, setCotacoesF] = useState<any[]>([])
@@ -56,12 +68,18 @@ export default function QuotationMatrix() {
   const [historico, setHistorico] = useState<any[]>([])
   const [fornecedores, setFornecedores] = useState<any[]>([])
 
-  const [selectedFornecedor, setSelectedFornecedor] = useState('')
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isCounterOpen, setIsCounterOpen] = useState(false)
+  const [isCompact, setIsCompact] = useState(false)
+  const [isFrozen, setIsFrozen] = useState(false)
+  const [comboboxSearch, setComboboxSearch] = useState('')
 
   const [draftPrices, setDraftPrices] = useState<Record<string, number>>({})
   const [draftMoqs, setDraftMoqs] = useState<Record<string, number>>({})
+  const [localSalesPrices, setLocalSalesPrices] = useState<Record<string, number>>({})
+
+  const [suppliersWithHistory, setSuppliersWithHistory] = useState<Set<string>>(new Set())
+  const [prioritizedSuppliers, setPrioritizedSuppliers] = useState<Set<string>>(new Set())
 
   const [moqValidation, setMoqValidation] = useState<{
     warnings: any[]
@@ -100,6 +118,9 @@ export default function QuotationMatrix() {
       setCotacoesI(cI)
       setFornecedores(forn)
 
+      const anyFinalizada = cF.some((c) => c.status === 'finalizada')
+      if (anyFinalizada && !isFrozen) setIsFrozen(true)
+
       const itemIds = pItens.map((i) => i.item_id)
       if (itemIds.length > 0) {
         const hist = await pb.collection('historico_precos').getFullList({
@@ -108,6 +129,29 @@ export default function QuotationMatrix() {
         })
         setHistorico(hist)
       }
+
+      const linhaIds = Array.from(
+        new Set(pItens.map((i) => i.expand?.item_id?.linha_id).filter(Boolean)),
+      )
+      if (linhaIds.length > 0) {
+        const histLinhas = await pb.collection('historico_precos').getFullList({
+          filter: linhaIds.map((id) => `item_id.linha_id="${id}"`).join(' || '),
+          fields: 'fornecedor',
+        })
+        setPrioritizedSuppliers(new Set(histLinhas.map((h) => h.fornecedor)))
+      }
+
+      const allHist = await pb
+        .collection('historico_precos')
+        .getList(1, 1000, { fields: 'fornecedor' })
+      const allNotas = await pb
+        .collection('potencial_notas')
+        .getList(1, 1000, { filter: 'fornecedor_id != ""', fields: 'fornecedor_id' })
+
+      const histSet = new Set<string>()
+      allHist.items.forEach((h) => histSet.add(h.fornecedor))
+      allNotas.items.forEach((n) => histSet.add(n.fornecedor_id))
+      setSuppliersWithHistory(histSet)
     } catch (err) {
       console.error(err)
     }
@@ -116,9 +160,24 @@ export default function QuotationMatrix() {
   useEffect(() => {
     loadData()
   }, [potencialId])
+
   useRealtime('potencial_itens', loadData)
   useRealtime('cotacoes_fornecedor', loadData)
   useRealtime('cotacoes_itens', loadData)
+
+  useEffect(() => {
+    setLocalSalesPrices((prev) => {
+      const next = { ...prev }
+      let changed = false
+      potencialItens.forEach((pi) => {
+        if (!(pi.id in next)) {
+          next[pi.id] = pi.preco_unitario || pi.expand?.item_id?.preco_venda || 0
+          changed = true
+        }
+      })
+      return changed ? next : prev
+    })
+  }, [potencialItens])
 
   const handleUpdateCf = async (cfId: string, data: any) => {
     try {
@@ -204,7 +263,6 @@ export default function QuotationMatrix() {
           row = []
           val = ''
         } else if (char === '\r' && !inQuotes) {
-          // ignore
         } else {
           val += char
         }
@@ -275,17 +333,16 @@ export default function QuotationMatrix() {
     setImportState(null)
   }
 
-  const handleAddFornecedor = async () => {
-    if (!potencialId || !selectedFornecedor) return
+  const handleAddFornecedor = async (id: string) => {
+    if (!potencialId || !id) return
     try {
       await pb.collection('cotacoes_fornecedor').create({
         potencial_id: potencialId,
-        fornecedor_id: selectedFornecedor,
+        fornecedor_id: id,
         status: 'pendente',
         data_solicitacao: new Date().toISOString(),
       })
       setIsAddOpen(false)
-      setSelectedFornecedor('')
       toast({ title: 'Fabricante adicionado' })
     } catch (err: any) {
       toast({ title: 'Erro', description: err.message, variant: 'destructive' })
@@ -325,6 +382,14 @@ export default function QuotationMatrix() {
       })
     } catch (err: any) {
       toast({ title: 'Erro', description: err.message, variant: 'destructive' })
+    }
+  }
+
+  const handleSalesPriceBlur = async (piId: string, val: number) => {
+    try {
+      await pb.collection('potencial_itens').update(piId, { preco_unitario: val })
+    } catch {
+      /* intentionally ignored */
     }
   }
 
@@ -399,6 +464,7 @@ export default function QuotationMatrix() {
       const winners = cotacoesI.filter((c) => c.vencedor && c.preco_ofertado > 0)
       const promises = []
       let updatedCount = 0
+      const fornecedoresNomes = new Set<string>()
 
       for (const w of winners) {
         const pi = potencialItens.find((p) => p.item_id === w.item_id)
@@ -415,92 +481,54 @@ export default function QuotationMatrix() {
         if (adjustMoq && moqToUse > 0 && pi.quantidade < moqToUse) {
           promises.push(pb.collection('potencial_itens').update(pi.id, { quantidade: moqToUse }))
         }
+
+        const cf = cotacoesF.find((f) => f.id === w.cotacao_fornecedor_id)
+        const fornecedorNome = cf?.expand?.fornecedor_id?.nome || 'Desconhecido'
+        if (cf) fornecedoresNomes.add(fornecedorNome)
+
+        promises.push(
+          pb.collection('historico_precos').create({
+            item_id: w.item_id,
+            preco: priceToUse,
+            fornecedor: fornecedorNome,
+            data_cotacao: new Date().toISOString(),
+          }),
+        )
+
         updatedCount++
       }
 
-      await Promise.all(promises)
-      toast({ title: 'Sucesso', description: `${updatedCount} preços de compra atualizados.` })
-    } catch (err: any) {
-      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
-    } finally {
-      setMoqValidation(null)
-    }
-  }
-
-  const handleFinalizeWithValidation = async () => {
-    const winners = cotacoesI.filter((c) => c.vencedor && c.preco_ofertado > 0)
-    const warnings = []
-    for (const w of winners) {
-      const pi = potencialItens.find((p) => p.item_id === w.item_id)
-      const moqToUse = draftMoqs[`${w.cotacao_fornecedor_id}_${w.item_id}`] ?? w.quantidade_minima
-      if (pi && moqToUse > 0 && pi.quantidade < moqToUse) {
-        warnings.push({ pi, ci: { ...w, quantidade_minima: moqToUse } })
+      const cfsWithWinners = new Set(winners.map((w) => w.cotacao_fornecedor_id))
+      for (const cfId of cfsWithWinners) {
+        promises.push(pb.collection('cotacoes_fornecedor').update(cfId, { status: 'finalizada' }))
       }
-    }
-    if (warnings.length > 0) {
-      setMoqValidation({ warnings, action: 'finalize' })
-      return
-    }
-    executeFinalize(false)
-  }
 
-  const executeFinalize = async (adjustMoq: boolean) => {
-    try {
-      const winners = cotacoesI.filter((c) => c.vencedor && c.preco_ofertado > 0)
-      const promises = []
-
-      for (const w of winners) {
-        const pi = potencialItens.find((p) => p.item_id === w.item_id)
-        let qty = pi?.quantidade || 0
-        const moqToUse = draftMoqs[`${w.cotacao_fornecedor_id}_${w.item_id}`] ?? w.quantidade_minima
-
-        if (adjustMoq && pi && moqToUse > 0 && pi.quantidade < moqToUse) {
-          qty = moqToUse
-          promises.push(pb.collection('potencial_itens').update(pi.id, { quantidade: qty }))
-        }
-
-        let priceToUse =
-          draftPrices[`${w.cotacao_fornecedor_id}_${w.item_id}`] ??
-          (w.preco_contraproposta > 0 ? w.preco_contraproposta : w.preco_ofertado)
-
-        promises.push(pb.collection('itens').update(w.item_id, { preco_compra: priceToUse }))
-
-        const cf = cotacoesF.find((f) => f.id === w.cotacao_fornecedor_id)
-        if (!cf) continue
-        const fornecedorNome = cf.expand?.fornecedor_id?.nome || 'Desconhecido'
-        const existing = historico.find(
-          (h) =>
-            h.item_id === w.item_id &&
-            h.fornecedor === fornecedorNome &&
-            Math.abs(h.preco - w.preco_ofertado) < 0.01,
+      if (user?.id) {
+        promises.push(
+          pb.collection('potencial_notas').create({
+            potencial_id: potencialId,
+            user_id: user.id,
+            conteudo: `Cotação aceita e finalizada. Fornecedores selecionados: ${Array.from(fornecedoresNomes).join(', ')}. Itens atualizados: ${updatedCount}.`,
+            categoria: 'Cotação',
+          }),
         )
-        if (!existing) {
-          promises.push(
-            pb.collection('historico_precos').create({
-              item_id: w.item_id,
-              preco: w.preco_ofertado,
-              fornecedor: fornecedorNome,
-              data_cotacao: new Date().toISOString(),
-            }),
-          )
-        }
-      }
-
-      const pending = cotacoesF.filter((c) => c.status !== 'finalizada')
-      for (const c of pending) {
-        promises.push(pb.collection('cotacoes_fornecedor').update(c.id, { status: 'finalizada' }))
       }
 
       await Promise.all(promises)
       toast({
-        title: 'Histórico Salvo',
-        description: 'Cotações finalizadas e histórico de preços atualizado.',
+        title: 'Sucesso',
+        description: `${updatedCount} preços de compra aceitos e histórico salvo.`,
       })
+      setIsFrozen(true)
     } catch (err: any) {
       toast({ title: 'Erro', description: err.message, variant: 'destructive' })
     } finally {
       setMoqValidation(null)
     }
+  }
+
+  const executeFinalize = async (adjustMoq: boolean) => {
+    executeAcceptSelected(adjustMoq)
   }
 
   const handleExportExcel = (lang: 'pt' | 'en') => {
@@ -554,12 +582,53 @@ export default function QuotationMatrix() {
     URL.revokeObjectURL(url)
   }
 
+  const handleExportForSupplier = (cf: any) => {
+    let csv = 'SKU,Descricao,Qtd,Unidade,Preco Unitario,MOQ\n'
+    potencialItens.forEach((pi) => {
+      const itemNode = pi.expand?.item_id
+      const desc = itemNode?.descricao_curta || itemNode?.descr_pt || ''
+      csv += `"${(itemNode?.sku || '').replace(/"/g, '""')}","${desc.replace(/"/g, '""')}",${pi.quantidade},"${pi.unidade_medida || 'UN'}","",""\n`
+    })
+
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `Cotacao_Preenchimento_${cf.expand?.fornecedor_id?.nome}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const getCostPrice = (pi: any) => {
+    const winner = cotacoesI.find((c) => c.item_id === pi.item_id && c.vencedor)
+    if (winner) {
+      const draft = draftPrices[`${winner.cotacao_fornecedor_id}_${pi.item_id}`]
+      if (draft !== undefined) return draft
+      return winner.preco_contraproposta > 0 ? winner.preco_contraproposta : winner.preco_ofertado
+    }
+
+    const currentPrices = cotacoesF.map((cf) => {
+      const ci = cotacoesI.find(
+        (c) => c.cotacao_fornecedor_id === cf.id && c.item_id === pi.item_id,
+      )
+      const draft = draftPrices[`${cf.id}_${pi.item_id}`]
+      if (draft !== undefined) return draft
+      if (ci && ci.preco_ofertado > 0)
+        return ci.preco_contraproposta > 0 ? ci.preco_contraproposta : ci.preco_ofertado
+      return 0
+    })
+    const validCurrentPrices = currentPrices.filter((p) => p > 0)
+    if (validCurrentPrices.length > 0) return Math.min(...validCurrentPrices)
+
+    return pi.expand?.item_id?.preco_compra || 0
+  }
+
   const totals = useMemo(() => {
     let vendaTotal = 0,
       custoTotal = 0
     potencialItens.forEach((pi) => {
       const qtd = pi.quantidade || 0
-      vendaTotal += qtd * (pi.preco_unitario || 0)
+      vendaTotal += qtd * (localSalesPrices[pi.id] ?? 0)
       const winner = cotacoesI.find((c) => c.item_id === pi.item_id && c.vencedor)
       if (winner) {
         let draftP = draftPrices[`${winner.cotacao_fornecedor_id}_${pi.item_id}`]
@@ -577,21 +646,36 @@ export default function QuotationMatrix() {
       custoTotal,
       margin: vendaTotal > 0 ? ((vendaTotal - custoTotal) / vendaTotal) * 100 : 0,
     }
-  }, [potencialItens, cotacoesI, draftPrices])
+  }, [potencialItens, cotacoesI, draftPrices, localSalesPrices])
 
   const formatCurrency = (val: number) =>
     val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
   if (!potencialId) return <div className="p-4 text-center">Potencial não encontrado.</div>
+
   const availableFornecedores = fornecedores.filter(
     (f) => !cotacoesF.some((cf) => cf.fornecedor_id === f.id),
   )
+  const sortedFornecedores = [...availableFornecedores].sort((a, b) => {
+    const aPrio = prioritizedSuppliers.has(a.nome)
+    const bPrio = prioritizedSuppliers.has(b.nome)
+    if (aPrio && !bPrio) return -1
+    if (!aPrio && bPrio) return 1
+    return a.nome.localeCompare(b.nome)
+  })
 
   return (
     <div className="flex flex-col h-full space-y-6">
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center bg-card p-4 border rounded-xl shadow-sm gap-4 shrink-0">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Cotação de Fabricantes</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-bold tracking-tight">Cotação de Fabricantes</h2>
+            {isFrozen && (
+              <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                <Lock className="w-3 h-3 mr-1" /> Bloqueada
+              </Badge>
+            )}
+          </div>
           <div className="flex flex-wrap gap-x-8 gap-y-2 mt-3 text-sm">
             <div className="flex flex-col">
               <span className="text-muted-foreground font-medium text-[10px] uppercase tracking-wider">
@@ -631,47 +715,103 @@ export default function QuotationMatrix() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 self-stretch xl:self-auto pt-2 xl:pt-0 border-t xl:border-0">
-          <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Plus className="w-4 h-4 mr-2" /> Fabricante
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Selecione um Fabricante</DialogTitle>
-              </DialogHeader>
-              <div className="py-4">
-                <Select value={selectedFornecedor} onValueChange={setSelectedFornecedor}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableFornecedores.map((f) => (
-                      <SelectItem key={f.id} value={f.id}>
-                        {f.nome}
-                      </SelectItem>
-                    ))}
-                    {availableFornecedores.length === 0 && (
-                      <SelectItem value="none" disabled>
-                        Nenhum fabricante disponível
-                      </SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex justify-end">
-                <Button onClick={handleAddFornecedor} disabled={!selectedFornecedor}>
-                  Adicionar
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsCompact(!isCompact)}
+            className="hidden xl:flex text-muted-foreground"
+            title="Alternar Densidade"
+          >
+            {isCompact ? <Maximize2 className="w-4 h-4" /> : <Minimize2 className="w-4 h-4" />}
+          </Button>
+
+          {isFrozen ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsFrozen(false)}
+              className="border-red-200 text-red-700 bg-red-50 hover:bg-red-100 hover:text-red-800"
+            >
+              <Unlock className="w-4 h-4 mr-2" /> Editar Cotação
+            </Button>
+          ) : (
+            <Popover open={isAddOpen} onOpenChange={setIsAddOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Plus className="w-4 h-4 mr-2" /> Fabricante
                 </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+              </PopoverTrigger>
+              <PopoverContent className="w-[320px] p-0" align="start">
+                <Command
+                  filter={(value, search) => {
+                    const normalizedValue = value.toLowerCase()
+                    const normalizedSearch = search.toLowerCase()
+                    const tokens = normalizedSearch.split(/\s+/)
+                    return tokens.every((token) => normalizedValue.includes(token)) ? 1 : 0
+                  }}
+                >
+                  <CommandInput
+                    placeholder="Buscar fabricante..."
+                    value={comboboxSearch}
+                    onValueChange={setComboboxSearch}
+                  />
+                  <CommandList>
+                    <CommandEmpty>Nenhum fabricante encontrado.</CommandEmpty>
+                    <CommandGroup>
+                      {sortedFornecedores.map((f) => (
+                        <CommandItem
+                          key={f.id}
+                          value={f.nome}
+                          onSelect={() => {
+                            handleAddFornecedor(f.id)
+                            setComboboxSearch('')
+                          }}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span className="truncate" title={f.nome}>
+                              {f.nome}
+                            </span>
+                            <div className="flex items-center gap-1 shrink-0 ml-2">
+                              {prioritizedSuppliers.has(f.nome) && (
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[9px] px-1 h-4 font-normal bg-emerald-50 text-emerald-700 border-emerald-200"
+                                >
+                                  Recomendado
+                                </Badge>
+                              )}
+                              {f.auditado && (
+                                <ShieldCheck
+                                  className="w-3.5 h-3.5 text-blue-600"
+                                  title="Auditado"
+                                />
+                              )}
+                              {(suppliersWithHistory.has(f.id) ||
+                                suppliersWithHistory.has(f.nome)) && (
+                                <History
+                                  className="w-3.5 h-3.5 text-muted-foreground"
+                                  title="Possui Histórico"
+                                />
+                              )}
+                            </div>
+                          </div>
+                        </CommandItem>
+                      ))}
+                      {sortedFornecedores.length === 0 && (
+                        <CommandItem disabled>Nenhum fabricante disponível</CommandItem>
+                      )}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          )}
 
           <Button
             variant="outline"
             size="sm"
             onClick={() => setIsCounterOpen(true)}
+            disabled={isFrozen}
             className="border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 hover:text-amber-800"
           >
             <TrendingDown className="w-4 h-4 mr-2" /> Contraproposta
@@ -697,18 +837,10 @@ export default function QuotationMatrix() {
             variant="outline"
             size="sm"
             onClick={handleAcceptSelected}
+            disabled={isFrozen}
             className="border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 hover:text-blue-800"
           >
             <CheckSquare className="w-4 h-4 mr-2" /> Aceitar Selecionados
-          </Button>
-
-          <Button
-            size="sm"
-            onClick={handleFinalizeWithValidation}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white"
-            disabled={cotacoesF.length === 0}
-          >
-            <Check className="w-4 h-4 mr-2" /> Salvar Histórico
           </Button>
         </div>
       </div>
@@ -718,22 +850,22 @@ export default function QuotationMatrix() {
           <Table>
             <TableHeader className="bg-muted/50 sticky top-0 z-20 shadow-sm">
               <TableRow>
-                <TableHead className="min-w-[180px] font-semibold py-2">Item</TableHead>
+                <TableHead className="min-w-[160px] font-semibold py-2">Item</TableHead>
                 <TableHead className="font-semibold text-center w-16 py-2">Qtd</TableHead>
-                <TableHead className="font-semibold text-right min-w-[90px] py-2 bg-muted/10">
-                  Menor Cotação
+                <TableHead className="font-semibold text-right min-w-[90px] py-2 bg-muted/10 border-r">
+                  Custo Ref.
                   <span className="text-[9px] font-normal text-muted-foreground block">
-                    (Atual)
+                    (Menor/Vencedor)
                   </span>
                 </TableHead>
-                <TableHead className="font-semibold text-right min-w-[90px] py-2 border-r bg-muted/10">
-                  Último Hist.
+                <TableHead className="font-semibold text-right min-w-[90px] py-2 border-r bg-muted/5">
+                  Markup %
                   <span className="text-[9px] font-normal text-muted-foreground block">
-                    (Salvo)
+                    (Estimado)
                   </span>
                 </TableHead>
-                <TableHead className="font-semibold text-right min-w-[90px] py-2 border-r">
-                  Preço{' '}
+                <TableHead className="font-semibold text-right min-w-[100px] py-2 border-r">
+                  Preço Venda
                   <span className="text-[9px] font-normal text-muted-foreground block">
                     (Cliente)
                   </span>
@@ -741,19 +873,24 @@ export default function QuotationMatrix() {
                 {cotacoesF.map((cf) => (
                   <TableHead key={cf.id} className="min-w-[160px] bg-muted/30 border-r py-2">
                     <div className="flex flex-col items-center relative group">
-                      <div className="flex items-center gap-1">
-                        <span
-                          className="font-bold text-foreground truncate max-w-[120px] text-xs"
-                          title={cf.expand?.fornecedor_id?.nome}
-                        >
-                          {cf.expand?.fornecedor_id?.nome}
-                        </span>
+                      <div className="flex items-center gap-1 w-full justify-center">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="font-bold text-foreground truncate max-w-[120px] text-xs cursor-help">
+                              {cf.expand?.fornecedor_id?.nome}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            <p>{cf.expand?.fornecedor_id?.nome}</p>
+                          </TooltipContent>
+                        </Tooltip>
+
                         {cf.expand?.fornecedor_id?.auditado && (
                           <Badge
                             variant="outline"
                             className="text-[8px] h-4 px-1 bg-blue-50 text-blue-700 border-blue-200"
                           >
-                            Auditado
+                            Aud
                           </Badge>
                         )}
                         <Popover>
@@ -777,6 +914,7 @@ export default function QuotationMatrix() {
                                   onBlur={(e) =>
                                     handleUpdateCf(cf.id, { incoterm: e.target.value })
                                   }
+                                  disabled={isFrozen}
                                 />
                               </div>
                               <div className="space-y-1">
@@ -787,6 +925,7 @@ export default function QuotationMatrix() {
                                   onBlur={(e) =>
                                     handleUpdateCf(cf.id, { tempo_fabricacao: e.target.value })
                                   }
+                                  disabled={isFrozen}
                                 />
                               </div>
                               <div className="pt-2 border-t flex flex-col gap-2">
@@ -794,7 +933,16 @@ export default function QuotationMatrix() {
                                   variant="outline"
                                   size="sm"
                                   className="w-full justify-start text-xs h-7"
+                                  onClick={() => handleExportForSupplier(cf)}
+                                >
+                                  <Download className="w-3 h-3 mr-2" /> Planilha para Preenchimento
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full justify-start text-xs h-7"
                                   onClick={() => handleSelectAllFor(cf.id)}
+                                  disabled={isFrozen}
                                 >
                                   <CheckSquare className="w-3 h-3 mr-2" /> Selecionar Todos
                                 </Button>
@@ -802,7 +950,8 @@ export default function QuotationMatrix() {
                                   <Input
                                     type="file"
                                     accept=".csv"
-                                    className="absolute inset-0 opacity-0 cursor-pointer"
+                                    className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                                    disabled={isFrozen}
                                     onChange={(e) =>
                                       e.target.files?.[0] &&
                                       handleFileSelect(cf.id, e.target.files[0])
@@ -812,6 +961,7 @@ export default function QuotationMatrix() {
                                     variant="outline"
                                     size="sm"
                                     className="w-full justify-start text-xs h-7 pointer-events-none"
+                                    disabled={isFrozen}
                                   >
                                     <FileUp className="w-3 h-3 mr-2" /> Importar Preços (CSV)
                                   </Button>
@@ -867,68 +1017,107 @@ export default function QuotationMatrix() {
                 </TableRow>
               ) : (
                 potencialItens.map((pi) => {
+                  const costPrice = getCostPrice(pi)
+                  const salesPrice = localSalesPrices[pi.id] ?? 0
+                  const markup = costPrice > 0 ? ((salesPrice - costPrice) / costPrice) * 100 : 0
+
                   const currentPrices = cotacoesF.map((cf) => {
                     const ci = cotacoesI.find(
                       (c) => c.cotacao_fornecedor_id === cf.id && c.item_id === pi.item_id,
                     )
                     const draft = draftPrices[`${cf.id}_${pi.item_id}`]
-
                     if (draft !== undefined) return draft
-                    if (ci) {
-                      if (ci.vencedor && ci.preco_contraproposta > 0) return ci.preco_contraproposta
-                      return ci.preco_ofertado
-                    }
+                    if (ci)
+                      return ci.vencedor && ci.preco_contraproposta > 0
+                        ? ci.preco_contraproposta
+                        : ci.preco_ofertado
                     return 0
                   })
-
                   const validCurrentPrices = currentPrices.filter((p) => p > 0)
                   const lowestCurrentPrice =
                     validCurrentPrices.length > 0 ? Math.min(...validCurrentPrices) : undefined
 
-                  const itemHist = historico.filter((h) => h.item_id === pi.item_id)
-                  const lastHist = itemHist.length > 0 ? itemHist[0].preco : undefined
-
                   return (
                     <TableRow key={pi.id} className="group hover:bg-transparent">
-                      <TableCell className="align-top py-1.5 px-3">
+                      <TableCell
+                        className={cn('align-top px-3 border-r', isCompact ? 'py-1' : 'py-1.5')}
+                      >
                         <div className="font-semibold text-xs">{pi.expand?.item_id?.sku}</div>
                         <div className="text-[10px] text-muted-foreground line-clamp-2 pr-2">
                           {pi.expand?.item_id?.descricao_curta}
                         </div>
                       </TableCell>
-                      <TableCell className="align-top py-1.5 px-2 text-center">
+                      <TableCell
+                        className={cn(
+                          'align-top px-2 text-center border-r',
+                          isCompact ? 'py-1' : 'py-1.5',
+                        )}
+                      >
                         <span className="font-medium text-sm">{pi.quantidade}</span>
                         <span className="text-[9px] text-muted-foreground block">
                           {pi.unidade_medida || 'UN'}
                         </span>
                       </TableCell>
-                      <TableCell className="align-top py-1.5 px-2 text-right bg-muted/5">
-                        {lowestCurrentPrice ? (
-                          <span className="font-mono text-xs text-green-600 font-bold">
-                            $ {formatCurrency(lowestCurrentPrice)}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
+                      <TableCell
+                        className={cn(
+                          'align-middle px-2 text-right border-r bg-muted/10',
+                          isCompact ? 'py-1' : 'py-1.5',
                         )}
+                      >
+                        <span className="font-mono text-xs text-muted-foreground font-medium">
+                          {costPrice > 0 ? `$ ${formatCurrency(costPrice)}` : '-'}
+                        </span>
                       </TableCell>
-                      <TableCell className="align-top py-1.5 px-2 text-right border-r bg-muted/5">
-                        {lastHist ? (
-                          <span className="font-mono text-xs text-muted-foreground font-medium">
-                            $ {formatCurrency(lastHist)}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
+
+                      <TableCell
+                        className={cn(
+                          'align-middle px-2 text-right border-r bg-muted/5',
+                          isCompact ? 'py-1' : 'py-1.5',
                         )}
+                      >
+                        <Input
+                          type="number"
+                          className={cn(
+                            'h-7 text-xs text-right bg-background',
+                            isFrozen && 'pointer-events-none opacity-70 border-transparent',
+                          )}
+                          value={markup.toFixed(2)}
+                          onChange={(e) => {
+                            const m = parseFloat(e.target.value) || 0
+                            const sp = costPrice * (1 + m / 100)
+                            setLocalSalesPrices((p) => ({ ...p, [pi.id]: sp }))
+                          }}
+                          onBlur={(e) => {
+                            const m = parseFloat(e.target.value) || 0
+                            handleSalesPriceBlur(pi.id, costPrice * (1 + m / 100))
+                          }}
+                          disabled={isFrozen}
+                        />
                       </TableCell>
-                      <TableCell className="align-top py-1.5 px-2 text-right border-r">
-                        {pi.preco_unitario ? (
-                          <span className="font-mono text-xs font-bold text-foreground">
-                            $ {formatCurrency(pi.preco_unitario)}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
+                      <TableCell
+                        className={cn(
+                          'align-middle px-2 text-right border-r',
+                          isCompact ? 'py-1' : 'py-1.5',
                         )}
+                      >
+                        <Input
+                          type="number"
+                          className={cn(
+                            'h-7 text-xs text-right font-bold text-foreground bg-background',
+                            isFrozen && 'pointer-events-none opacity-70 border-transparent',
+                          )}
+                          value={salesPrice.toFixed(4)}
+                          onChange={(e) => {
+                            const sp = parseFloat(e.target.value) || 0
+                            setLocalSalesPrices((p) => ({ ...p, [pi.id]: sp }))
+                          }}
+                          onBlur={(e) =>
+                            handleSalesPriceBlur(pi.id, parseFloat(e.target.value) || 0)
+                          }
+                          disabled={isFrozen}
+                        />
                       </TableCell>
+
                       {cotacoesF.map((cf) => {
                         const ci = cotacoesI.find(
                           (c) => c.cotacao_fornecedor_id === cf.id && c.item_id === pi.item_id,
@@ -940,11 +1129,19 @@ export default function QuotationMatrix() {
                             : (ci?.vencedor && ci?.preco_contraproposta > 0
                                 ? ci.preco_contraproposta
                                 : ci?.preco_ofertado) || 0
+                        const isWinnerCell = ci?.vencedor
 
                         return (
                           <TableCell
                             key={cf.id}
-                            className="align-top py-1 px-1 border-r bg-background/50 hover:bg-muted/20"
+                            className={cn(
+                              'align-top px-1 border-r transition-colors relative',
+                              isCompact ? 'py-0.5' : 'py-1',
+                              isWinnerCell
+                                ? 'bg-blue-100/40 border-l-2 border-r-2 border-y-2 border-blue-400 shadow-[inset_0_0_0_1px_rgba(96,165,250,0.5)] z-10'
+                                : 'bg-background/50 hover:bg-muted/20',
+                              isFrozen && 'pointer-events-none opacity-80',
+                            )}
                           >
                             <PriceCell
                               cotacaoF={cf}
@@ -1095,21 +1292,12 @@ export default function QuotationMatrix() {
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (moqValidation?.action === 'accept') executeAcceptSelected(false)
-                else executeFinalize(false)
-              }}
-            >
+            <Button variant="outline" onClick={() => executeAcceptSelected(false)}>
               Prosseguir Mesmo Assim
             </Button>
             <Button
               className="bg-amber-600 hover:bg-amber-700 text-white"
-              onClick={() => {
-                if (moqValidation?.action === 'accept') executeAcceptSelected(true)
-                else executeFinalize(true)
-              }}
+              onClick={() => executeAcceptSelected(true)}
             >
               Ajustar para MOQ
             </Button>

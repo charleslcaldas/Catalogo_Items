@@ -42,7 +42,7 @@ export function CounterProposalModal({
       const allFornecedores = cotacoesF?.map((cf: any) => cf.id) || []
       setSelectedFornecedores(allFornecedores)
     }
-  }, [open])
+  }, [open, cotacoesF])
 
   useEffect(() => {
     if (open) {
@@ -84,8 +84,8 @@ export function CounterProposalModal({
         let np = item.newPrice
         if (action === 'discount') {
           np = item.currentPrice * (1 - d / 100)
-        } else if (action === 'fixed_value') {
-          np = Math.max(0, item.currentPrice - d)
+        } else if (action === 'fixed_target') {
+          np = Math.max(0, d)
         } else if (action === 'match_best') {
           np = item.bestPrice
         } else if (action === 'discount_best') {
@@ -145,11 +145,13 @@ export function CounterProposalModal({
 
       const pItems = potencialItens.filter((pi: any) => pi.item_id === item.item_id)
       for (const pi of pItems) {
-        const updateData: any = { preco_unitario: finalPrice }
+        const updateData: any = {}
         if (moq > 0 && pi.quantidade < moq) {
           updateData.quantidade = moq
         }
-        promises.push(pb.collection('potencial_itens').update(pi.id, updateData))
+        if (Object.keys(updateData).length > 0) {
+          promises.push(pb.collection('potencial_itens').update(pi.id, updateData))
+        }
       }
 
       promises.push(
@@ -202,11 +204,13 @@ export function CounterProposalModal({
 
         const pItems = potencialItens.filter((pi: any) => pi.item_id === item.item_id)
         for (const pi of pItems) {
-          const updateData: any = { preco_unitario: finalPrice }
+          const updateData: any = {}
           if (moq > 0 && pi.quantidade < moq) {
             updateData.quantidade = moq
           }
-          promises.push(pb.collection('potencial_itens').update(pi.id, updateData))
+          if (Object.keys(updateData).length > 0) {
+            promises.push(pb.collection('potencial_itens').update(pi.id, updateData))
+          }
         }
 
         promises.push(
@@ -239,7 +243,7 @@ export function CounterProposalModal({
       <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <TrendingDown className="w-5 h-5 text-amber-600" /> Motor de Contraproposta
+            <TrendingDown className="w-5 h-5 text-amber-600" /> Motor de Contraproposta Global
           </DialogTitle>
         </DialogHeader>
 
@@ -269,16 +273,16 @@ export function CounterProposalModal({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="discount">Desconto (%) s/ o preço atual</SelectItem>
-                  <SelectItem value="fixed_value">Valor fixo s/ o preço atual</SelectItem>
-                  <SelectItem value="match_best">Igualar ao menor preço geral</SelectItem>
-                  <SelectItem value="discount_best">Desconto (%) s/ o menor preço geral</SelectItem>
+                  <SelectItem value="fixed_target">Preço Alvo Global (Fixo)</SelectItem>
+                  <SelectItem value="match_best">Igualar ao Menor Preço Geral</SelectItem>
+                  <SelectItem value="discount_best">Desconto (%) s/ o Menor Preço Geral</SelectItem>
                   <SelectItem value="manual">Definição Manual</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             {action !== 'match_best' && action !== 'manual' && (
               <div className="flex flex-col gap-1.5 w-32">
-                <Label>{action === 'fixed_value' ? 'Desconto (Fixo)' : 'Desconto (%)'}</Label>
+                <Label>{action === 'fixed_target' ? 'Preço Alvo ($)' : 'Desconto (%)'}</Label>
                 <Input
                   type="number"
                   step="0.1"
@@ -288,7 +292,7 @@ export function CounterProposalModal({
               </div>
             )}
             <Button variant="secondary" onClick={applyLogic} disabled={action === 'manual'}>
-              Simular
+              Simular em Massa
             </Button>
           </div>
         </div>
