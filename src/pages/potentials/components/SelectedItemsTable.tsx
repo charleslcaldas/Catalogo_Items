@@ -48,7 +48,7 @@ export function SelectedItemsTable({
     const num = Number(value)
     return isNaN(num)
       ? '-'
-      : `$ ${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : `$ ${num.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`
   }
 
   const handleQuantityBlur = async (recordId: string | undefined, quantidade: string | number) => {
@@ -93,7 +93,7 @@ export function SelectedItemsTable({
             <TableHead className="w-24 text-[11px]">Acabamento</TableHead>
             <TableHead className="w-16 text-[11px] text-center">Unidade</TableHead>
             <TableHead className="w-20 text-[11px]">Quant.</TableHead>
-            <TableHead className="w-20 text-[11px] text-right">Custo Ref.</TableHead>
+            <TableHead className="w-20 text-[11px] text-right text-amber-600">Custo Ref.</TableHead>
             <TableHead className="w-20 text-[11px] text-right">Margem %</TableHead>
             <TableHead className="w-28 text-[11px] text-right">Preço Venda</TableHead>
             <TableHead className="w-24 text-[11px] text-right">Total</TableHead>
@@ -190,7 +190,7 @@ export function SelectedItemsTable({
                     onBlur={() => handleQuantityBlur(record.recordId, data.quantidade)}
                   />
                 </TableCell>
-                <TableCell className="py-1 text-xs text-right font-mono text-muted-foreground whitespace-nowrap">
+                <TableCell className="py-1 text-xs text-right font-mono text-amber-600 font-semibold whitespace-nowrap">
                   {formatCurrency(data.item.preco_compra || 0)}
                 </TableCell>
                 <TableCell className="py-1 text-right">
@@ -201,15 +201,15 @@ export function SelectedItemsTable({
                         ? (
                             (1 - (data.item.preco_compra || 0) / Number(data.preco_unitario)) *
                             100
-                          ).toFixed(2)
-                        : '0.00'
+                          ).toFixed(3)
+                        : '0.000'
                     }
                     onValueChange={(val) => {
                       const m = parseFloat(val) || 0
                       if (m >= 100) return
                       const custo = data.item.preco_compra || 0
                       const newVenda = custo / (1 - m / 100)
-                      handleUpdateItem(id, 'preco_unitario', newVenda.toString())
+                      handleUpdateItem(id, 'preco_unitario', newVenda.toFixed(3))
                     }}
                     onBlur={() => {
                       let parsed = parseFloat(String(data.preco_unitario))
@@ -223,12 +223,16 @@ export function SelectedItemsTable({
                     isPrice
                     prefixText="$"
                     className="h-7 w-24 px-2 text-right text-xs bg-white font-bold ml-auto"
-                    value={data.preco_unitario}
+                    value={
+                      typeof data.preco_unitario === 'number'
+                        ? data.preco_unitario.toFixed(3)
+                        : data.preco_unitario
+                    }
                     onValueChange={(val) => handleUpdateItem(id, 'preco_unitario', val)}
                     onBlur={() => {
                       let parsed = parseFloat(String(data.preco_unitario))
                       if (isNaN(parsed)) parsed = 0
-                      handleUpdateItem(id, 'preco_unitario', parsed.toString())
+                      handleUpdateItem(id, 'preco_unitario', parsed.toFixed(3))
                       handlePriceBlur(record.recordId, parsed)
                     }}
                   />

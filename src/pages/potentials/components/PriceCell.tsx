@@ -59,7 +59,7 @@ export function PriceCell({
             )}
             title="Proposta"
           >
-            $ {counterPrice.toFixed(4)}
+            $ {counterPrice.toFixed(3)}
           </span>
         )}
       </div>

@@ -91,7 +91,7 @@ export function CounterProposalModal({
         } else if (action === 'discount_best') {
           np = item.bestPrice * (1 - d / 100)
         }
-        return { ...item, newPrice: Number(np.toFixed(4)) }
+        return { ...item, newPrice: Number(np.toFixed(3)) }
       }),
     )
   }
@@ -166,7 +166,7 @@ export function CounterProposalModal({
       await Promise.all(promises)
       toast({
         title: 'Item aceito',
-        description: `Preço de compra atualizado para $ ${finalPrice.toFixed(4)}.`,
+        description: `Preço de compra atualizado para $ ${finalPrice.toFixed(3)}.`,
       })
     } catch (err: any) {
       toast({ title: 'Erro', description: err.message, variant: 'destructive' })
@@ -347,10 +347,10 @@ export function CounterProposalModal({
                       {item.fornecedor}
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs">
-                      $ {item.currentPrice.toFixed(4)}
+                      $ {item.currentPrice.toFixed(3)}
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs text-muted-foreground">
-                      $ {item.bestPrice.toFixed(4)}
+                      $ {item.bestPrice.toFixed(3)}
                     </TableCell>
                     <TableCell className="text-right">
                       <Input
