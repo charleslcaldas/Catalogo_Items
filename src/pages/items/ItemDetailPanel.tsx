@@ -452,6 +452,13 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
   }
 
   const confTamanho = getFieldConfig('tamanho', 'Tamanho', 'Size')
+
+  const latestHist = priceHistory.length > 0 ? priceHistory[0] : null
+  const displayPrecoCompra = !isEditing && latestHist ? latestHist.preco : formData.preco_compra
+  const displayFornecedor =
+    !isEditing && latestHist ? latestHist.fornecedor : formData.fornecedor_ultima_atualizacao
+  const displayDataAtualizacao =
+    !isEditing && latestHist ? latestHist.data_cotacao : formData.data_atualizacao
   const confTipoRosca = getFieldConfig('tipo_rosca', 'Tipo Rosca', 'Thread Type')
   const confCompRosca = getFieldConfig('comprimento_rosca', 'Comp. Rosca', 'Thread Length')
   const confGrau = getFieldConfig('grau', 'Grau', 'Grade')
@@ -846,7 +853,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                 <Field label="Último Preço (Compra)" className="md:col-span-3">
                   <PriceInput
                     disabled={!isEditing}
-                    value={formData.preco_compra}
+                    value={displayPrecoCompra}
                     onChange={(val) => setFormData({ ...formData, preco_compra: val })}
                   />
                 </Field>
@@ -854,7 +861,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                   <Input
                     className="h-8 text-xs"
                     disabled={!isEditing}
-                    value={formData.fornecedor_ultima_atualizacao || ''}
+                    value={displayFornecedor || ''}
                     onChange={(e) =>
                       setFormData({ ...formData, fornecedor_ultima_atualizacao: e.target.value })
                     }
@@ -865,9 +872,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     type="date"
                     className="h-8 text-xs"
                     disabled={!isEditing}
-                    value={
-                      formData.data_atualizacao ? formData.data_atualizacao.substring(0, 10) : ''
-                    }
+                    value={displayDataAtualizacao ? displayDataAtualizacao.substring(0, 10) : ''}
                     onChange={(e) => setFormData({ ...formData, data_atualizacao: e.target.value })}
                   />
                 </Field>
@@ -1171,7 +1176,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                 <Field label="Last Price (Purchase)" className="md:col-span-3">
                   <PriceInput
                     disabled={!isEditing}
-                    value={formData.preco_compra}
+                    value={displayPrecoCompra}
                     onChange={(val) => setFormData({ ...formData, preco_compra: val })}
                   />
                 </Field>
@@ -1179,7 +1184,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                   <Input
                     className="h-8 text-xs"
                     disabled={!isEditing}
-                    value={formData.fornecedor_ultima_atualizacao || ''}
+                    value={displayFornecedor || ''}
                     onChange={(e) =>
                       setFormData({ ...formData, fornecedor_ultima_atualizacao: e.target.value })
                     }
@@ -1190,9 +1195,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
                     type="date"
                     className="h-8 text-xs"
                     disabled={!isEditing}
-                    value={
-                      formData.data_atualizacao ? formData.data_atualizacao.substring(0, 10) : ''
-                    }
+                    value={displayDataAtualizacao ? displayDataAtualizacao.substring(0, 10) : ''}
                     onChange={(e) => setFormData({ ...formData, data_atualizacao: e.target.value })}
                   />
                 </Field>

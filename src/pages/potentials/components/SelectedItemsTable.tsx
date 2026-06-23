@@ -24,6 +24,8 @@ interface SelectedItemsTableProps {
   setIsSelecting: (selecting: boolean) => void
 }
 
+import { useEffect, useState } from 'react'
+
 export function SelectedItemsTable({
   selectedItems,
   handleUpdateItem,
@@ -32,6 +34,46 @@ export function SelectedItemsTable({
   handleMoveDown,
   setIsSelecting,
 }: SelectedItemsTableProps) {
+  const [historyMap, setHistoryMap] = useState<Record<string, any>>({})
+
+  useEffect(() => {
+    const itemIds = Array.from(new Set(selectedItems.map((si) => si.id)))
+    if (itemIds.length === 0) return
+
+    const fetchHistory = async () => {
+      try {
+        const chunks = []
+        for (let i = 0; i < itemIds.length; i += 50) {
+          chunks.push(itemIds.slice(i, i + 50))
+        }
+
+        const allMaps = await Promise.all(
+          chunks.map(async (chunk) => {
+            const filter = chunk.map((id) => `item_id="${id}"`).join(' || ')
+            const res = await pb.collection('historico_precos').getList(1, 500, {
+              filter: `(${filter})`,
+              sort: '-data_cotacao,-created',
+            })
+            const map: Record<string, any> = {}
+            res.items.forEach((h) => {
+              if (!map[h.item_id]) {
+                map[h.item_id] = h
+              }
+            })
+            return map
+          }),
+        )
+
+        const finalMap = Object.assign({}, ...allMaps)
+        setHistoryMap(finalMap)
+      } catch (err) {
+        console.error('Failed to fetch price history for selected items', err)
+      }
+    }
+
+    fetchHistory()
+  }, [selectedItems.map((si) => si.id).join(',')])
+
   if (selectedItems.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-32 text-muted-foreground bg-white">
@@ -191,15 +233,46 @@ export function SelectedItemsTable({
                   />
                 </TableCell>
                 <TableCell className="py-1 text-xs text-right font-mono text-amber-600 font-semibold whitespace-nowrap">
-                  {formatCurrency(data.item.preco_compra || 0)}
+                  {(() => {
+                    const hist = historyMap[id]
+                    const refPrice = hist?.preco ?? data.item.preco_compra ?? 0
+                    const refSupplier = hist?.fornecedor ?? data.item.fornecedor_ultima_atualizacao
+                    const refDate = hist?.data_cotacao ?? data.item.data_atualizacao
+
+                    return (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex flex-col cursor-help items-end">
+                            <span>{formatCurrency(refPrice)}</span>
+                            {refSupplier ? (
+                              <span className="text-[9px] text-muted-foreground truncate max-w-[80px]">
+                                {refSupplier}
+                              </span>
+                            ) : (
+                              <span className="text-[9px] text-muted-foreground">-</span>
+                            )}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="font-semibold">Último Fornecedor: {refSupplier || '-'}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Data: {refDate ? new Date(refDate).toLocaleDateString() : '-'}
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )
+                  })()}
                 </TableCell>
                 <TableCell className="py-1 text-right">
                   <FormattedInput
                     className="h-7 w-16 px-2 text-right text-xs bg-white ml-auto"
                     value={
-                      Number(data.preco_unitario) > 0 && (data.item.preco_compra || 0) > 0
+                      Number(data.preco_unitario) > 0 &&
+                      ((historyMap[id]?.preco ?? data.item.preco_compra) || 0) > 0
                         ? (
-                            (1 - (data.item.preco_compra || 0) / Number(data.preco_unitario)) *
+                            (1 -
+                              ((historyMap[id]?.preco ?? data.item.preco_compra) || 0) /
+                                Number(data.preco_unitario)) *
                             100
                           ).toFixed(3)
                         : '0.000'
@@ -207,7 +280,7 @@ export function SelectedItemsTable({
                     onValueChange={(val) => {
                       const m = parseFloat(val) || 0
                       if (m >= 100) return
-                      const custo = data.item.preco_compra || 0
+                      const custo = (historyMap[id]?.preco ?? data.item.preco_compra) || 0
                       const newVenda = custo / (1 - m / 100)
                       handleUpdateItem(id, 'preco_unitario', newVenda.toFixed(3))
                     }}

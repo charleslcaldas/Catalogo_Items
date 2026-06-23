@@ -160,6 +160,32 @@ export default function ItemsPage() {
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false)
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false)
 
+  const [historyMap, setHistoryMap] = useState<Record<string, any>>({})
+
+  useEffect(() => {
+    const itemIds = apiItens.map((i) => i.id)
+    if (itemIds.length === 0) {
+      setHistoryMap({})
+      return
+    }
+    const filter = itemIds.map((id) => `item_id="${id}"`).join(' || ')
+    pb.collection('historico_precos')
+      .getList(1, 500, {
+        filter: `(${filter})`,
+        sort: '-data_cotacao,-created',
+      })
+      .then((res) => {
+        const map: Record<string, any> = {}
+        res.items.forEach((h) => {
+          if (!map[h.item_id]) {
+            map[h.item_id] = h
+          }
+        })
+        setHistoryMap(map)
+      })
+      .catch((err) => console.error(err))
+  }, [apiItens])
+
   // Debounce search term to prevent rate limits while typing
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -866,36 +892,46 @@ export default function ItemsPage() {
                         {!selectedItemId && (
                           <>
                             <TableCell className="py-1 px-2 text-xs overflow-hidden text-ellipsis">
-                              {typeof item.preco_compra === 'number' && item.preco_compra > 0 ? (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <div className="flex flex-col cursor-help">
-                                      <span className="font-semibold text-amber-600">
-                                        $ {item.preco_compra.toFixed(2)}
-                                      </span>
-                                      {item.fornecedor_ultima_atualizacao && (
-                                        <span className="text-[9px] text-muted-foreground truncate">
-                                          {item.fornecedor_ultima_atualizacao}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p className="font-semibold">
-                                      Último Fornecedor:{' '}
-                                      {item.fornecedor_ultima_atualizacao || 'Não informado'}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      Data do Preço:{' '}
-                                      {item.data_atualizacao
-                                        ? new Date(item.data_atualizacao).toLocaleDateString()
-                                        : 'Não informada'}
-                                    </p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              ) : (
-                                '-'
-                              )}
+                              {(() => {
+                                const hist = historyMap[item.id]
+                                const refPrice = hist?.preco ?? item.preco_compra
+                                const refSupplier =
+                                  hist?.fornecedor ?? item.fornecedor_ultima_atualizacao
+                                const refDate = hist?.data_cotacao ?? item.data_atualizacao
+
+                                if (typeof refPrice === 'number' && refPrice > 0) {
+                                  return (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <div className="flex flex-col cursor-help items-start">
+                                          <span className="font-semibold text-amber-600">
+                                            $ {refPrice.toFixed(2)}
+                                          </span>
+                                          {refSupplier ? (
+                                            <span className="text-[9px] text-muted-foreground truncate max-w-[100px]">
+                                              {refSupplier}
+                                            </span>
+                                          ) : (
+                                            <span className="text-[9px] text-muted-foreground">
+                                              -
+                                            </span>
+                                          )}
+                                        </div>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p className="font-semibold">
+                                          Último Fornecedor: {refSupplier || '-'}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                          Data do Preço:{' '}
+                                          {refDate ? new Date(refDate).toLocaleDateString() : '-'}
+                                        </p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  )
+                                }
+                                return '-'
+                              })()}
                             </TableCell>
                             <TableCell className="whitespace-nowrap py-1 px-2 text-xs overflow-hidden text-ellipsis">
                               {typeof item.preco_venda === 'number'
