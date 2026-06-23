@@ -14,8 +14,10 @@ import {
   Minimize2,
   Lock,
   Unlock,
+  Search,
 } from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
+import { Switch } from '@/components/ui/switch'
 import { useRealtime } from '@/hooks/use-realtime'
 import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
@@ -93,6 +95,9 @@ export default function QuotationMatrix() {
     headers: string[]
     open: boolean
   } | null>(null)
+
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterByLine, setFilterByLine] = useState(false)
 
   const loadData = async () => {
     if (!potencialId) return
@@ -479,9 +484,12 @@ export default function QuotationMatrix() {
 
         promises.push(pb.collection('itens').update(w.item_id, { preco_compra: priceToUse }))
 
+        const sp = localSalesPrices[pi.id] ?? pi.preco_unitario ?? 0
+        const updateData: any = { preco_unitario: sp }
         if (adjustMoq && moqToUse > 0 && pi.quantidade < moqToUse) {
-          promises.push(pb.collection('potencial_itens').update(pi.id, { quantidade: moqToUse }))
+          updateData.quantidade = moqToUse
         }
+        promises.push(pb.collection('potencial_itens').update(pi.id, updateData))
 
         const cf = cotacoesF.find((f) => f.id === w.cotacao_fornecedor_id)
         const fornecedorNome = cf?.expand?.fornecedor_id?.nome || 'Desconhecido'
@@ -532,53 +540,84 @@ export default function QuotationMatrix() {
     executeAcceptSelected(adjustMoq)
   }
 
-  const handleExportExcel = (lang: 'pt' | 'en') => {
-    let csv =
-      lang === 'pt'
-        ? 'SKU,Descricao,Qtd,Unidade,Menor Preco Atual,Menor Preco Historico'
-        : 'SKU,Description,Qty,Unit,Min Current Price,Min Hist Price'
-
-    cotacoesF.forEach((cf) => {
-      const nome = cf.expand?.fornecedor_id?.nome || 'Fornecedor'
-      csv += lang === 'pt' ? `,${nome} - Preco,${nome} - MOQ` : `,${nome} - Price,${nome} - MOQ`
-    })
-    csv += '\n'
+  const handleExportExcel = () => {
+    let html = `<html xmlns:x="urn:schemas-microsoft-com:office:excel">
+<head>
+  <meta charset="utf-8">
+  <!--[if gte mso 9]>
+  <xml>
+    <x:ExcelWorkbook>
+      <x:ExcelWorksheets>
+        <x:ExcelWorksheet>
+          <x:Name>Counter Proposal</x:Name>
+          <x:WorksheetOptions>
+            <x:DisplayGridlines/>
+          </x:WorksheetOptions>
+        </x:ExcelWorksheet>
+      </x:ExcelWorksheets>
+    </x:ExcelWorkbook>
+  </xml>
+  <![endif]-->
+</head>
+<body>
+  <table border="1">
+    <tr>
+      <th style="background:#f3f4f6">SKU</th>
+      <th style="background:#f3f4f6">Description</th>
+      <th style="background:#f3f4f6">Quantity</th>
+      <th style="background:#f3f4f6">Unit</th>
+      <th style="background:#f3f4f6">Offered Price</th>
+      <th style="background:#f3f4f6">Target Price</th>
+    </tr>`
 
     potencialItens.forEach((pi) => {
-      const itemHist = historico.filter((h) => h.item_id === pi.item_id)
-      const minHist = itemHist.length > 0 ? Math.min(...itemHist.map((h) => h.preco)) : ''
-      const currentPrices = cotacoesF.map(
-        (cf) =>
-          draftPrices[`${cf.id}_${pi.item_id}`] ??
-          cotacoesI.find((c) => c.cotacao_fornecedor_id === cf.id && c.item_id === pi.item_id)
-            ?.preco_ofertado ??
-          0,
-      )
-      const validCurr = currentPrices.filter((p) => p > 0)
-      const minCurr = validCurr.length > 0 ? Math.min(...validCurr) : ''
-
       const itemNode = pi.expand?.item_id
       const desc =
-        lang === 'pt'
-          ? itemNode?.descricao_curta || itemNode?.descr_pt || ''
-          : itemNode?.descricao_curta_en || itemNode?.descr_en || ''
+        itemNode?.descricao_curta_en ||
+        itemNode?.descr_en ||
+        itemNode?.descricao_curta ||
+        itemNode?.descr_pt ||
+        ''
 
-      csv += `"${(itemNode?.sku || '').replace(/"/g, '""')}","${desc.replace(/"/g, '""')}",${pi.quantidade},"${pi.unidade_medida || 'UN'}",${minCurr},${minHist}`
+      const currentPrices = cotacoesF
+        .map((cf) => {
+          const draft = draftPrices[`${cf.id}_${pi.item_id}`]
+          const ci = cotacoesI.find(
+            (c) => c.cotacao_fornecedor_id === cf.id && c.item_id === pi.item_id,
+          )
+          return draft !== undefined ? draft : ci?.preco_ofertado || 0
+        })
+        .filter((p) => p > 0)
+      const offeredPrice = currentPrices.length > 0 ? Math.min(...currentPrices) : 0
 
-      cotacoesF.forEach((cf) => {
-        const ci = cotacoesI.find(
-          (c) => c.cotacao_fornecedor_id === cf.id && c.item_id === pi.item_id,
-        )
-        csv += `,${(draftPrices[`${cf.id}_${pi.item_id}`] ?? ci?.preco_ofertado) || ''},${(draftMoqs[`${cf.id}_${pi.item_id}`] ?? ci?.quantidade_minima) || ''}`
-      })
-      csv += '\n'
+      let targetPrice = 0
+      const winners = cotacoesI.filter((c) => c.item_id === pi.item_id && c.vencedor)
+      if (winners.length > 0) {
+        targetPrice =
+          winners[0].preco_contraproposta > 0
+            ? winners[0].preco_contraproposta
+            : winners[0].preco_ofertado
+      } else {
+        targetPrice = offeredPrice
+      }
+
+      html += `<tr>
+        <td>${itemNode?.sku || ''}</td>
+        <td>${desc}</td>
+        <td>${pi.quantidade}</td>
+        <td>${pi.unidade_medida || 'UN'}</td>
+        <td>${offeredPrice}</td>
+        <td>${targetPrice}</td>
+      </tr>`
     })
 
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    html += `</table></body></html>`
+
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `Cotacao_${potencialId}_${lang.toUpperCase()}.csv`
+    a.download = `Counter_Proposal_${potencialId}.xlsx`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -657,12 +696,31 @@ export default function QuotationMatrix() {
   const availableFornecedores = fornecedores.filter(
     (f) => !cotacoesF.some((cf) => cf.fornecedor_id === f.id),
   )
-  const sortedFornecedores = [...availableFornecedores].sort((a, b) => {
-    const aPrio = prioritizedSuppliers.has(a.nome)
-    const bPrio = prioritizedSuppliers.has(b.nome)
-    if (aPrio && !bPrio) return -1
-    if (!aPrio && bPrio) return 1
-    return a.nome.localeCompare(b.nome)
+  const sortedFornecedores = [...availableFornecedores]
+    .filter((f) => (filterByLine ? prioritizedSuppliers.has(f.nome) : true))
+    .sort((a, b) => {
+      const aPrio = prioritizedSuppliers.has(a.nome)
+      const bPrio = prioritizedSuppliers.has(b.nome)
+      if (aPrio && !bPrio) return -1
+      if (!aPrio && bPrio) return 1
+      return a.nome.localeCompare(b.nome)
+    })
+
+  const filteredPotencialItens = potencialItens.filter((pi) => {
+    if (!searchTerm) return true
+    const term = searchTerm.toLowerCase()
+    const sku = (pi.expand?.item_id?.sku || '').toLowerCase()
+    const pt = (
+      pi.expand?.item_id?.descr_pt ||
+      pi.expand?.item_id?.descricao_curta ||
+      ''
+    ).toLowerCase()
+    const en = (
+      pi.expand?.item_id?.descr_en ||
+      pi.expand?.item_id?.descricao_curta_en ||
+      ''
+    ).toLowerCase()
+    return sku.includes(term) || pt.includes(term) || en.includes(term)
   })
 
   return (
@@ -716,6 +774,16 @@ export default function QuotationMatrix() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 self-stretch xl:self-auto pt-2 xl:pt-0 border-t xl:border-0">
+          <div className="relative w-48 xl:w-64">
+            <Search className="w-4 h-4 absolute left-2.5 top-2.5 text-muted-foreground" />
+            <Input
+              placeholder="Buscar SKU ou Descrição..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="h-9 pl-9 text-xs"
+            />
+          </div>
+
           <Button
             variant="ghost"
             size="icon"
@@ -742,7 +810,20 @@ export default function QuotationMatrix() {
                   <Plus className="w-4 h-4 mr-2" /> Fabricante
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-[320px] p-0" align="start">
+              <PopoverContent className="w-[340px] p-0" align="start">
+                <div className="p-2 border-b flex items-center justify-between bg-muted/10">
+                  <Label
+                    className="text-xs text-muted-foreground cursor-pointer"
+                    htmlFor="line-filter"
+                  >
+                    Apenas fornecedores da linha
+                  </Label>
+                  <Switch
+                    id="line-filter"
+                    checked={filterByLine}
+                    onCheckedChange={setFilterByLine}
+                  />
+                </div>
                 <Command
                   filter={(value, search) => {
                     const normalizedValue = value.toLowerCase()
@@ -818,21 +899,9 @@ export default function QuotationMatrix() {
             <TrendingDown className="w-4 h-4 mr-2" /> Contraproposta
           </Button>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Download className="w-4 h-4 mr-2" /> Exportar
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleExportExcel('pt')}>
-                Português (PT-BR)
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExportExcel('en')}>
-                English (EN)
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button variant="outline" size="sm" onClick={handleExportExcel} disabled={isFrozen}>
+            <Download className="w-4 h-4 mr-2" /> Exportar Excel
+          </Button>
 
           <Button
             variant="outline"
@@ -860,9 +929,9 @@ export default function QuotationMatrix() {
                   </span>
                 </TableHead>
                 <TableHead className="font-semibold text-right min-w-[90px] py-2 border-r bg-muted/5">
-                  Markup %
+                  Margem %
                   <span className="text-[9px] font-normal text-muted-foreground block">
-                    (Estimado)
+                    (Inside)
                   </span>
                 </TableHead>
                 <TableHead className="font-semibold text-right min-w-[100px] py-2 border-r">
@@ -1007,20 +1076,23 @@ export default function QuotationMatrix() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {potencialItens.length === 0 ? (
+              {filteredPotencialItens.length === 0 ? (
                 <TableRow>
                   <TableCell
                     colSpan={5 + cotacoesF.length}
                     className="h-32 text-center text-muted-foreground"
                   >
-                    Nenhum item adicionado a este potencial.
+                    {potencialItens.length === 0
+                      ? 'Nenhum item adicionado a este potencial.'
+                      : 'Nenhum item encontrado para a busca.'}
                   </TableCell>
                 </TableRow>
               ) : (
-                potencialItens.map((pi) => {
+                filteredPotencialItens.map((pi) => {
                   const costPrice = getCostPrice(pi)
                   const salesPrice = localSalesPrices[pi.id] ?? 0
-                  const markup = costPrice > 0 ? ((salesPrice - costPrice) / costPrice) * 100 : 0
+                  const markup =
+                    costPrice > 0 && salesPrice > 0 ? (1 - costPrice / salesPrice) * 100 : 0
 
                   const currentPrices = cotacoesF.map((cf) => {
                     const ci = cotacoesI.find(
@@ -1085,12 +1157,15 @@ export default function QuotationMatrix() {
                           value={markup.toFixed(2)}
                           onChange={(e) => {
                             const m = parseFloat(e.target.value) || 0
-                            const sp = costPrice * (1 + m / 100)
+                            if (m >= 100) return
+                            const sp = costPrice / (1 - m / 100)
                             setLocalSalesPrices((p) => ({ ...p, [pi.id]: sp }))
                           }}
                           onBlur={(e) => {
                             const m = parseFloat(e.target.value) || 0
-                            handleSalesPriceBlur(pi.id, costPrice * (1 + m / 100))
+                            if (m >= 100) return
+                            const sp = costPrice / (1 - m / 100)
+                            handleSalesPriceBlur(pi.id, sp)
                           }}
                           disabled={isFrozen}
                         />

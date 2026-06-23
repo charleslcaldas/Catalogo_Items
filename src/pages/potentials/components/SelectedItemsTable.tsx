@@ -92,8 +92,10 @@ export function SelectedItemsTable({
             <TableHead className="w-20 text-[11px]">Tamanho</TableHead>
             <TableHead className="w-24 text-[11px]">Acabamento</TableHead>
             <TableHead className="w-16 text-[11px] text-center">Unidade</TableHead>
-            <TableHead className="w-24 text-[11px]">Quant.</TableHead>
-            <TableHead className="w-28 text-[11px]">Preço Unit.</TableHead>
+            <TableHead className="w-20 text-[11px]">Quant.</TableHead>
+            <TableHead className="w-20 text-[11px] text-right">Custo Ref.</TableHead>
+            <TableHead className="w-20 text-[11px] text-right">Margem %</TableHead>
+            <TableHead className="w-28 text-[11px] text-right">Preço Venda</TableHead>
             <TableHead className="w-24 text-[11px] text-right">Total</TableHead>
             <TableHead className="w-10 text-center text-[11px]">Ação</TableHead>
           </TableRow>
@@ -179,7 +181,7 @@ export function SelectedItemsTable({
                 </TableCell>
                 <TableCell className="py-1">
                   <FormattedInput
-                    className="h-7 w-20 px-2 text-right text-xs bg-white"
+                    className="h-7 w-16 px-2 text-right text-xs bg-white"
                     value={data.quantidade}
                     onValueChange={(val) => {
                       if (Number(val) < 0) return
@@ -188,11 +190,39 @@ export function SelectedItemsTable({
                     onBlur={() => handleQuantityBlur(record.recordId, data.quantidade)}
                   />
                 </TableCell>
-                <TableCell className="py-1">
+                <TableCell className="py-1 text-xs text-right font-mono text-muted-foreground whitespace-nowrap">
+                  {formatCurrency(data.item.preco_compra || 0)}
+                </TableCell>
+                <TableCell className="py-1 text-right">
+                  <FormattedInput
+                    className="h-7 w-16 px-2 text-right text-xs bg-white ml-auto"
+                    value={
+                      Number(data.preco_unitario) > 0 && (data.item.preco_compra || 0) > 0
+                        ? (
+                            (1 - (data.item.preco_compra || 0) / Number(data.preco_unitario)) *
+                            100
+                          ).toFixed(2)
+                        : '0.00'
+                    }
+                    onValueChange={(val) => {
+                      const m = parseFloat(val) || 0
+                      if (m >= 100) return
+                      const custo = data.item.preco_compra || 0
+                      const newVenda = custo / (1 - m / 100)
+                      handleUpdateItem(id, 'preco_unitario', newVenda.toString())
+                    }}
+                    onBlur={() => {
+                      let parsed = parseFloat(String(data.preco_unitario))
+                      if (isNaN(parsed)) parsed = 0
+                      handlePriceBlur(record.recordId, parsed)
+                    }}
+                  />
+                </TableCell>
+                <TableCell className="py-1 text-right">
                   <FormattedInput
                     isPrice
                     prefixText="$"
-                    className="h-7 w-24 px-2 text-right text-xs bg-white"
+                    className="h-7 w-24 px-2 text-right text-xs bg-white font-bold ml-auto"
                     value={data.preco_unitario}
                     onValueChange={(val) => handleUpdateItem(id, 'preco_unitario', val)}
                     onBlur={() => {
