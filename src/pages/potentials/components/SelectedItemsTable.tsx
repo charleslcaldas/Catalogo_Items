@@ -33,6 +33,9 @@ export function SelectedItemsTable({
   handleMoveDown,
   setIsSelecting,
 }: SelectedItemsTableProps) {
+  const [globalMargin, setGlobalMargin] = useState('')
+  const [isApplying, setIsApplying] = useState(false)
+
   if (selectedItems.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-32 text-muted-foreground bg-white">
@@ -75,9 +78,6 @@ export function SelectedItemsTable({
       }
     }
   }
-
-  const [globalMargin, setGlobalMargin] = useState('')
-  const [isApplying, setIsApplying] = useState(false)
 
   const handleApplyLineMargins = async () => {
     setIsApplying(true)
