@@ -243,7 +243,7 @@ export function SelectedItemsTable({
                         typeof data.referencia_preco === 'number' && data.referencia_preco > 0
                       const custo = hasSnapshot ? Number(data.referencia_preco) : 0
                       return Number(data.preco_unitario) > 0 && custo > 0
-                        ? ((Number(data.preco_unitario) / custo - 1) * 100).toFixed(3)
+                        ? ((1 - custo / Number(data.preco_unitario)) * 100).toFixed(3)
                         : '0.000'
                     })()}
                     onValueChange={(val) => {
@@ -251,8 +251,8 @@ export function SelectedItemsTable({
                       const hasSnapshot =
                         typeof data.referencia_preco === 'number' && data.referencia_preco > 0
                       const custo = hasSnapshot ? Number(data.referencia_preco) : 0
-                      if (custo === 0) return
-                      const newVenda = custo * (1 + m / 100)
+                      if (custo === 0 || m >= 100) return
+                      const newVenda = custo / (1 - m / 100)
                       handleUpdateItem(id, 'preco_unitario', newVenda.toFixed(3))
                     }}
                     onBlur={() => {

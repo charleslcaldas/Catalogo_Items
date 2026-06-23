@@ -72,11 +72,14 @@ export default function PotentialDetailsWrapper() {
       setIsApplying(true)
       const items = await pb.collection('potencial_itens').getFullList({
         filter: `potencial_id="${potencialId}"`,
-        expand: 'item_id',
+        expand: 'item_id.linha_id',
       })
       const promises = items.map((item) => {
         const cost = typeof item.referencia_preco === 'number' ? item.referencia_preco : 0
-        const salePrice = cost > 0 ? cost / (1 - margin / 100) : item.preco_unitario
+        const linhaMargin = item.expand?.item_id?.expand?.linha_id?.margem_padrao
+        const appliedMargin =
+          typeof linhaMargin === 'number' && linhaMargin > 0 ? linhaMargin : margin
+        const salePrice = cost > 0 ? cost / (1 - appliedMargin / 100) : item.preco_unitario
         return pb.collection('potencial_itens').update(item.id, { preco_unitario: salePrice })
       })
       await Promise.all(promises)
@@ -126,6 +129,8 @@ export default function PotentialDetailsWrapper() {
                     setGlobalMargin(val)
                   }
                 }}
+                onBlur={applyGlobalMargin}
+                onKeyDown={(e) => e.key === 'Enter' && applyGlobalMargin()}
                 className="w-20 h-7 text-xs text-right font-mono bg-background"
               />
               <span className="text-xs text-muted-foreground font-semibold">%</span>
@@ -136,7 +141,7 @@ export default function PotentialDetailsWrapper() {
               onClick={applyGlobalMargin}
               disabled={isApplying}
             >
-              {isApplying ? 'Aplicando...' : 'Aplicar a Todos'}
+              {isApplying ? 'Aplicando...' : 'Recalcular Preços'}
             </Button>
 
             <div className="w-px h-6 bg-border mx-1" />
