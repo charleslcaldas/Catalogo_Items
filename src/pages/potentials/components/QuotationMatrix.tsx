@@ -105,12 +105,10 @@ export default function QuotationMatrix() {
           expand: 'fornecedor_id',
           sort: 'created',
         }),
-        pb
-          .collection('cotacoes_itens')
-          .getFullList({
-            filter: `cotacao_fornecedor_id.potencial_id="${potencialId}"`,
-            expand: 'cotacao_fornecedor_id,cotacao_fornecedor_id.fornecedor_id',
-          }),
+        pb.collection('cotacoes_itens').getFullList({
+          filter: `cotacao_fornecedor_id.potencial_id="${potencialId}"`,
+          expand: 'cotacao_fornecedor_id,cotacao_fornecedor_id.fornecedor_id',
+        }),
         pb.collection('fornecedores').getFullList({ filter: 'ativo=true', sort: 'nome' }),
       ])
       setPotencialItens(pItens)
@@ -507,20 +505,34 @@ export default function QuotationMatrix() {
   }
 
   const handleExportExcel = () => {
-    let csv = 'SKU,Description,Quantity,Unit,Offered Price,Target Price\n'
+    let csv = 'SKU,Description,Quantity,Unit,'
+
+    cotacoesF.forEach((cf) => {
+      csv += `"${(cf.expand?.fornecedor_id?.nome || '').replace(/"/g, '""')} Price",`
+    })
+    csv += 'Lowest Price,Target Price\n'
+
     potencialItens.forEach((pi) => {
       const itemNode = pi.expand?.item_id
       const desc = itemNode?.descr_en || itemNode?.descricao_curta_en || ''
+      const sku = (itemNode?.sku || '').replace(/"/g, '""')
+      const qty = pi.quantidade || 0
+      const unit = pi.unidade_medida || 'UN'
 
-      const currentPrices = cotacoesF
-        .map((cf) => {
-          const draft = draftPrices[`${cf.id}_${pi.item_id}`]
-          const ci = cotacoesI.find(
-            (c) => c.cotacao_fornecedor_id === cf.id && c.item_id === pi.item_id,
-          )
-          return draft !== undefined ? draft : ci?.preco_ofertado || 0
-        })
-        .filter((p) => p > 0)
+      let row = `"${sku}","${desc.replace(/"/g, '""')}",${qty},"${unit}",`
+
+      let currentPrices: number[] = []
+
+      cotacoesF.forEach((cf) => {
+        const draft = draftPrices[`${cf.id}_${pi.item_id}`]
+        const ci = cotacoesI.find(
+          (c) => c.cotacao_fornecedor_id === cf.id && c.item_id === pi.item_id,
+        )
+        const price = draft !== undefined ? draft : ci?.preco_ofertado || 0
+        if (price > 0) currentPrices.push(price)
+        row += price > 0 ? `${price.toFixed(3)},` : `"",`
+      })
+
       const offeredPrice = currentPrices.length > 0 ? Math.min(...currentPrices) : 0
 
       let targetPrice = 0
@@ -534,14 +546,42 @@ export default function QuotationMatrix() {
         targetPrice = offeredPrice
       }
 
-      csv += `"${(itemNode?.sku || '').replace(/"/g, '""')}","${desc.replace(/"/g, '""')}",${pi.quantidade},"${pi.unidade_medida || 'UN'}",${offeredPrice.toFixed(3)},${targetPrice.toFixed(3)}\n`
+      row += `"${offeredPrice > 0 ? offeredPrice.toFixed(3) : ''}","${targetPrice > 0 ? targetPrice.toFixed(3) : ''}"\n`
+      csv += row
     })
 
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `Counter_Proposal_${potencialId}.csv`
+    a.download = `Comparative_Matrix_${potencialId}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleExportCounterProposal = (cf: any) => {
+    let csv = 'SKU,Description,Quantity,Unit,Current Offered Price,Target Price\n'
+    potencialItens.forEach((pi) => {
+      const itemNode = pi.expand?.item_id
+      const desc = itemNode?.descr_en || itemNode?.descricao_curta_en || ''
+      const sku = (itemNode?.sku || '').replace(/"/g, '""')
+      const qty = pi.quantidade || 0
+      const unit = pi.unidade_medida || 'UN'
+
+      const ci = cotacoesI.find(
+        (c) => c.cotacao_fornecedor_id === cf.id && c.item_id === pi.item_id,
+      )
+      const offered = ci?.preco_ofertado || 0
+      const target = ci?.preco_contraproposta > 0 ? ci.preco_contraproposta : offered
+
+      csv += `"${sku}","${desc.replace(/"/g, '""')}",${qty},"${unit}",${offered > 0 ? offered.toFixed(3) : ''},${target > 0 ? target.toFixed(3) : ''}\n`
+    })
+
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `Counter_Proposal_${cf.expand?.fornecedor_id?.nome}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -583,6 +623,47 @@ export default function QuotationMatrix() {
       custoTotal,
     }
   }, [potencialItens, cotacoesI, draftPrices])
+
+  const costSummary = useMemo(() => {
+    let custoUltimoPreco = 0
+    let custoSelecionado = 0
+    let totalVenda = 0
+
+    potencialItens.forEach((pi) => {
+      const qty = pi.quantidade || 0
+
+      const lastHist = historico.find((h) => h.item_id === pi.item_id)
+      const lastPrice = lastHist ? lastHist.preco : pi.expand?.item_id?.preco_compra || 0
+      custoUltimoPreco += qty * lastPrice
+
+      const winner = cotacoesI.find((c) => c.item_id === pi.item_id && c.vencedor)
+      let selectedPrice = 0
+      if (winner) {
+        const draftP = draftPrices[`${winner.cotacao_fornecedor_id}_${pi.item_id}`]
+        selectedPrice =
+          draftP !== undefined
+            ? draftP
+            : ((winner.preco_contraproposta > 0
+                ? winner.preco_contraproposta
+                : winner.preco_ofertado) ?? 0)
+      }
+      custoSelecionado += qty * selectedPrice
+
+      const salePrice = pi.preco_unitario || 0
+      totalVenda += qty * salePrice
+    })
+
+    const rentabilidadeAbsoluta = totalVenda - custoSelecionado
+    const rentabilidadePercentual = totalVenda > 0 ? (rentabilidadeAbsoluta / totalVenda) * 100 : 0
+
+    return {
+      custoUltimoPreco,
+      custoSelecionado,
+      totalVenda,
+      rentabilidadeAbsoluta,
+      rentabilidadePercentual,
+    }
+  }, [potencialItens, cotacoesI, draftPrices, historico])
 
   const formatCurrency = (val: number) =>
     val.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
@@ -875,6 +956,15 @@ export default function QuotationMatrix() {
                                   variant="outline"
                                   size="sm"
                                   className="w-full justify-start text-xs h-7"
+                                  onClick={() => handleExportCounterProposal(cf)}
+                                  disabled={isFrozen}
+                                >
+                                  <Download className="w-3 h-3 mr-2" /> Exportar Contra-proposta
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full justify-start text-xs h-7"
                                   onClick={() => handleSelectAllFor(cf.id)}
                                   disabled={isFrozen}
                                 >
@@ -1017,7 +1107,7 @@ export default function QuotationMatrix() {
                           isCompact ? 'py-1' : 'py-1.5',
                         )}
                       >
-                        <span className="font-mono text-xs text-muted-foreground font-medium">
+                        <span className="font-mono text-xs text-amber-600 font-bold">
                           {lastPrice > 0 ? `$ ${formatCurrency(lastPrice)}` : '-'}
                         </span>
                       </TableCell>
@@ -1066,7 +1156,7 @@ export default function QuotationMatrix() {
                           <TableCell
                             key={cf.id}
                             className={cn(
-                              'align-top px-1 border-r transition-colors relative',
+                              'align-top px-1 border-r transition-colors relative text-green-700',
                               isCompact ? 'py-0.5' : 'py-1',
                               isWinnerCell
                                 ? 'bg-blue-100/40 border-l-2 border-r-2 border-y-2 border-blue-400 shadow-[inset_0_0_0_1px_rgba(96,165,250,0.5)] z-10'
@@ -1165,8 +1255,43 @@ export default function QuotationMatrix() {
             </TableFooter>
           </Table>
         </div>
-        <div className="shrink-0 mb-4">
+        <div className="shrink-0 flex flex-col gap-4 mb-4">
           <QuotationNotes potencialId={potencialId} cotacoesF={cotacoesF} />
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-2">
+            <div className="border rounded-xl p-4 bg-card shadow-sm flex flex-col justify-center">
+              <span className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">
+                Custo Último Preço
+              </span>
+              <span className="text-lg font-mono font-bold text-amber-600 mt-1">
+                $ {formatCurrency(costSummary.custoUltimoPreco)}
+              </span>
+            </div>
+            <div className="border rounded-xl p-4 bg-card shadow-sm flex flex-col justify-center">
+              <span className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">
+                Custo Selecionado
+              </span>
+              <span className="text-lg font-mono font-bold text-green-700 mt-1">
+                $ {formatCurrency(costSummary.custoSelecionado)}
+              </span>
+            </div>
+            <div className="border rounded-xl p-4 bg-card shadow-sm flex flex-col justify-center md:col-span-2">
+              <span className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">
+                Rentabilidade (vs Venda)
+              </span>
+              <div className="flex items-baseline gap-4 mt-1">
+                <span className="text-lg font-mono font-bold text-blue-700">
+                  $ {formatCurrency(costSummary.rentabilidadeAbsoluta)}
+                </span>
+                <span className="text-sm font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                  {costSummary.rentabilidadePercentual.toFixed(3)}%
+                </span>
+                <span className="text-xs text-muted-foreground ml-auto">
+                  Venda Total: $ {formatCurrency(costSummary.totalVenda)}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

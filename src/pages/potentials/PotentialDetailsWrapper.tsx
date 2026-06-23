@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import AddItemsToPotential from './AddItemsToPotential'
@@ -9,11 +9,13 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import pb from '@/lib/pocketbase/client'
+import { useRealtime } from '@/hooks/use-realtime'
 
 export default function PotentialDetailsWrapper() {
   const [tab, setTab] = useState('items')
   const [itemsKey, setItemsKey] = useState(Date.now())
   const [globalMargin, setGlobalMargin] = useState('7.5')
+  const [realMargin, setRealMargin] = useState<number | null>(null)
   const [isApplying, setIsApplying] = useState(false)
   const { toast } = useToast()
   const [searchParams] = useSearchParams()
@@ -24,6 +26,39 @@ export default function PotentialDetailsWrapper() {
     setTab(v)
     if (v === 'items') setItemsKey(Date.now())
   }
+
+  const loadTotals = async () => {
+    if (!potencialId) return
+    try {
+      const items = await pb.collection('potencial_itens').getFullList({
+        filter: `potencial_id="${potencialId}"`,
+        expand: 'item_id',
+      })
+      let totalPurchase = 0
+      let totalSale = 0
+      items.forEach((item) => {
+        const q = item.quantidade || 0
+        const p = item.expand?.item_id?.preco_compra || 0
+        const v = item.preco_unitario || 0
+        totalPurchase += q * p
+        totalSale += q * v
+      })
+      if (totalSale > 0) {
+        setRealMargin((1 - totalPurchase / totalSale) * 100)
+      } else {
+        setRealMargin(null)
+      }
+    } catch (err) {
+      console.error('Failed to load totals', err)
+    }
+  }
+
+  useEffect(() => {
+    loadTotals()
+  }, [potencialId, itemsKey])
+
+  useRealtime('potencial_itens', loadTotals)
+  useRealtime('itens', loadTotals)
 
   const applyGlobalMargin = async () => {
     if (!potencialId) return
@@ -45,6 +80,7 @@ export default function PotentialDetailsWrapper() {
       })
       await Promise.all(promises)
       setItemsKey(Date.now())
+      loadTotals()
       toast({ title: `Margem de ${margin}% aplicada a ${items.length} itens.` })
     } catch (err: any) {
       toast({ title: 'Erro ao aplicar margem', description: err.message, variant: 'destructive' })
@@ -101,6 +137,18 @@ export default function PotentialDetailsWrapper() {
             >
               {isApplying ? 'Aplicando...' : 'Aplicar a Todos'}
             </Button>
+
+            <div className="w-px h-6 bg-border mx-1" />
+
+            <Label className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
+              Margem Real Calculada
+            </Label>
+            <div className="flex items-center gap-1">
+              <div className="h-7 px-3 flex items-center justify-end bg-background border rounded-md text-xs font-mono text-muted-foreground min-w-[4rem]">
+                {realMargin !== null ? realMargin.toFixed(3) : '0.000'}
+              </div>
+              <span className="text-xs text-muted-foreground font-semibold">%</span>
+            </div>
           </div>
         )}
       </div>
