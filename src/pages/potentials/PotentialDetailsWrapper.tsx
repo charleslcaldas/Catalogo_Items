@@ -76,10 +76,7 @@ export default function PotentialDetailsWrapper() {
       })
       const promises = items.map((item) => {
         const cost = typeof item.referencia_preco === 'number' ? item.referencia_preco : 0
-        const linhaMargin = item.expand?.item_id?.expand?.linha_id?.margem_padrao
-        const appliedMargin =
-          typeof linhaMargin === 'number' && linhaMargin > 0 ? linhaMargin : margin
-        const salePrice = cost > 0 ? cost / (1 - appliedMargin / 100) : item.preco_unitario
+        const salePrice = cost > 0 ? cost / (1 - margin / 100) : item.preco_unitario
         return pb.collection('potencial_itens').update(item.id, { preco_unitario: salePrice })
       })
       await Promise.all(promises)
@@ -141,7 +138,7 @@ export default function PotentialDetailsWrapper() {
               onClick={applyGlobalMargin}
               disabled={isApplying}
             >
-              {isApplying ? 'Aplicando...' : 'Recalcular Preços'}
+              {isApplying ? 'Aplicando...' : 'Aplicar Margem Global'}
             </Button>
 
             <div className="w-px h-6 bg-border mx-1" />

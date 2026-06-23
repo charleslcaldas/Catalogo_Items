@@ -142,14 +142,18 @@ export default function QuotationMatrix() {
       allNotas.items.forEach((n) => histSet.add(n.fornecedor_id))
       setSuppliersWithHistory(histSet)
 
+      const potencial = await pb.collection('potenciais').getOne(potencialId)
+      const potencialDate = potencial.created
+
       const itemIds = Array.from(new Set(pItens.map((i) => i.item_id)))
       const latestHist: Record<string, any> = {}
       if (itemIds.length > 0) {
         const chunkSize = 50
         for (let i = 0; i < itemIds.length; i += chunkSize) {
           const chunk = itemIds.slice(i, i + chunkSize)
+          const itemFilter = chunk.map((id) => `item_id="${id}"`).join(' || ')
           const h = await pb.collection('historico_precos').getFullList({
-            filter: chunk.map((id) => `item_id="${id}"`).join(' || '),
+            filter: `(${itemFilter}) && created < "${potencialDate}"`,
             sort: '-data_cotacao',
           })
           h.forEach((record) => {

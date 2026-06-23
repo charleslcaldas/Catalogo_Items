@@ -85,7 +85,10 @@ export function SelectedItemsTable({
     for (const record of selectedItems) {
       const custo = Number(record.data.referencia_preco) || 0
       if (custo > 0) {
-        const margem = record.data.item.expand?.linha_id?.margem_padrao ?? 7.5
+        let margem = record.data.item.expand?.linha_id?.margem_padrao
+        if (typeof margem !== 'number' || isNaN(margem)) {
+          margem = 7.5
+        }
         const newVenda = margem < 100 ? custo / (1 - margem / 100) : custo
         if (record.recordId && record.recordId.length === 15) {
           promises.push(
@@ -153,7 +156,7 @@ export function SelectedItemsTable({
               disabled={isApplying || !globalMargin || selectedItems.length === 0}
               className="h-full rounded-none px-3 text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border-l"
             >
-              Aplicar Global
+              Aplicar Margem Global
             </Button>
           </div>
         </div>
