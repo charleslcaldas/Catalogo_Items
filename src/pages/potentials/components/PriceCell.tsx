@@ -1,5 +1,6 @@
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { PriceInput } from '@/components/PriceInput'
 
 export function PriceCell({
   cotacaoF,
@@ -32,27 +33,24 @@ export function PriceCell({
       )}
     >
       <div className="flex items-center gap-1">
-        <Input
-          type="number"
-          value={currentPrice || ''}
-          onChange={(e) =>
-            onDraftChange(cotacaoF.id, item.item_id, parseFloat(e.target.value) || 0)
-          }
-          onBlur={() =>
-            (draftPrice !== undefined || draftMoq !== undefined) &&
-            onBlur(cotacaoF.id, item.item_id, currentPrice, currentMoq, cotacaoI?.id)
-          }
-          onClick={(e) => e.stopPropagation()}
-          className={cn(
-            'h-7 text-xs text-right font-mono flex-1 min-w-0',
-            cotacaoI?.vencedor
-              ? 'bg-blue-700 text-white border-blue-500 focus-visible:ring-blue-300 placeholder:text-blue-300'
-              : isLowest
-                ? 'text-green-700 font-bold'
-                : '',
-          )}
-          placeholder="Preço"
-        />
+        <div onClick={(e) => e.stopPropagation()} className="flex-1 min-w-0">
+          <PriceInput
+            value={currentPrice || undefined}
+            onChange={(val) => onDraftChange(cotacaoF.id, item.item_id, val || 0)}
+            onBlur={() =>
+              (draftPrice !== undefined || draftMoq !== undefined) &&
+              onBlur(cotacaoF.id, item.item_id, currentPrice, currentMoq, cotacaoI?.id)
+            }
+            className={cn(
+              'h-7 text-xs text-right font-mono w-full',
+              cotacaoI?.vencedor
+                ? 'bg-blue-700 text-white border-blue-500 focus-visible:ring-blue-300 placeholder:text-blue-300'
+                : isLowest
+                  ? 'text-green-700 font-bold'
+                  : 'bg-background',
+            )}
+          />
+        </div>
         {hasCounter && (
           <span
             className={cn(
@@ -77,11 +75,13 @@ export function PriceCell({
             MOQ
           </span>
           <Input
-            type="number"
+            type="text"
+            inputMode="numeric"
             value={currentMoq || ''}
-            onChange={(e) =>
-              onDraftMoqChange(cotacaoF.id, item.item_id, parseInt(e.target.value) || 0)
-            }
+            onChange={(e) => {
+              const val = e.target.value.replace(/[^0-9]/g, '')
+              onDraftMoqChange(cotacaoF.id, item.item_id, val ? parseInt(val, 10) : 0)
+            }}
             onBlur={() =>
               (draftPrice !== undefined || draftMoq !== undefined) &&
               onBlur(cotacaoF.id, item.item_id, currentPrice, currentMoq, cotacaoI?.id)

@@ -56,6 +56,7 @@ import { CounterProposalModal } from './CounterProposalModal'
 import { QuotationNotes } from './QuotationNotes'
 import { PriceCell } from './PriceCell'
 import { ImportMappingModal } from './ImportMappingModal'
+import { PriceInput } from '@/components/PriceInput'
 
 export default function QuotationMatrix() {
   const [searchParams] = useSearchParams()
@@ -606,8 +607,8 @@ export default function QuotationMatrix() {
         <td>${desc}</td>
         <td>${pi.quantidade}</td>
         <td>${pi.unidade_medida || 'UN'}</td>
-        <td>${offeredPrice}</td>
-        <td>${targetPrice}</td>
+        <td>${offeredPrice.toString()}</td>
+        <td>${targetPrice.toString()}</td>
       </tr>`
     })
 
@@ -627,7 +628,7 @@ export default function QuotationMatrix() {
     potencialItens.forEach((pi) => {
       const itemNode = pi.expand?.item_id
       const desc = itemNode?.descricao_curta || itemNode?.descr_pt || ''
-      csv += `"${(itemNode?.sku || '').replace(/"/g, '""')}","${desc.replace(/"/g, '""')}",${pi.quantidade},"${pi.unidade_medida || 'UN'}","",""\n`
+      csv += `"${(itemNode?.sku || '').replace(/"/g, '""')}","${desc.replace(/"/g, '""')}",${pi.quantidade.toString()},"${pi.unidade_medida || 'UN'}","",""\n`
     })
 
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
@@ -1148,21 +1149,20 @@ export default function QuotationMatrix() {
                           isCompact ? 'py-1' : 'py-1.5',
                         )}
                       >
-                        <Input
-                          type="number"
+                        <PriceInput
                           className={cn(
                             'h-7 text-xs text-right bg-background',
                             isFrozen && 'pointer-events-none opacity-70 border-transparent',
                           )}
-                          value={markup.toFixed(2)}
-                          onChange={(e) => {
-                            const m = parseFloat(e.target.value) || 0
-                            if (m >= 100) return
-                            const sp = costPrice / (1 - m / 100)
+                          value={parseFloat(markup.toFixed(2))}
+                          onChange={(m) => {
+                            const val = m || 0
+                            if (val >= 100) return
+                            const sp = costPrice / (1 - val / 100)
                             setLocalSalesPrices((p) => ({ ...p, [pi.id]: sp }))
                           }}
                           onBlur={(e) => {
-                            const m = parseFloat(e.target.value) || 0
+                            const m = parseFloat(e.target.value.replace(/,/g, '.')) || 0
                             if (m >= 100) return
                             const sp = costPrice / (1 - m / 100)
                             handleSalesPriceBlur(pi.id, sp)
@@ -1176,19 +1176,20 @@ export default function QuotationMatrix() {
                           isCompact ? 'py-1' : 'py-1.5',
                         )}
                       >
-                        <Input
-                          type="number"
+                        <PriceInput
                           className={cn(
                             'h-7 text-xs text-right font-bold text-foreground bg-background',
                             isFrozen && 'pointer-events-none opacity-70 border-transparent',
                           )}
-                          value={salesPrice.toFixed(4)}
-                          onChange={(e) => {
-                            const sp = parseFloat(e.target.value) || 0
-                            setLocalSalesPrices((p) => ({ ...p, [pi.id]: sp }))
+                          value={parseFloat(salesPrice.toFixed(4))}
+                          onChange={(sp) => {
+                            setLocalSalesPrices((p) => ({ ...p, [pi.id]: sp || 0 }))
                           }}
                           onBlur={(e) =>
-                            handleSalesPriceBlur(pi.id, parseFloat(e.target.value) || 0)
+                            handleSalesPriceBlur(
+                              pi.id,
+                              parseFloat(e.target.value.replace(/,/g, '.')) || 0,
+                            )
                           }
                           disabled={isFrozen}
                         />

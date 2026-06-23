@@ -284,10 +284,15 @@ export function CounterProposalModal({
               <div className="flex flex-col gap-1.5 w-32">
                 <Label>{action === 'fixed_target' ? 'Preço Alvo ($)' : 'Desconto (%)'}</Label>
                 <Input
-                  type="number"
-                  step="0.1"
+                  type="text"
+                  inputMode="decimal"
                   value={discountVal}
-                  onChange={(e) => setDiscountVal(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/,/g, '.')
+                    if (val === '' || /^-?\d*\.?\d*$/.test(val)) {
+                      setDiscountVal(val)
+                    }
+                  }}
                 />
               </div>
             )}
@@ -349,13 +354,17 @@ export function CounterProposalModal({
                     </TableCell>
                     <TableCell className="text-right">
                       <Input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         className="h-7 text-right text-xs font-mono text-amber-600 font-bold"
                         value={item.newPrice}
                         onChange={(e) => {
-                          const next = [...items]
-                          next[idx].newPrice = parseFloat(e.target.value) || 0
-                          setItems(next)
+                          const val = e.target.value.replace(/,/g, '.')
+                          if (val === '' || /^-?\d*\.?\d*$/.test(val)) {
+                            const next = [...items]
+                            next[idx].newPrice = val === '' ? 0 : parseFloat(val) || 0
+                            setItems(next)
+                          }
                         }}
                       />
                     </TableCell>

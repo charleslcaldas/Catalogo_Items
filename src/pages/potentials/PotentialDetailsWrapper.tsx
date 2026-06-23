@@ -80,11 +80,16 @@ export default function PotentialDetailsWrapper() {
             </Label>
             <div className="flex items-center gap-1">
               <Input
-                type="number"
+                type="text"
+                inputMode="decimal"
                 value={globalMargin}
-                onChange={(e) => setGlobalMargin(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/,/g, '.')
+                  if (val === '' || /^-?\d*\.?\d*$/.test(val)) {
+                    setGlobalMargin(val)
+                  }
+                }}
                 className="w-20 h-7 text-xs text-right font-mono bg-background"
-                step="0.1"
               />
               <span className="text-xs text-muted-foreground font-semibold">%</span>
             </div>

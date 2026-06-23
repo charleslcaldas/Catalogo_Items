@@ -5,11 +5,13 @@ import { cn } from '@/lib/utils'
 export function PriceInput({
   value,
   onChange,
+  onBlur,
   className,
   disabled,
 }: {
   value: number | undefined
   onChange: (val: number | undefined) => void
+  onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void
   className?: string
   disabled?: boolean
 }) {
@@ -27,24 +29,34 @@ export function PriceInput({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let val = e.target.value.replace(/,/g, '.')
-    val = val.replace(/[^0-9.]/g, '')
+    val = val.replace(/[^0-9.-]/g, '')
     const parts = val.split('.')
     if (parts.length > 2) {
       val = parts[0] + '.' + parts.slice(1).join('')
     }
     setStrVal(val)
-    if (val === '' || val === '.') {
+    if (val === '' || val === '.' || val === '-') {
       onChange(undefined)
     } else {
       onChange(parseFloat(val))
     }
   }
 
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    if (value !== undefined) {
+      // Optional minimal formatting
+    }
+    onBlur?.(e)
+  }
+
   return (
     <Input
+      type="text"
+      inputMode="decimal"
       className={cn('font-mono', className)}
       value={strVal}
       onChange={handleChange}
+      onBlur={handleBlur}
       placeholder="0.00"
       disabled={disabled}
     />

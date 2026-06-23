@@ -63,40 +63,38 @@ export function ProductCatalog({
     const getDescricaoBasePt = (id?: string) =>
       descricoesBase.find((d) => d.id === id)?.nome_pt || ''
 
-    return itens
-      .filter((item) => {
-        if (!item.ativo) return false
+    return itens.filter((item) => {
+      if (!item.ativo) return false
 
-        const aca = acabamentos.find((a) => a.id === item.acabamento_id)
-        const acaInfo = aca ? `${aca.nome_pt} ${aca.nome_en || ''} ${aca.codigo}` : ''
+      const aca = acabamentos.find((a) => a.id === item.acabamento_id)
+      const acaInfo = aca ? `${aca.nome_pt} ${aca.nome_en || ''} ${aca.codigo}` : ''
 
-        const text = [
-          item.sku,
-          item.descr_pt,
-          item.descr_en,
-          getDescricaoBasePt(item.descricao_base_id),
-          item.descricao_curta,
-          item.descricao_curta_en,
-          item.descricao_base_pt,
-          item.classe_material,
-          item.tipo_rosca,
-          item.norma,
-          item.informacao_extra,
-          item.tamanho,
-          getLinhaName(item.linha_id),
-          getCategoriaName(item.linha_id),
-          getNcmCode(item.ncm_id),
-          acaInfo,
-        ]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase()
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
+      const text = [
+        item.sku,
+        item.descr_pt,
+        item.descr_en,
+        getDescricaoBasePt(item.descricao_base_id),
+        item.descricao_curta,
+        item.descricao_curta_en,
+        item.descricao_base_pt,
+        item.classe_material,
+        item.tipo_rosca,
+        item.norma,
+        item.informacao_extra,
+        item.tamanho,
+        getLinhaName(item.linha_id),
+        getCategoriaName(item.linha_id),
+        getNcmCode(item.ncm_id),
+        acaInfo,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
 
-        return tokens.every((token) => text.includes(token))
-      })
-      .slice(0, 100)
+      return tokens.every((token) => text.includes(token))
+    })
   }, [itens, searchTerm, acabamentos])
 
   return (
@@ -212,11 +210,14 @@ export function ProductCatalog({
                   </TableCell>
                   <TableCell className="py-1 px-2 text-center" onClick={(e) => e.stopPropagation()}>
                     <Input
-                      type="number"
-                      min="1"
+                      type="text"
+                      inputMode="numeric"
                       disabled={!isSelected}
                       value={selectedItem ? selectedItem.data.quantidade : ''}
-                      onChange={(e) => onUpdateItem(item.id, 'quantidade', e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '')
+                        onUpdateItem(item.id, 'quantidade', val)
+                      }}
                       className="h-7 w-16 text-xs text-center mx-auto"
                     />
                   </TableCell>

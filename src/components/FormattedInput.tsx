@@ -55,10 +55,10 @@ export function FormattedInput({
           props.onFocus?.(e)
         }}
         onChange={(e) => {
-          let val = e.target.value
+          let val = e.target.value.replace(/,/g, '.')
           setLocalVal(val)
 
-          const parsed = val.replace(/,/g, '')
+          const parsed = val
           if (parsed === '' || /^-?\d*\.?\d*$/.test(parsed)) {
             onValueChange(parsed)
           }
