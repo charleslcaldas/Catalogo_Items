@@ -61,6 +61,7 @@ export default function QuotationMatrix() {
   const [cotacoesF, setCotacoesF] = useState<any[]>([])
   const [cotacoesI, setCotacoesI] = useState<any[]>([])
   const [fornecedores, setFornecedores] = useState<any[]>([])
+  const [latestHistorico, setLatestHistorico] = useState<Record<string, any>>({})
 
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isCounterOpen, setIsCounterOpen] = useState(false)
@@ -96,7 +97,7 @@ export default function QuotationMatrix() {
       const [pItens, cF, cI, forn] = await Promise.all([
         pb.collection('potencial_itens').getFullList({
           filter: `potencial_id="${potencialId}"`,
-          expand: 'item_id',
+          expand: 'item_id,item_id.linha_id',
           sort: 'ordem',
         }),
         pb.collection('cotacoes_fornecedor').getFullList({
@@ -140,6 +141,25 @@ export default function QuotationMatrix() {
       allHist.items.forEach((h) => histSet.add(h.fornecedor))
       allNotas.items.forEach((n) => histSet.add(n.fornecedor_id))
       setSuppliersWithHistory(histSet)
+
+      const itemIds = Array.from(new Set(pItens.map((i) => i.item_id)))
+      const latestHist: Record<string, any> = {}
+      if (itemIds.length > 0) {
+        const chunkSize = 50
+        for (let i = 0; i < itemIds.length; i += chunkSize) {
+          const chunk = itemIds.slice(i, i + chunkSize)
+          const h = await pb.collection('historico_precos').getFullList({
+            filter: chunk.map((id) => `item_id="${id}"`).join(' || '),
+            sort: '-data_cotacao',
+          })
+          h.forEach((record) => {
+            if (!latestHist[record.item_id]) {
+              latestHist[record.item_id] = record
+            }
+          })
+        }
+      }
+      setLatestHistorico(latestHist)
     } catch (err) {
       console.error(err)
     }
@@ -445,13 +465,27 @@ export default function QuotationMatrix() {
 
         promises.push(pb.collection('itens').update(w.item_id, { preco_compra: priceToUse }))
 
+        const margin = pi.expand?.item_id?.expand?.linha_id?.margem_padrao ?? 7.5
+        const newSellingPrice = priceToUse * (1 + margin / 100)
+
+        let qtdeToUpdate = pi.quantidade
         if (adjustMoq && moqToUse > 0 && pi.quantidade < moqToUse) {
-          promises.push(pb.collection('potencial_itens').update(pi.id, { quantidade: moqToUse }))
+          qtdeToUpdate = moqToUse
         }
 
         const cf = cotacoesF.find((f) => f.id === w.cotacao_fornecedor_id)
         const fornecedorNome = cf?.expand?.fornecedor_id?.nome || 'Desconhecido'
         if (cf) fornecedoresNomes.add(fornecedorNome)
+
+        promises.push(
+          pb.collection('potencial_itens').update(pi.id, {
+            quantidade: qtdeToUpdate,
+            referencia_preco: priceToUse,
+            referencia_fornecedor: fornecedorNome,
+            referencia_data: new Date().toISOString(),
+            preco_unitario: newSellingPrice,
+          }),
+        )
 
         promises.push(
           pb.collection('historico_precos').create({
@@ -862,6 +896,12 @@ export default function QuotationMatrix() {
                     (Snapshot)
                   </span>
                 </TableHead>
+                <TableHead className="font-semibold text-right min-w-[90px] py-2 bg-muted/10 border-r">
+                  Último Preço
+                  <span className="text-[9px] font-normal text-muted-foreground block">
+                    (Histórico)
+                  </span>
+                </TableHead>
                 <TableHead className="font-semibold text-right min-w-[90px] py-2 border-r bg-muted/5">
                   Menor Oferta
                   <span className="text-[9px] font-normal text-muted-foreground block">
@@ -1022,7 +1062,7 @@ export default function QuotationMatrix() {
               {filteredPotencialItens.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={4 + cotacoesF.length}
+                    colSpan={5 + cotacoesF.length}
                     className="h-32 text-center text-muted-foreground"
                   >
                     {potencialItens.length === 0
@@ -1121,6 +1161,40 @@ export default function QuotationMatrix() {
 
                       <TableCell
                         className={cn(
+                          'align-middle px-2 text-right border-r bg-muted/10',
+                          isCompact ? 'py-1' : 'py-1.5',
+                        )}
+                      >
+                        {(() => {
+                          const hist = latestHistorico[pi.item_id]
+                          if (hist && hist.preco > 0) {
+                            return (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="font-mono text-xs text-blue-600 font-bold cursor-help underline decoration-dashed underline-offset-2">
+                                    $ {formatCurrency(hist.preco)}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="font-semibold">
+                                    Fornecedor: {hist.fornecedor || 'Não informado'}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Data do Preço:{' '}
+                                    {new Date(hist.data_cotacao).toLocaleDateString()}
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )
+                          }
+                          return (
+                            <span className="font-mono text-xs text-blue-600 font-bold">N/A</span>
+                          )
+                        })()}
+                      </TableCell>
+
+                      <TableCell
+                        className={cn(
                           'align-middle px-2 text-right border-r bg-muted/5',
                           isCompact ? 'py-1' : 'py-1.5',
                         )}
@@ -1185,7 +1259,7 @@ export default function QuotationMatrix() {
             </TableBody>
             <TableFooter className="bg-muted/30 border-t">
               <TableRow>
-                <TableCell colSpan={4} className="text-right font-semibold py-2 border-r text-xs">
+                <TableCell colSpan={5} className="text-right font-semibold py-2 border-r text-xs">
                   Valor Total:
                 </TableCell>
                 {cotacoesF.map((cf) => {
@@ -1210,7 +1284,7 @@ export default function QuotationMatrix() {
               </TableRow>
               <TableRow className="bg-amber-50/50">
                 <TableCell
-                  colSpan={4}
+                  colSpan={5}
                   className="text-right font-semibold py-2 border-r text-xs text-amber-700"
                 >
                   Total Selecionado (Parcial):
