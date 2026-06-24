@@ -36,7 +36,8 @@ onRecordCreate((e) => {
         } catch (err) {
           console.log('Error fetching line margin:', err.message)
         }
-        e.record.set('preco_unitario', refPrice / (1 - margin / 100))
+        let calc = refPrice / (1 - margin / 100)
+        e.record.set('preco_unitario', Number(calc.toFixed(3)))
       }
     }
   } catch (err) {
@@ -55,25 +56,30 @@ onRecordUpdate((e) => {
 
   if (newRef && newRef !== oldRef && newRef > 0 && newVenda === oldVenda) {
     let margin = 7.5
-    try {
-      const itemId = e.record.get('item_id')
-      if (itemId) {
-        const item = $app.findRecordById('itens', itemId)
-        if (item) {
-          const linhaId = item.get('linha_id')
-          if (linhaId) {
-            const linha = $app.findRecordById('linhas', linhaId)
-            const linhaMargin = linha.get('margem_padrao')
-            if (typeof linhaMargin === 'number' && linhaMargin > 0) {
-              margin = linhaMargin
+    if (oldRef > 0 && oldVenda > 0) {
+      margin = (1 - oldRef / oldVenda) * 100
+    } else {
+      try {
+        const itemId = e.record.get('item_id')
+        if (itemId) {
+          const item = $app.findRecordById('itens', itemId)
+          if (item) {
+            const linhaId = item.get('linha_id')
+            if (linhaId) {
+              const linha = $app.findRecordById('linhas', linhaId)
+              const linhaMargin = linha.get('margem_padrao')
+              if (typeof linhaMargin === 'number' && linhaMargin > 0) {
+                margin = linhaMargin
+              }
             }
           }
         }
+      } catch (err) {
+        console.log('Error fetching line margin:', err.message)
       }
-    } catch (err) {
-      console.log('Error fetching line margin:', err.message)
     }
-    e.record.set('preco_unitario', newRef / (1 - margin / 100))
+    let newCalculated = newRef / (1 - margin / 100)
+    e.record.set('preco_unitario', Number(newCalculated.toFixed(3)))
   }
 
   return e.next()

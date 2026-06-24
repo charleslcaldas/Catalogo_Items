@@ -92,7 +92,9 @@ export function SelectedItemsTable({
         const newVenda = margem < 100 ? custo / (1 - margem / 100) : custo
         if (record.recordId && record.recordId.length === 15) {
           promises.push(
-            pb.collection('potencial_itens').update(record.recordId, { preco_unitario: newVenda }),
+            pb
+              .collection('potencial_itens')
+              .update(record.recordId, { preco_unitario: Number(newVenda.toFixed(3)) }),
           )
         }
         handleUpdateItem(record.id, 'preco_unitario', newVenda.toFixed(3))
@@ -113,7 +115,9 @@ export function SelectedItemsTable({
         const newVenda = custo / (1 - m / 100)
         if (record.recordId && record.recordId.length === 15) {
           promises.push(
-            pb.collection('potencial_itens').update(record.recordId, { preco_unitario: newVenda }),
+            pb
+              .collection('potencial_itens')
+              .update(record.recordId, { preco_unitario: Number(newVenda.toFixed(3)) }),
           )
         }
         handleUpdateItem(record.id, 'preco_unitario', newVenda.toFixed(3))
