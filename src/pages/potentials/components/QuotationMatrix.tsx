@@ -895,12 +895,6 @@ export default function QuotationMatrix() {
                 <TableHead className="min-w-[160px] font-semibold py-2">Item</TableHead>
                 <TableHead className="font-semibold text-center w-16 py-2">Qtd</TableHead>
                 <TableHead className="font-semibold text-right min-w-[90px] py-2 bg-muted/10 border-r">
-                  Custo Referência
-                  <span className="text-[9px] font-normal text-muted-foreground block">
-                    (Snapshot)
-                  </span>
-                </TableHead>
-                <TableHead className="font-semibold text-right min-w-[90px] py-2 bg-muted/10 border-r">
                   Último Preço
                   <span className="text-[9px] font-normal text-muted-foreground block">
                     (Histórico)
@@ -1066,7 +1060,7 @@ export default function QuotationMatrix() {
               {filteredPotencialItens.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={5 + cotacoesF.length}
+                    colSpan={4 + cotacoesF.length}
                     className="h-32 text-center text-muted-foreground"
                   >
                     {potencialItens.length === 0
@@ -1108,12 +1102,6 @@ export default function QuotationMatrix() {
                     }
                   }
 
-                  const hasSnapshot =
-                    typeof pi.referencia_preco === 'number' && pi.referencia_preco > 0
-                  const refPrice = hasSnapshot ? pi.referencia_preco : null
-                  const refSupplier = pi.referencia_fornecedor
-                  const refDate = pi.referencia_data
-
                   return (
                     <TableRow key={pi.id} className="group hover:bg-transparent">
                       <TableCell
@@ -1134,33 +1122,6 @@ export default function QuotationMatrix() {
                         <span className="text-[9px] text-muted-foreground block">
                           {pi.unidade_medida || 'UN'}
                         </span>
-                      </TableCell>
-                      <TableCell
-                        className={cn(
-                          'align-middle px-2 text-right border-r bg-muted/10',
-                          isCompact ? 'py-1' : 'py-1.5',
-                        )}
-                      >
-                        {refPrice ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="font-mono text-xs text-amber-600 font-bold cursor-help underline decoration-dashed underline-offset-2">
-                                $ {formatCurrency(refPrice)}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="font-semibold">
-                                Fornecedor: {refSupplier || 'Não informado'}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                Data do Preço:{' '}
-                                {refDate ? new Date(refDate).toLocaleDateString() : 'Não informada'}
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        ) : (
-                          <span className="font-mono text-xs text-amber-600 font-bold">N/A</span>
-                        )}
                       </TableCell>
 
                       <TableCell
@@ -1263,7 +1224,7 @@ export default function QuotationMatrix() {
             </TableBody>
             <TableFooter className="bg-muted/30 border-t">
               <TableRow>
-                <TableCell colSpan={5} className="text-right font-semibold py-2 border-r text-xs">
+                <TableCell colSpan={4} className="text-right font-semibold py-2 border-r text-xs">
                   Valor Total:
                 </TableCell>
                 {cotacoesF.map((cf) => {
@@ -1288,7 +1249,7 @@ export default function QuotationMatrix() {
               </TableRow>
               <TableRow className="bg-amber-50/50">
                 <TableCell
-                  colSpan={5}
+                  colSpan={4}
                   className="text-right font-semibold py-2 border-r text-xs text-amber-700"
                 >
                   Total Selecionado (Parcial):
