@@ -82,10 +82,30 @@ export function SelectedItemsTable({
   const handleApplyLineMargins = async () => {
     setIsApplying(true)
     const promises = []
+    const linhasCache: Record<string, number | null> = {}
+
     for (const record of selectedItems) {
       const custo = Number(record.data.referencia_preco) || 0
       if (custo > 0) {
         let margem = record.data.item.expand?.linha_id?.margem_padrao
+
+        if (margem === undefined && record.data.item.linha_id) {
+          const linhaId = record.data.item.linha_id
+          if (linhasCache[linhaId] !== undefined) {
+            margem = linhasCache[linhaId] ?? undefined
+          } else {
+            try {
+              const linha = await pb.collection('linhas').getOne(linhaId)
+              const m = typeof linha.margem_padrao === 'number' ? linha.margem_padrao : null
+              linhasCache[linhaId] = m
+              margem = m ?? undefined
+            } catch (err) {
+              console.error('Failed to fetch linha', err)
+              linhasCache[linhaId] = null
+            }
+          }
+        }
+
         if (typeof margem !== 'number' || isNaN(margem)) {
           margem = 7.5
         }
