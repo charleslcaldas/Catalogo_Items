@@ -541,7 +541,7 @@ export default function QuotationMatrix() {
   }
 
   const handleExportExcel = () => {
-    let csv = 'SKU;Description;Quantity;Unit;'
+    let csv = 'SKU;Description;Extra Description;Quantity;Unit;'
 
     cotacoesF.forEach((cf) => {
       csv += `"${(cf.expand?.fornecedor_id?.nome || '').replace(/"/g, '""')} Price";`
@@ -551,11 +551,12 @@ export default function QuotationMatrix() {
     potencialItens.forEach((pi) => {
       const itemNode = pi.expand?.item_id
       const desc = itemNode?.descr_en || itemNode?.descricao_curta_en || ''
+      const extraDesc = itemNode?.descricao_extra_en || itemNode?.descricao_extra || ''
       const sku = (itemNode?.sku || '').replace(/"/g, '""')
       const qty = pi.quantidade || 0
       const unit = pi.unidade_medida || 'UN'
 
-      let row = `"${sku}";"${desc.replace(/"/g, '""')}";${qty};"${unit}";`
+      let row = `"${sku}";"${desc.replace(/"/g, '""')}";"${extraDesc.replace(/"/g, '""')}";${qty};"${unit}";`
 
       let currentPrices: number[] = []
 
@@ -596,10 +597,12 @@ export default function QuotationMatrix() {
   }
 
   const handleExportCounterProposal = (cf: any) => {
-    let csv = 'SKU;Description;Quantity;Unit;MOQ;Current Offered Price;Target Price\n'
+    let csv =
+      'SKU;Description;Extra Description;Quantity;Unit;MOQ;Current Offered Price;Target Price\n'
     potencialItens.forEach((pi) => {
       const itemNode = pi.expand?.item_id
       const desc = itemNode?.descr_en || itemNode?.descricao_curta_en || ''
+      const extraDesc = itemNode?.descricao_extra_en || itemNode?.descricao_extra || ''
       const sku = (itemNode?.sku || '').replace(/"/g, '""')
       const qty = pi.quantidade || 0
       const unit = pi.unidade_medida || 'UN'
@@ -614,7 +617,7 @@ export default function QuotationMatrix() {
       const offeredStr = offered > 0 ? offered.toFixed(3).replace('.', ',') : ''
       const targetStr = target > 0 ? target.toFixed(3).replace('.', ',') : ''
 
-      csv += `"${sku}";"${desc.replace(/"/g, '""')}";${qty};"${unit}";${moq};"${offeredStr}";"${targetStr}"\n`
+      csv += `"${sku}";"${desc.replace(/"/g, '""')}";"${extraDesc.replace(/"/g, '""')}";${qty};"${unit}";${moq};"${offeredStr}";"${targetStr}"\n`
     })
 
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
@@ -627,11 +630,12 @@ export default function QuotationMatrix() {
   }
 
   const handleExportForSupplier = (cf: any) => {
-    let csv = 'SKU;Description;Quantity;Unit;MOQ;Offered Price;Target Price\n'
+    let csv = 'SKU;Description;Extra Description;Quantity;Unit;MOQ;Offered Price;Target Price\n'
     potencialItens.forEach((pi) => {
       const itemNode = pi.expand?.item_id
       const desc = itemNode?.descr_en || itemNode?.descricao_curta_en || ''
-      csv += `"${(itemNode?.sku || '').replace(/"/g, '""')}";"${desc.replace(/"/g, '""')}";${pi.quantidade};"${pi.unidade_medida || 'UN'}";"";"";""\n`
+      const extraDesc = itemNode?.descricao_extra_en || itemNode?.descricao_extra || ''
+      csv += `"${(itemNode?.sku || '').replace(/"/g, '""')}";"${desc.replace(/"/g, '""')}";"${extraDesc.replace(/"/g, '""')}";${pi.quantidade};"${pi.unidade_medida || 'UN'}";"";"";""\n`
     })
 
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
@@ -1115,10 +1119,35 @@ export default function QuotationMatrix() {
                       <TableCell
                         className={cn('align-top px-3 border-r', isCompact ? 'py-1' : 'py-1.5')}
                       >
-                        <div className="font-semibold text-xs">{pi.expand?.item_id?.sku}</div>
-                        <div className="text-[10px] text-muted-foreground line-clamp-2 pr-2">
-                          {pi.expand?.item_id?.descr_en || pi.expand?.item_id?.descricao_curta}
-                        </div>
+                        {(() => {
+                          const extraDesc =
+                            pi.expand?.item_id?.descricao_extra_en ||
+                            pi.expand?.item_id?.descricao_extra ||
+                            ''
+                          const content = (
+                            <div className={cn(extraDesc && 'cursor-help')}>
+                              <div className="font-semibold text-xs">{pi.expand?.item_id?.sku}</div>
+                              <div className="text-[10px] text-muted-foreground line-clamp-2 pr-2">
+                                {pi.expand?.item_id?.descr_en ||
+                                  pi.expand?.item_id?.descricao_curta}
+                              </div>
+                            </div>
+                          )
+
+                          return extraDesc ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>{content}</TooltipTrigger>
+                              <TooltipContent
+                                side="right"
+                                className="max-w-[300px] whitespace-pre-wrap text-xs"
+                              >
+                                {extraDesc}
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            content
+                          )
+                        })()}
                       </TableCell>
                       <TableCell
                         className={cn(
