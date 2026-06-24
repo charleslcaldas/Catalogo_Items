@@ -597,13 +597,20 @@ export default function QuotationMatrix() {
   }
 
   const handleExportCounterProposal = (cf: any) => {
-    let csv =
-      'SKU;Description;Extra Description;Quantity;Unit;MOQ;Current Offered Price;Target Price\n'
+    let csv = 'SKU;Description;Size;Finish;Quantity;Unit;MOQ;Current Offered Price;Target Price\n'
     potencialItens.forEach((pi) => {
       const itemNode = pi.expand?.item_id
-      const desc = itemNode?.descr_en || itemNode?.descricao_curta_en || ''
+      const desc =
+        itemNode?.descr_en || itemNode?.descricao_curta_en || itemNode?.descricao_curta || ''
       const extraDesc = itemNode?.descricao_extra_en || itemNode?.descricao_extra || ''
+      const combinedDesc = extraDesc ? `${desc}\n${extraDesc}` : desc
       const sku = (itemNode?.sku || '').replace(/"/g, '""')
+      const size = (itemNode?.tamanho || '').replace(/"/g, '""')
+      const finish = (
+        itemNode?.expand?.acabamento_id?.nome_en ||
+        itemNode?.expand?.acabamento_id?.nome_pt ||
+        ''
+      ).replace(/"/g, '""')
       const qty = pi.quantidade || 0
       const unit = pi.unidade_medida || 'UN'
 
@@ -617,7 +624,7 @@ export default function QuotationMatrix() {
       const offeredStr = offered > 0 ? offered.toFixed(3).replace('.', ',') : ''
       const targetStr = target > 0 ? target.toFixed(3).replace('.', ',') : ''
 
-      csv += `"${sku}";"${desc.replace(/"/g, '""')}";"${extraDesc.replace(/"/g, '""')}";${qty};"${unit}";${moq};"${offeredStr}";"${targetStr}"\n`
+      csv += `"${sku}";"${combinedDesc.replace(/"/g, '""')}";"${size}";"${finish}";${qty};"${unit}";${moq};"${offeredStr}";"${targetStr}"\n`
     })
 
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
@@ -630,12 +637,22 @@ export default function QuotationMatrix() {
   }
 
   const handleExportForSupplier = (cf: any) => {
-    let csv = 'SKU;Description;Extra Description;Quantity;Unit;MOQ;Offered Price;Target Price\n'
+    let csv = 'SKU;Description;Size;Finish;Quantity;Unit;MOQ;Offered Price;Target Price\n'
     potencialItens.forEach((pi) => {
       const itemNode = pi.expand?.item_id
-      const desc = itemNode?.descr_en || itemNode?.descricao_curta_en || ''
+      const desc =
+        itemNode?.descr_en || itemNode?.descricao_curta_en || itemNode?.descricao_curta || ''
       const extraDesc = itemNode?.descricao_extra_en || itemNode?.descricao_extra || ''
-      csv += `"${(itemNode?.sku || '').replace(/"/g, '""')}";"${desc.replace(/"/g, '""')}";"${extraDesc.replace(/"/g, '""')}";${pi.quantidade};"${pi.unidade_medida || 'UN'}";"";"";""\n`
+      const combinedDesc = extraDesc ? `${desc}\n${extraDesc}` : desc
+      const sku = (itemNode?.sku || '').replace(/"/g, '""')
+      const size = (itemNode?.tamanho || '').replace(/"/g, '""')
+      const finish = (
+        itemNode?.expand?.acabamento_id?.nome_en ||
+        itemNode?.expand?.acabamento_id?.nome_pt ||
+        ''
+      ).replace(/"/g, '""')
+
+      csv += `"${sku}";"${combinedDesc.replace(/"/g, '""')}";"${size}";"${finish}";${pi.quantidade};"${pi.unidade_medida || 'UN'}";"";"";""\n`
     })
 
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
