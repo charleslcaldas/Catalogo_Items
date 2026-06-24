@@ -445,29 +445,31 @@ export default function ItemsPage() {
 
   const handleExportCSV = () => {
     if (apiItens.length === 0) return toast.warning('Nenhum item para exportar')
-    const headers = [
-      'SKU',
-      'Descricao Pt',
-      'Descricao En',
-      'Tamanho',
-      'Preco Compra',
-      'Preco Venda',
-      'Ativo',
-    ]
-    const rows = apiItens.map((i) => [
-      i.sku,
-      i.descr_pt,
-      i.descr_en,
-      i.tamanho,
-      i.preco_compra,
-      i.preco_venda,
-      i.ativo,
-    ])
+    const headers = ['SKU', 'Quantidade', 'Unidade', 'Description', 'Size', 'Finish']
+    const rows = apiItens.map((i) => {
+      const description = [i.descricao_curta, i.descricao_extra]
+        .map((s) => String(s || '').trim())
+        .filter(Boolean)
+        .join('\n\n')
+
+      const finish = i.expand?.acabamento_id?.nome_pt || i.expand?.acabamento_id?.codigo || ''
+      const unit = i.unidade || i.expand?.unidade_id?.nome || ''
+
+      return [
+        i.sku,
+        '', // Quantidade column
+        unit,
+        description,
+        i.tamanho,
+        finish,
+      ]
+    })
     const csv = [
       headers.join(','),
       ...rows.map((r) => r.map((c) => `"${String(c || '').replace(/"/g, '""')}"`).join(',')),
     ].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
+    // Add BOM for correct UTF-8 handling in Excel
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
