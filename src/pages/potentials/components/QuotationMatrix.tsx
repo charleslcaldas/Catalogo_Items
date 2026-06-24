@@ -97,7 +97,7 @@ export default function QuotationMatrix() {
       const [pItens, cF, cI, forn] = await Promise.all([
         pb.collection('potencial_itens').getFullList({
           filter: `potencial_id="${potencialId}"`,
-          expand: 'item_id,item_id.linha_id',
+          expand: 'item_id,item_id.linha_id,item_id.acabamento_id',
           sort: 'ordem',
         }),
         pb.collection('cotacoes_fornecedor').getFullList({
@@ -541,7 +541,7 @@ export default function QuotationMatrix() {
   }
 
   const handleExportExcel = () => {
-    let csv = 'SKU;Description;Extra Description;Quantity;Unit;'
+    let csv = 'SKU;Description;Size;Finish;Quantity;Unit;'
 
     cotacoesF.forEach((cf) => {
       csv += `"${(cf.expand?.fornecedor_id?.nome || '').replace(/"/g, '""')} Price";`
@@ -556,17 +556,20 @@ export default function QuotationMatrix() {
         itemNode?.descr_en ||
         itemNode?.descr_pt ||
         ''
-      const extraDesc =
-        itemNode?.informacao_extra_en ||
-        itemNode?.informacao_extra ||
-        itemNode?.descricao_extra_en ||
-        itemNode?.descricao_extra ||
-        ''
+      const extraDesc = itemNode?.descricao_extra_en || itemNode?.descricao_extra || ''
+      const combinedDesc = extraDesc ? `${desc}\n\n${extraDesc}` : desc
       const sku = (itemNode?.sku || '').replace(/"/g, '""')
+      const size = (itemNode?.tamanho || '').replace(/"/g, '""')
+      const finish = (
+        itemNode?.expand?.acabamento_id?.nome_en ||
+        itemNode?.expand?.acabamento_id?.nome_pt ||
+        itemNode?.expand?.acabamento_id?.codigo ||
+        ''
+      ).replace(/"/g, '""')
       const qty = pi.quantidade || 0
       const unit = pi.unidade_medida || 'UN'
 
-      let row = `"${sku}";"${desc.replace(/"/g, '""')}";"${extraDesc.replace(/"/g, '""')}";${qty};"${unit}";`
+      let row = `"${sku}";"${combinedDesc.replace(/"/g, '""')}";"${size}";"${finish}";${qty};"${unit}";`
 
       let currentPrices: number[] = []
 
@@ -616,18 +619,14 @@ export default function QuotationMatrix() {
         itemNode?.descr_en ||
         itemNode?.descr_pt ||
         ''
-      const extraDesc =
-        itemNode?.informacao_extra_en ||
-        itemNode?.informacao_extra ||
-        itemNode?.descricao_extra_en ||
-        itemNode?.descricao_extra ||
-        ''
+      const extraDesc = itemNode?.descricao_extra_en || itemNode?.descricao_extra || ''
       const combinedDesc = extraDesc ? `${desc}\n\n${extraDesc}` : desc
       const sku = (itemNode?.sku || '').replace(/"/g, '""')
       const size = (itemNode?.tamanho || '').replace(/"/g, '""')
       const finish = (
         itemNode?.expand?.acabamento_id?.nome_en ||
         itemNode?.expand?.acabamento_id?.nome_pt ||
+        itemNode?.expand?.acabamento_id?.codigo ||
         ''
       ).replace(/"/g, '""')
       const qty = pi.quantidade || 0
@@ -665,18 +664,14 @@ export default function QuotationMatrix() {
         itemNode?.descr_en ||
         itemNode?.descr_pt ||
         ''
-      const extraDesc =
-        itemNode?.informacao_extra_en ||
-        itemNode?.informacao_extra ||
-        itemNode?.descricao_extra_en ||
-        itemNode?.descricao_extra ||
-        ''
+      const extraDesc = itemNode?.descricao_extra_en || itemNode?.descricao_extra || ''
       const combinedDesc = extraDesc ? `${desc}\n\n${extraDesc}` : desc
       const sku = (itemNode?.sku || '').replace(/"/g, '""')
       const size = (itemNode?.tamanho || '').replace(/"/g, '""')
       const finish = (
         itemNode?.expand?.acabamento_id?.nome_en ||
         itemNode?.expand?.acabamento_id?.nome_pt ||
+        itemNode?.expand?.acabamento_id?.codigo ||
         ''
       ).replace(/"/g, '""')
 
