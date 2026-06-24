@@ -550,8 +550,18 @@ export default function QuotationMatrix() {
 
     potencialItens.forEach((pi) => {
       const itemNode = pi.expand?.item_id
-      const desc = itemNode?.descr_en || itemNode?.descricao_curta_en || ''
-      const extraDesc = itemNode?.descricao_extra_en || itemNode?.descricao_extra || ''
+      const desc =
+        itemNode?.descricao_curta_en ||
+        itemNode?.descricao_curta ||
+        itemNode?.descr_en ||
+        itemNode?.descr_pt ||
+        ''
+      const extraDesc =
+        itemNode?.informacao_extra_en ||
+        itemNode?.informacao_extra ||
+        itemNode?.descricao_extra_en ||
+        itemNode?.descricao_extra ||
+        ''
       const sku = (itemNode?.sku || '').replace(/"/g, '""')
       const qty = pi.quantidade || 0
       const unit = pi.unidade_medida || 'UN'
@@ -597,13 +607,22 @@ export default function QuotationMatrix() {
   }
 
   const handleExportCounterProposal = (cf: any) => {
-    let csv = 'SKU;Description;Size;Finish;Quantity;Unit;MOQ;Current Offered Price;Target Price\n'
+    let csv = 'SKU;Description;Size;Finish;Quantity;Unit;MOQ;Offered Price;Target Price\n'
     potencialItens.forEach((pi) => {
       const itemNode = pi.expand?.item_id
       const desc =
-        itemNode?.descr_en || itemNode?.descricao_curta_en || itemNode?.descricao_curta || ''
-      const extraDesc = itemNode?.descricao_extra_en || itemNode?.descricao_extra || ''
-      const combinedDesc = extraDesc ? `${desc}\n${extraDesc}` : desc
+        itemNode?.descricao_curta_en ||
+        itemNode?.descricao_curta ||
+        itemNode?.descr_en ||
+        itemNode?.descr_pt ||
+        ''
+      const extraDesc =
+        itemNode?.informacao_extra_en ||
+        itemNode?.informacao_extra ||
+        itemNode?.descricao_extra_en ||
+        itemNode?.descricao_extra ||
+        ''
+      const combinedDesc = extraDesc ? `${desc}\n\n${extraDesc}` : desc
       const sku = (itemNode?.sku || '').replace(/"/g, '""')
       const size = (itemNode?.tamanho || '').replace(/"/g, '""')
       const finish = (
@@ -641,9 +660,18 @@ export default function QuotationMatrix() {
     potencialItens.forEach((pi) => {
       const itemNode = pi.expand?.item_id
       const desc =
-        itemNode?.descr_en || itemNode?.descricao_curta_en || itemNode?.descricao_curta || ''
-      const extraDesc = itemNode?.descricao_extra_en || itemNode?.descricao_extra || ''
-      const combinedDesc = extraDesc ? `${desc}\n${extraDesc}` : desc
+        itemNode?.descricao_curta_en ||
+        itemNode?.descricao_curta ||
+        itemNode?.descr_en ||
+        itemNode?.descr_pt ||
+        ''
+      const extraDesc =
+        itemNode?.informacao_extra_en ||
+        itemNode?.informacao_extra ||
+        itemNode?.descricao_extra_en ||
+        itemNode?.descricao_extra ||
+        ''
+      const combinedDesc = extraDesc ? `${desc}\n\n${extraDesc}` : desc
       const sku = (itemNode?.sku || '').replace(/"/g, '""')
       const size = (itemNode?.tamanho || '').replace(/"/g, '""')
       const finish = (
