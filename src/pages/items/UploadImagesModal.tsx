@@ -1,65 +1,113 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Checkbox } from '@/components/ui/checkbox'
 import {
-  Upload,
-  FileImage,
-  FileSpreadsheet,
-  AlertCircle,
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
-  FolderUp,
-  X,
-} from 'lucide-react'
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Upload, Loader2, CheckCircle2, XCircle, AlertTriangle, Copy } from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 
-interface ReportDetail {
+interface ManifestRow {
   sku: string
   item_id_books: string
-  nome_arquivo_imagem: string
-  status: string
-  message?: string
+  imagem: string
 }
 
-interface UploadReport {
+interface ReportDetail {
+  status: string
+  sku: string
+  item_id_books: string
+  imagem: string
+  mensagem: string
+}
+
+interface Report {
   atualizados: number
-  nao_encontrados: number
-  erros_upload: number
   duplicados: number
+  naoEncontrados: number
+  erros: number
+  total: number
   detalhes: ReportDetail[]
 }
 
-function StatusIcon({ status }: { status: string }) {
-  switch (status) {
-    case 'atualizado':
-      return <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-    case 'nao_encontrado':
-      return <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
-    case 'erro':
-      return <XCircle className="w-4 h-4 text-red-500 shrink-0" />
-    case 'duplicado':
-      return <AlertCircle className="w-4 h-4 text-blue-500 shrink-0" />
-    default:
-      return null
+function parseCSV(text: string): string[][] {
+  const clean = text.replace(/^\uFEFF/, '')
+  const rows: string[][] = []
+  let row: string[] = []
+  let field = ''
+  let inQ = false
+  for (let i = 0; i < clean.length; i++) {
+    const c = clean[i]
+    if (inQ) {
+      if (c === '"' && clean[i + 1] === '"') {
+        field += '"'
+        i++
+      } else if (c === '"') {
+        inQ = false
+      } else {
+        field += c
+      }
+    } else if (c === '"') {
+      inQ = true
+    } else if (c === ',') {
+      row.push(field)
+      field = ''
+    } else if (c === '\n') {
+      row.push(field)
+      rows.push(row)
+      row = []
+      field = ''
+    } else if (c !== '\r') {
+      field += c
+    }
   }
+  if (field || row.length) {
+    row.push(field)
+    rows.push(row)
+  }
+  return rows
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  atualizado: 'Atualizado',
-  nao_encontrado: 'Não Encontrado',
-  erro: 'Erro',
-  duplicado: 'Duplicado',
+function extractManifest(text: string): ManifestRow[] {
+  const rows = parseCSV(text)
+  if (rows.length < 2) return []
+  const h = rows[0].map((x) => x.trim().toLowerCase())
+  let sIdx = h.findIndex((x) => x === 'sku')
+  let bIdx = h.findIndex((x) => x.includes('item') && x.includes('books'))
+  let iIdx = h.findIndex((x) => x === 'imagem' || x === 'image' || x === 'foto')
+  if (sIdx === -1) sIdx = 0
+  if (bIdx === -1) bIdx = 1
+  if (iIdx === -1) iIdx = 2
+  return rows
+    .slice(1)
+    .filter((r) => r.length >= 3 && (r[sIdx]?.trim() || r[bIdx]?.trim()))
+    .map((r) => ({
+      sku: (r[sIdx] || '').trim(),
+      item_id_books: (r[bIdx] || '').trim(),
+      imagem: (r[iIdx] || '').trim(),
+    }))
+}
+
+const statusConfig: Record<string, { icon: typeof CheckCircle2; color: string }> = {
+  Atualizado: { icon: CheckCircle2, color: 'text-emerald-600' },
+  Duplicado: { icon: Copy, color: 'text-blue-500' },
+  'Não Encontrado': { icon: AlertTriangle, color: 'text-orange-500' },
+  Erro: { icon: XCircle, color: 'text-red-500' },
 }
 
 export function UploadImagesModal({
@@ -68,394 +116,240 @@ export function UploadImagesModal({
   onSuccess,
 }: {
   open: boolean
-  onOpenChange: (open: boolean) => void
-  onSuccess?: () => void
+  onOpenChange: (o: boolean) => void
+  onSuccess: () => void
 }) {
-  const [images, setImages] = useState<File[]>([])
-  const [csvText, setCsvText] = useState('')
-  const [csvName, setCsvName] = useState('')
-  const [overwrite, setOverwrite] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const [report, setReport] = useState<UploadReport | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const folderInputRef = useRef<HTMLInputElement>(null)
-  const csvInputRef = useRef<HTMLInputElement>(null)
+  const [csvFile, setCsvFile] = useState<File | null>(null)
+  const [imageFiles, setImageFiles] = useState<File[]>([])
+  const [manifest, setManifest] = useState<ManifestRow[]>([])
+  const [processing, setProcessing] = useState(false)
+  const [progress, setProgress] = useState('')
+  const [report, setReport] = useState<Report | null>(null)
 
   const reset = () => {
-    setImages([])
-    setCsvText('')
-    setCsvName('')
-    setOverwrite(false)
-    setProgress(0)
+    setCsvFile(null)
+    setImageFiles([])
+    setManifest([])
     setReport(null)
-    setError(null)
+    setProgress('')
   }
 
-  const handleClose = () => {
-    reset()
-    onOpenChange(false)
-  }
-
-  const handleImagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []).filter(
-      (f) =>
-        f.type.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|svg|bmp|tiff?)$/i.test(f.name),
-    )
-    setImages((prev) => [...prev, ...files])
-    if (fileInputRef.current) fileInputRef.current.value = ''
-    if (folderInputRef.current) folderInputRef.current.value = ''
-  }
-
-  const handleCsvChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setCsvName(file.name)
-    const text = await file.text()
-    setCsvText(text)
-    setError(null)
-  }
-
-  const removeImage = (index: number) => {
-    setImages((prev) => prev.filter((_, i) => i !== index))
-  }
-
-  const handleUpload = () => {
-    if (images.length === 0) {
-      setError('Selecione pelo menos uma imagem.')
-      return
-    }
-    if (!csvText) {
-      setError('Selecione o arquivo CSV manifest.')
-      return
-    }
-
-    const lines = csvText.trim().split('\n')
-    if (lines.length < 2) {
-      setError('O CSV deve conter pelo menos um cabeçalho e uma linha de dados.')
-      return
-    }
-    const headers = lines[0]
-      .toLowerCase()
-      .split(',')
-      .map((h) => h.trim())
-    const required = ['sku', 'item_id_books', 'nome_arquivo_imagem']
-    const missing = required.filter((r) => !headers.includes(r))
-    if (missing.length > 0) {
-      setError(`Colunas obrigatórias ausentes no CSV: ${missing.join(', ')}`)
-      return
-    }
-
-    setUploading(true)
-    setProgress(0)
-    setError(null)
+  const handleCsv = async (file: File) => {
+    setCsvFile(file)
     setReport(null)
+    const m = extractManifest(await file.text())
+    setManifest(m)
+    if (m.length === 0) toast.warning('Nenhum item encontrado no CSV')
+    else toast.success(`${m.length} itens encontrados no CSV`)
+  }
 
-    const formData = new FormData()
-    formData.append('manifest_csv', csvText)
-    formData.append('overwrite', overwrite ? 'true' : 'false')
-    for (const file of images) {
-      formData.append('images', file, file.name)
-    }
-
-    // Pre-flight check: verify files are present in FormData before sending
-    let preflightFileCount = 0
-    const preflightFileNames: string[] = []
-    for (const [key, value] of formData.entries()) {
-      if (value instanceof File) {
-        preflightFileCount++
-        preflightFileNames.push(value.name)
-        console.log(
-          `[UploadImages] FormData file part: field="${key}", name="${value.name}", size=${value.size}, type="${value.type}"`,
-        )
-      } else {
-        console.log(
-          `[UploadImages] FormData text part: field="${key}", value="${String(value).substring(0, 100)}..."`,
-        )
-      }
-    }
+  const handleImages = (files: FileList | null) => {
+    const arr = files ? Array.from(files) : []
+    setImageFiles(arr)
+    setReport(null)
     console.log(
-      `[UploadImages] Pre-flight: ${preflightFileCount} file(s) attached under field "images":`,
-      preflightFileNames,
+      `[UploadImagesModal] ${arr.length} arquivos selecionados:`,
+      arr.map((f) => f.name),
     )
+    if (arr.length > 0) toast.success(`${arr.length} imagens selecionadas`)
+  }
 
-    const xhr = new XMLHttpRequest()
-    xhr.upload.addEventListener('progress', (e) => {
-      if (e.lengthComputable) {
-        setProgress(Math.round((e.loaded / e.total) * 100))
-      }
-    })
-
-    xhr.onload = () => {
-      setUploading(false)
-      try {
-        const res = JSON.parse(xhr.responseText)
-        if (xhr.status >= 200 && xhr.status < 300) {
-          setReport(res)
-          if (res.atualizados > 0) {
-            toast.success(`${res.atualizados} itens atualizados!`)
-            onSuccess?.()
-          }
-        } else {
-          let errorMsg = res.error || res.message || `Erro ${xhr.status}`
-          if (res.files_received !== undefined) {
-            errorMsg += ` (arquivos recebidos: ${res.files_received}`
-            if (res.received_basenames && res.received_basenames.length > 0) {
-              errorMsg += `: ${res.received_basenames.join(', ')}`
-            }
-            errorMsg += ')'
-          }
-          if (res.multipart_file_fields) {
-            errorMsg += ` — campos multipart: ${res.multipart_file_fields.join(', ') || '(nenhum)'}`
-          }
-          if (res.file_read_error) {
-            errorMsg += ` — erro de leitura: ${res.file_read_error}`
-          }
-          setError(errorMsg)
+  const handleProcess = async () => {
+    if (manifest.length === 0) return toast.error('Carregue um CSV válido')
+    setProcessing(true)
+    try {
+      const uniqueNames = [...new Set(manifest.map((r) => r.imagem).filter(Boolean))]
+      let uploaded = 0
+      for (const name of uniqueNames) {
+        setProgress(`Enviando imagens... (${uploaded + 1}/${uniqueNames.length})`)
+        try {
+          const escaped = name.replace(/"/g, '\\"')
+          await pb.collection('foto_catalogo').getFirstListItem(`descricao = "${escaped}"`)
+          uploaded++
+          continue
+        } catch {
+          /* intentionally ignored */
         }
-      } catch {
-        setError('Erro ao processar resposta do servidor.')
+        const file = imageFiles.find((f) => f.name === name)
+        if (!file) continue
+        const fd = new FormData()
+        fd.append('descricao', name)
+        fd.append('arquivo', file)
+        await pb.collection('foto_catalogo').create(fd)
+        uploaded++
       }
+      setProgress('Associando imagens aos itens...')
+      const result = await pb.send('/backend/v1/upload-item-images', {
+        method: 'POST',
+        body: JSON.stringify({ rows: manifest }),
+        headers: { 'Content-Type': 'application/json' },
+      })
+      setReport(result as Report)
+      toast.success('Processamento concluído!')
+      onSuccess()
+    } catch (err: any) {
+      toast.error('Erro: ' + (err.message || ''))
+    } finally {
+      setProcessing(false)
+      setProgress('')
     }
-
-    xhr.onerror = () => {
-      setUploading(false)
-      setError('Erro de rede ao fazer upload.')
-    }
-
-    const url = `${import.meta.env.VITE_POCKETBASE_URL}/backend/v1/upload-item-images`
-    xhr.open('POST', url)
-    xhr.setRequestHeader('Authorization', pb.authStore.token || '')
-    xhr.send(formData)
   }
 
   return (
     <Dialog
       open={open}
       onOpenChange={(o) => {
-        if (!o) handleClose()
+        if (!o) reset()
+        onOpenChange(o)
       }}
     >
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Upload de Imagens</DialogTitle>
-          <DialogDescription>
-            Faça upload em massa de imagens e associe-as aos itens via CSV manifest.
-          </DialogDescription>
+          <DialogTitle>Upload de Imagens em Lote</DialogTitle>
         </DialogHeader>
-
-        {report ? (
-          <div className="flex-1 overflow-y-auto space-y-4 py-2">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[
-                { label: 'Atualizados', value: report.atualizados, color: 'emerald' },
-                { label: 'Duplicados', value: report.duplicados, color: 'blue' },
-                { label: 'Não Encontrados', value: report.nao_encontrados, color: 'amber' },
-                { label: 'Erros', value: report.erros_upload, color: 'red' },
-              ].map((s) => (
-                <div
-                  key={s.label}
-                  className={`border rounded-lg p-3 text-center bg-${s.color}-50 border-${s.color}-200`}
-                >
-                  <p className={`text-2xl font-bold text-${s.color}-700`}>{s.value}</p>
-                  <p className={`text-xs text-${s.color}-600`}>{s.label}</p>
+        <div className="flex-1 overflow-y-auto space-y-4">
+          {!report && (
+            <>
+              <div className="space-y-2">
+                <Label>1. Arquivo CSV (manifesto)</Label>
+                <Input
+                  type="file"
+                  accept=".csv"
+                  onChange={(e) => e.target.files?.[0] && handleCsv(e.target.files[0])}
+                />
+                {csvFile && <p className="text-xs text-muted-foreground">{csvFile.name}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label>2. Arquivos de Imagem</Label>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => handleImages(e.target.files)}
+                />
+                {imageFiles.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {imageFiles.length} imagens selecionadas
+                  </p>
+                )}
+              </div>
+              {manifest.length > 0 && (
+                <div className="text-sm text-muted-foreground">
+                  {manifest.length} itens no manifesto •{' '}
+                  {new Set(manifest.map((r) => r.imagem).filter(Boolean)).size} imagens únicas
                 </div>
-              ))}
-            </div>
-
-            <div className="border rounded-lg overflow-hidden">
-              <div className="max-h-[300px] overflow-y-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted sticky top-0">
-                    <tr>
-                      <th className="text-left p-2 font-medium">Status</th>
-                      <th className="text-left p-2 font-medium">SKU</th>
-                      <th className="text-left p-2 font-medium">Item ID Books</th>
-                      <th className="text-left p-2 font-medium">Imagem</th>
-                      <th className="text-left p-2 font-medium">Mensagem</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {report.detalhes.map((d, i) => (
-                      <tr key={i} className="border-t">
-                        <td className="p-2">
-                          <div className="flex items-center gap-1.5">
-                            <StatusIcon status={d.status} />
-                            <span className="text-xs">{STATUS_LABELS[d.status] || d.status}</span>
-                          </div>
-                        </td>
-                        <td className="p-2 text-xs font-mono">{d.sku || '-'}</td>
-                        <td className="p-2 text-xs font-mono">{d.item_id_books || '-'}</td>
-                        <td className="p-2 text-xs truncate max-w-[120px]">
-                          {d.nome_arquivo_imagem || '-'}
-                        </td>
-                        <td className="p-2 text-xs text-muted-foreground">{d.message || '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              )}
+              {progress && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" /> {progress}
+                </div>
+              )}
+            </>
+          )}
+          {report && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  {
+                    label: 'Atualizados',
+                    value: report.atualizados,
+                    color: 'text-emerald-600 bg-emerald-50',
+                  },
+                  {
+                    label: 'Duplicados',
+                    value: report.duplicados,
+                    color: 'text-blue-600 bg-blue-50',
+                  },
+                  {
+                    label: 'Não Encontrados',
+                    value: report.naoEncontrados,
+                    color: 'text-orange-600 bg-orange-50',
+                  },
+                  { label: 'Erros', value: report.erros, color: 'text-red-600 bg-red-50' },
+                ].map((s) => (
+                  <div key={s.label} className={cn('rounded-lg p-3 text-center', s.color)}>
+                    <p className="text-2xl font-bold">{s.value}</p>
+                    <p className="text-xs">{s.label}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="border rounded-lg overflow-auto max-h-[400px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-32">Status</TableHead>
+                      <TableHead>SKU</TableHead>
+                      <TableHead>Item ID Books</TableHead>
+                      <TableHead>Imagem</TableHead>
+                      <TableHead>Mensagem</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {report.detalhes.map((d, i) => {
+                      const cfg = statusConfig[d.status] || statusConfig['Erro']
+                      const Icon = cfg.icon
+                      return (
+                        <TableRow key={i}>
+                          <TableCell>
+                            <span
+                              className={cn(
+                                'inline-flex items-center gap-1 text-xs font-medium',
+                                cfg.color,
+                              )}
+                            >
+                              <Icon className="w-3.5 h-3.5" /> {d.status}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-xs font-mono">{d.sku || '-'}</TableCell>
+                          <TableCell className="text-xs font-mono">
+                            {d.item_id_books || '-'}
+                          </TableCell>
+                          <TableCell className="text-xs">{d.imagem || '-'}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {d.mensagem}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
               </div>
             </div>
-
-            <Button onClick={handleClose} className="w-full">
+          )}
+        </div>
+        <DialogFooter>
+          {report ? (
+            <Button
+              onClick={() => {
+                reset()
+                onOpenChange(false)
+              }}
+            >
               Fechar
             </Button>
-          </div>
-        ) : (
-          <div className="flex-1 overflow-y-auto space-y-4 py-2">
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            <div className="space-y-2">
-              <Label>Imagens dos Produtos</Label>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                >
-                  <FileImage className="w-4 h-4 mr-2" /> Selecionar Arquivos
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => folderInputRef.current?.click()}
-                  disabled={uploading}
-                >
-                  <FolderUp className="w-4 h-4 mr-2" /> Selecionar Pasta
-                </Button>
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={handleImagesChange}
-              />
-              <input
-                ref={folderInputRef}
-                type="file"
-                {...({ webkitdirectory: '' } as any)}
-                multiple
-                className="hidden"
-                onChange={handleImagesChange}
-              />
-              {images.length > 0 && (
-                <>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>{images.length} imagem(ns) selecionada(s)</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 text-xs"
-                      onClick={() => setImages([])}
-                      disabled={uploading}
-                    >
-                      Limpar
-                    </Button>
-                  </div>
-                  <div className="max-h-32 overflow-y-auto border rounded-lg p-2 space-y-1">
-                    {images.slice(0, 20).map((f, i) => (
-                      <div key={i} className="flex items-center justify-between text-xs">
-                        <span className="truncate flex-1">{f.name}</span>
-                        <button
-                          onClick={() => removeImage(i)}
-                          className="text-muted-foreground hover:text-destructive ml-2 shrink-0"
-                          disabled={uploading}
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                    {images.length > 20 && (
-                      <p className="text-xs text-muted-foreground">
-                        ... e mais {images.length - 20} arquivo(s)
-                      </p>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label>CSV Manifest</Label>
+          ) : (
+            <>
               <Button
-                type="button"
                 variant="outline"
-                size="sm"
-                className="w-full justify-start"
-                onClick={() => csvInputRef.current?.click()}
-                disabled={uploading}
+                onClick={() => {
+                  reset()
+                  onOpenChange(false)
+                }}
+                disabled={processing}
               >
-                <FileSpreadsheet className="w-4 h-4 mr-2" />
-                {csvName || 'Selecionar CSV'}
+                Cancelar
               </Button>
-              <input
-                ref={csvInputRef}
-                type="file"
-                accept=".csv"
-                className="hidden"
-                onChange={handleCsvChange}
-              />
-              <p className="text-xs text-muted-foreground">
-                Colunas obrigatórias: <code>sku</code>, <code>item_id_books</code>,{' '}
-                <code>nome_arquivo_imagem</code>
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="overwrite"
-                checked={overwrite}
-                onCheckedChange={(c) => setOverwrite(c === true)}
-                disabled={uploading}
-              />
-              <Label htmlFor="overwrite" className="text-sm cursor-pointer">
-                Sobrescrever imagens existentes
-              </Label>
-            </div>
-
-            {uploading && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span>Enviando...</span>
-                  <span>{progress}%</span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                  <div
-                    className="bg-primary h-full transition-all duration-300"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-              </div>
-            )}
-
-            <Button
-              onClick={handleUpload}
-              disabled={uploading || images.length === 0 || !csvText}
-              className="w-full"
-            >
-              {uploading ? (
-                'Enviando...'
-              ) : (
-                <>
-                  <Upload className="w-4 h-4 mr-2" /> Iniciar Upload
-                </>
-              )}
-            </Button>
-          </div>
-        )}
+              <Button onClick={handleProcess} disabled={processing || manifest.length === 0}>
+                {processing ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Upload className="w-4 h-4 mr-2" />
+                )}
+                {processing ? 'Processando...' : 'Processar'}
+              </Button>
+            </>
+          )}
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
