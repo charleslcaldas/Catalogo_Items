@@ -43,6 +43,7 @@ import { ImagePreviewModal } from '@/components/ImagePreviewModal'
 import { ItemDetailPanel } from './ItemDetailPanel'
 import { BulkEditDialog } from './BulkEditDialog'
 import { UploadImagesModal } from './UploadImagesModal'
+import { PhotoPickerModal } from '@/components/PhotoPickerModal'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { cn, getContrastColor } from '@/lib/utils'
 import pb from '@/lib/pocketbase/client'
@@ -163,6 +164,7 @@ export default function ItemsPage() {
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false)
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false)
   const [isUploadImagesOpen, setIsUploadImagesOpen] = useState(false)
+  const [isPhotoPickerOpen, setIsPhotoPickerOpen] = useState(false)
 
   const [historyMap, setHistoryMap] = useState<Record<string, any>>({})
 
@@ -403,6 +405,28 @@ export default function ItemsPage() {
   const handleBulkSuccess = () => {
     setSelectedItemIds(new Set())
     setIsBulkEditOpen(false)
+  }
+
+  const handleBulkPhotoUpdate = async (fotoId: string) => {
+    const ids = Array.from(selectedItemIds)
+    if (ids.length === 0) return
+    try {
+      const res = await pb.send('/backend/v1/foto-catalogo/bulk-update', {
+        method: 'POST',
+        body: JSON.stringify({
+          itemIds: ids,
+          fotoCatalogoId: fotoId,
+        }),
+        headers: { 'Content-Type': 'application/json' },
+      })
+      const count = res.updated || 0
+      toast.success(`${count} ${count === 1 ? 'item atualizado' : 'itens atualizados'} com sucesso`)
+      setSelectedItemIds(new Set())
+      setIsPhotoPickerOpen(false)
+      fetchApiItens(debouncedSearch, page)
+    } catch (err: any) {
+      toast.error('Erro ao atualizar fotos: ' + (err.message || 'erro desconhecido'))
+    }
   }
 
   const [previewImage, setPreviewImage] = useState<{ url: string; alt: string } | null>(null)
@@ -1079,6 +1103,14 @@ export default function ItemsPage() {
           <Button onClick={handleBulkSync} size="sm" variant="secondary" className="rounded-full">
             <RefreshCcw className="w-3.5 h-3.5 mr-1.5" /> Sync Zoho
           </Button>
+          <Button
+            onClick={() => setIsPhotoPickerOpen(true)}
+            size="sm"
+            variant="secondary"
+            className="rounded-full"
+          >
+            <ImagePlus className="w-3.5 h-3.5 mr-1.5" /> Trocar foto
+          </Button>
           <Button onClick={() => setIsBulkEditOpen(true)} size="sm" className="rounded-full">
             <Layers className="w-3.5 h-3.5 mr-1.5" /> Editar
           </Button>
@@ -1112,6 +1144,12 @@ export default function ItemsPage() {
         open={isUploadImagesOpen}
         onOpenChange={setIsUploadImagesOpen}
         onSuccess={() => fetchApiItens(debouncedSearch, page)}
+      />
+
+      <PhotoPickerModal
+        open={isPhotoPickerOpen}
+        onOpenChange={setIsPhotoPickerOpen}
+        onSelect={handleBulkPhotoUpdate}
       />
 
       {previewImage && (
