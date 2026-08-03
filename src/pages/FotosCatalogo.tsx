@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import {
+  Maximize2,
   Plus,
   Trash2,
   Edit2,
@@ -8,6 +9,7 @@ import {
   List as ListIcon,
   Search,
   ArrowUpDown,
+  Eye,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -42,6 +44,7 @@ import { useData } from '@/contexts/data-context'
 import { ImagePreviewModal } from '@/components/ImagePreviewModal'
 import { useAuth } from '@/hooks/use-auth'
 import { ResizableHeader } from '@/components/ui/resizable-header'
+import { useNavigate } from 'react-router-dom'
 
 export default function FotosCatalogo() {
   const [fotos, setFotos] = useState<any[]>([])
@@ -54,6 +57,7 @@ export default function FotosCatalogo() {
   const [sortBy, setSortBy] = useState('created-desc')
 
   const { user, updatePreferences } = useAuth()
+  const navigate = useNavigate()
 
   const defaultFotosWidths = useMemo(
     () => ({
@@ -312,8 +316,8 @@ export default function FotosCatalogo() {
             >
               <div
                 className="aspect-square bg-muted relative border-b cursor-pointer hover:opacity-90 transition-opacity"
-                onClick={(e) => handleImageClick(e, f)}
-                title="Clique para ampliar / Duplo clique para editar"
+                onClick={() => navigate(`/fotos-catalogo/${f.id}`)}
+                title="Clique para ver itens vinculados"
               >
                 {f.arquivo ? (
                   <img
@@ -327,6 +331,15 @@ export default function FotosCatalogo() {
                   </div>
                 )}
                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={(e) => handleImageClick(e, f)}
+                    title="Ampliar imagem"
+                  >
+                    <Maximize2 className="w-4 h-4" />
+                  </Button>
                   <Button
                     variant="secondary"
                     size="icon"
@@ -464,8 +477,8 @@ export default function FotosCatalogo() {
                     {f.arquivo ? (
                       <div
                         className="w-12 h-12 rounded bg-muted overflow-hidden border cursor-pointer hover:opacity-80 transition-opacity"
-                        onClick={(e) => handleImageClick(e, f)}
-                        title="Clique para ampliar / Duplo clique para editar"
+                        onClick={() => navigate(`/fotos-catalogo/${f.id}`)}
+                        title="Ver itens vinculados"
                       >
                         <img
                           src={pb.files.getURL(f, f.arquivo, { thumb: '100x100' })}
@@ -476,8 +489,8 @@ export default function FotosCatalogo() {
                     ) : (
                       <div
                         className="w-12 h-12 rounded bg-muted flex items-center justify-center border cursor-pointer hover:bg-muted/80 transition-colors"
-                        onClick={(e) => handleImageClick(e, f)}
-                        title="Clique para ampliar / Duplo clique para editar"
+                        onClick={() => navigate(`/fotos-catalogo/${f.id}`)}
+                        title="Ver itens vinculados"
                       >
                         <ImageIcon className="w-5 h-5 text-muted-foreground opacity-30" />
                       </div>
@@ -515,6 +528,15 @@ export default function FotosCatalogo() {
                   </TableCell>
                   <TableCell className="text-right px-2">
                     <div className="flex items-center justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => navigate(`/fotos-catalogo/${f.id}`)}
+                        title="Ver itens vinculados"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"

@@ -18,6 +18,7 @@ import Login from './pages/Login'
 import Fornecedores from './pages/Fornecedores'
 import Unidades from './pages/Unidades'
 import FotosCatalogo from './pages/FotosCatalogo'
+import FotoCatalogoDetail from './pages/FotoCatalogoDetail'
 import { DataProvider } from './contexts/data-context'
 import { AuthProvider } from './hooks/use-auth'
 import { ProtectedRoute } from './components/ProtectedRoute'
@@ -46,6 +47,7 @@ const App = () => (
                 <Route path="/fornecedores" element={<Fornecedores />} />
                 <Route path="/unidades" element={<Unidades />} />
                 <Route path="/fotos-catalogo" element={<FotosCatalogo />} />
+                <Route path="/fotos-catalogo/:fotoId" element={<FotoCatalogoDetail />} />
               </Route>
             </Route>
             <Route path="*" element={<NotFound />} />
