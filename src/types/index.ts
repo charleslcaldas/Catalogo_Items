@@ -213,6 +213,7 @@ export type Item = {
   unidade?: string
   unidade_id?: string
   descricao_base_id?: string
+  foto_catalogo_id?: string
   validade_preco?: string
   created: string
   updated: string
@@ -221,5 +222,6 @@ export type Item = {
     linha_id?: Linha
     ncm_id?: NCM
     unidade_id?: UnidadeMedida
+    foto_catalogo_id?: FotoCatalogo
   }
 }

@@ -14,6 +14,7 @@ import {
   RefreshCcw,
   ChevronLeft,
   ChevronRight,
+  ImagePlus,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -41,6 +42,7 @@ import {
 import { ImagePreviewModal } from '@/components/ImagePreviewModal'
 import { ItemDetailPanel } from './ItemDetailPanel'
 import { BulkEditDialog } from './BulkEditDialog'
+import { UploadImagesModal } from './UploadImagesModal'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { cn, getContrastColor } from '@/lib/utils'
 import pb from '@/lib/pocketbase/client'
@@ -159,6 +161,7 @@ export default function ItemsPage() {
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set())
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false)
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false)
+  const [isUploadImagesOpen, setIsUploadImagesOpen] = useState(false)
 
   const [historyMap, setHistoryMap] = useState<Record<string, any>>({})
 
@@ -533,6 +536,14 @@ export default function ItemsPage() {
             />
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto ml-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsUploadImagesOpen(true)}
+              className="h-9 rounded-full px-3 text-sm hidden lg:flex"
+            >
+              <ImagePlus className="w-4 h-4 mr-1.5" /> Upload de Imagens
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -1093,6 +1104,12 @@ export default function ItemsPage() {
         onOpenChange={setIsBulkEditOpen}
         selectedItems={apiItens.filter((i) => selectedItemIds.has(i.id))}
         onSuccess={handleBulkSuccess}
+      />
+
+      <UploadImagesModal
+        open={isUploadImagesOpen}
+        onOpenChange={setIsUploadImagesOpen}
+        onSuccess={() => fetchApiItens(debouncedSearch, page)}
       />
 
       {previewImage && (
