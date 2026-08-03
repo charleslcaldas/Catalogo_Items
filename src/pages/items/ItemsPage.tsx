@@ -46,6 +46,7 @@ import { UploadImagesModal } from './UploadImagesModal'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { cn, getContrastColor } from '@/lib/utils'
 import pb from '@/lib/pocketbase/client'
+import { getItemImageUrl } from '@/lib/item-image'
 import { useRealtime } from '@/hooks/use-realtime'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
@@ -248,7 +249,8 @@ export default function ItemsPage() {
       const records = await pb.collection('itens').getList(currentPage, perPage, {
         sort: sortStr,
         filter: filterStr,
-        expand: 'linha_id,linha_id.categoria_id,acabamento_id,ncm_id,descricao_base_id,unidade_id',
+        expand:
+          'linha_id,linha_id.categoria_id,acabamento_id,ncm_id,descricao_base_id,unidade_id,foto_catalogo_id',
         requestKey: 'items_page_search', // Auto-cancel previous identical requests to save bandwidth and rate limits
       })
       setApiItens(records.items)
@@ -351,7 +353,7 @@ export default function ItemsPage() {
         pb.collection('itens')
           .getOne(selectedItemId, {
             expand:
-              'linha_id,linha_id.categoria_id,acabamento_id,ncm_id,descricao_base_id,unidade_id',
+              'linha_id,linha_id.categoria_id,acabamento_id,ncm_id,descricao_base_id,unidade_id,foto_catalogo_id',
           })
           .then(setActiveItemRecord)
           .catch(() => {
@@ -411,7 +413,7 @@ export default function ItemsPage() {
     if (e.detail === 1) {
       clickTimerRef.current = setTimeout(() => {
         setPreviewImage({
-          url: item.foto_url || 'https://img.usecurling.com/p/800/800?q=tools',
+          url: getItemImageUrl(item, 800),
           alt: item.sku,
         })
       }, 250)
@@ -810,7 +812,7 @@ export default function ItemsPage() {
                         </TableCell>
                         <TableCell className="py-1 px-2">
                           <img
-                            src={item.foto_url || 'https://img.usecurling.com/p/100/100?q=tools'}
+                            src={getItemImageUrl(item, 100)}
                             alt={item.sku}
                             className="w-6 h-6 rounded object-cover border bg-muted mx-auto cursor-pointer hover:opacity-80 transition-opacity"
                             title="Clique para ampliar / Duplo clique para editar"

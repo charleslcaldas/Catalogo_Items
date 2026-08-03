@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/table'
 import { toast } from 'sonner'
 import pb from '@/lib/pocketbase/client'
+import { getItemImageUrl } from '@/lib/item-image'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { GalleryModal } from './GalleryModal'
@@ -308,7 +309,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
         if (queryId) {
           const freshRecord = await pb
             .collection('itens')
-            .getOne(queryId, { expand: 'acabamento_id' })
+            .getOne(queryId, { expand: 'acabamento_id,foto_catalogo_id' })
           finalItem = freshRecord as unknown as Partial<Item>
         }
       } catch (err) {
@@ -417,7 +418,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
   const descCurtaToUseEn = formData.descricao_curta_en || autoDescCurtaEn
   const autoDescCompletaEn = `${descCurtaToUseEn}${formData.tamanho ? ` - ${formData.tamanho}` : ''}${selAcabamento?.nome_en || selAcabamento?.nome_pt ? ` /${selAcabamento.nome_en || selAcabamento.nome_pt}` : ''}`
 
-  const imageUrl = formData.foto_url || 'https://img.usecurling.com/p/200/200?q=tools&color=gray'
+  const imageUrl = getItemImageUrl(formData, 200)
 
   const categoryOptions = categorias.map((c) => ({ value: c.id, label: c.nome_pt, color: c.color }))
   const filteredLinhas = linhas.filter(
