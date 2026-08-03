@@ -37,14 +37,14 @@ routerAdd(
       const imagem = row.imagem || ''
 
       let item = null
-      if (sku) {
-        try {
-          item = $app.findFirstRecordByData('itens', 'sku', sku)
-        } catch (_) {}
-      }
-      if (!item && itemIdBooks) {
+      if (itemIdBooks) {
         try {
           item = $app.findFirstRecordByData('itens', 'item_id_books', itemIdBooks)
+        } catch (_) {}
+      }
+      if (!item && sku) {
+        try {
+          item = $app.findFirstRecordByData('itens', 'sku', sku)
         } catch (_) {}
       }
 

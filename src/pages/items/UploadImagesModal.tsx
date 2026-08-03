@@ -89,7 +89,9 @@ function extractManifest(text: string): ManifestRow[] {
   const h = rows[0].map((x) => x.trim().toLowerCase())
   let sIdx = h.findIndex((x) => x === 'sku')
   let bIdx = h.findIndex((x) => x.includes('item') && x.includes('books'))
-  let iIdx = h.findIndex((x) => x === 'imagem' || x === 'image' || x === 'foto')
+  let iIdx = h.findIndex(
+    (x) => x === 'imagem' || x === 'image' || x === 'foto' || x.includes('arquivo'),
+  )
   if (sIdx === -1) sIdx = 0
   if (bIdx === -1) bIdx = 1
   if (iIdx === -1) iIdx = 2
