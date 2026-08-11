@@ -23,6 +23,7 @@ interface SelectedItemsTableProps {
   handleMoveUp: (index: number) => void
   handleMoveDown: (index: number) => void
   setIsSelecting: (selecting: boolean) => void
+  lastOfferedPrices: Record<string, number>
 }
 
 export function SelectedItemsTable({
@@ -32,6 +33,7 @@ export function SelectedItemsTable({
   handleMoveUp,
   handleMoveDown,
   setIsSelecting,
+  lastOfferedPrices,
 }: SelectedItemsTableProps) {
   const [globalMargin, setGlobalMargin] = useState('')
   const [isApplying, setIsApplying] = useState(false)
@@ -199,6 +201,19 @@ export function SelectedItemsTable({
               <TableHead className="w-24 text-[11px]">Acabamento</TableHead>
               <TableHead className="w-16 text-[11px] text-center">Unidade</TableHead>
               <TableHead className="w-20 text-[11px]">Quant.</TableHead>
+              <TableHead className="w-24 text-[11px] text-right">
+                <Tooltip>
+                  <TooltipTrigger className="cursor-help underline decoration-dashed underline-offset-2">
+                    Último Preço Ofertado
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs font-semibold">Último Preço Ofertado ao Cliente</p>
+                    <p className="text-[10px] text-muted-foreground mt-1 max-w-[150px] leading-tight">
+                      Preço mais recente ofertado a clientes em outras cotações.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TableHead>
               <TableHead className="w-20 text-[11px] text-right text-amber-600">
                 <Tooltip>
                   <TooltipTrigger className="cursor-help underline decoration-dashed underline-offset-2">
@@ -307,6 +322,11 @@ export function SelectedItemsTable({
                       }}
                       onBlur={() => handleQuantityBlur(record.recordId, data.quantidade)}
                     />
+                  </TableCell>
+                  <TableCell className="py-1 text-xs text-right font-mono whitespace-nowrap text-blue-600">
+                    {lastOfferedPrices[data.item.id]
+                      ? formatCurrency(lastOfferedPrices[data.item.id])
+                      : '—'}
                   </TableCell>
                   <TableCell className="py-1 text-xs text-right font-mono text-amber-600 font-semibold whitespace-nowrap">
                     {(() => {

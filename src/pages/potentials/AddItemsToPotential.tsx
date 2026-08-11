@@ -70,6 +70,7 @@ export default function AddItemsToPotential() {
   })
 
   const [selectedItems, setSelectedItems] = useState<SelectedItemRecord[]>([])
+  const [lastOfferedPrices, setLastOfferedPrices] = useState<Record<string, number>>({})
 
   const [isSelecting, setIsSelecting] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -125,6 +126,40 @@ export default function AddItemsToPotential() {
         .catch(() => toast.error('Erro ao carregar a cotação a partir da URL.'))
     }
   }, [searchParams])
+
+  useEffect(() => {
+    const loadLastOfferedPrices = async () => {
+      const itemIds = selectedItems.map((si) => si.id)
+      if (itemIds.length === 0) {
+        setLastOfferedPrices({})
+        return
+      }
+      const result: Record<string, number> = {}
+      const chunkSize = 50
+      const currentPotId = currentPotential?.id || null
+      for (let i = 0; i < itemIds.length; i += chunkSize) {
+        const chunk = itemIds.slice(i, i + chunkSize)
+        const itemFilter = chunk.map((id) => `item_id="${id}"`).join(' || ')
+        const excludeFilter = currentPotId ? ` && potencial_id!="${currentPotId}"` : ''
+        try {
+          const records = await pb.collection('potencial_itens').getFullList({
+            filter: `(${itemFilter})${excludeFilter} && preco_unitario > 0`,
+            sort: '-created',
+            fields: 'item_id,preco_unitario',
+          })
+          for (const r of records) {
+            if (!result[r.item_id]) {
+              result[r.item_id] = r.preco_unitario
+            }
+          }
+        } catch (err) {
+          console.error('Failed to load last offered prices', err)
+        }
+      }
+      setLastOfferedPrices(result)
+    }
+    loadLastOfferedPrices()
+  }, [selectedItems, currentPotential])
 
   const handleToggleItem = (item: Item) => {
     setSelectedItems((prev) => {
@@ -277,11 +312,9 @@ export default function AddItemsToPotential() {
       return toast.error('O número da cotação é obrigatório.')
     }
     if (statusOverride === 'Completo') {
-      const hasIncomplete = selectedItems.some(
-        (si) => !si.data.quantidade || !si.data.preco_unitario,
-      )
+      const hasIncomplete = selectedItems.some((si) => !si.data.quantidade)
       if (hasIncomplete) {
-        return toast.error('Preencha quantidade e preço para todos os itens antes de concluir.')
+        return toast.error('Preencha a quantidade para todos os itens antes de concluir.')
       }
     }
 
@@ -646,6 +679,7 @@ export default function AddItemsToPotential() {
           handleMoveUp={handleMoveUp}
           handleMoveDown={handleMoveDown}
           setIsSelecting={setIsSelecting}
+          lastOfferedPrices={lastOfferedPrices}
         />
 
         {/* Totals Summary Widget */}
