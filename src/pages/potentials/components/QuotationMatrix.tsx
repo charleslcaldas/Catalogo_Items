@@ -124,7 +124,7 @@ export default function QuotationMatrix() {
       )
       if (linhaIds.length > 0) {
         const histLinhas = await pb.collection('historico_precos').getFullList({
-          filter: linhaIds.map((id) => `item_id.linha_id="${id}"`).join(' || '),
+          filter: `(${linhaIds.map((id) => `item_id.linha_id="${id}"`).join(' || ')}) && tipo="compra"`,
           fields: 'fornecedor',
         })
         setPrioritizedSuppliers(new Set(histLinhas.map((h) => h.fornecedor)))
@@ -132,7 +132,7 @@ export default function QuotationMatrix() {
 
       const allHist = await pb
         .collection('historico_precos')
-        .getList(1, 1000, { fields: 'fornecedor' })
+        .getList(1, 1000, { filter: 'tipo="compra"', fields: 'fornecedor' })
       const allNotas = await pb
         .collection('potencial_notas')
         .getList(1, 1000, { filter: 'fornecedor_id != ""', fields: 'fornecedor_id' })
@@ -153,7 +153,7 @@ export default function QuotationMatrix() {
           const chunk = itemIds.slice(i, i + chunkSize)
           const itemFilter = chunk.map((id) => `item_id="${id}"`).join(' || ')
           const h = await pb.collection('historico_precos').getFullList({
-            filter: `(${itemFilter}) && created < "${potencialDate}"`,
+            filter: `(${itemFilter}) && tipo="compra" && created < "${potencialDate}"`,
             sort: '-data_cotacao',
           })
           h.forEach((record) => {
@@ -505,6 +505,7 @@ export default function QuotationMatrix() {
             preco: priceToUse,
             fornecedor: fornecedorNome,
             data_cotacao: new Date().toISOString(),
+            tipo: 'compra',
           }),
         )
 

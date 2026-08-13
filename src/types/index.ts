@@ -97,6 +97,9 @@ export type HistoricoPreco = {
   preco: number
   fornecedor: string
   data_cotacao: string
+  tipo?: string
+  cliente?: string
+  potencial_id?: string
   created: string
   updated: string
 }

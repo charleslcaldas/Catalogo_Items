@@ -12,6 +12,7 @@ onRecordAfterUpdateSuccess((e) => {
     rec.set('preco', newPreco)
     rec.set('fornecedor', newForn)
     rec.set('data_cotacao', new Date().toISOString())
+    rec.set('tipo', 'compra')
     $app.saveNoValidate(rec)
   }
   return e.next()

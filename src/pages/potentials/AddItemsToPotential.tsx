@@ -130,26 +130,30 @@ export default function AddItemsToPotential() {
   useEffect(() => {
     const loadLastOfferedPrices = async () => {
       const itemIds = selectedItems.map((si) => si.id)
-      if (itemIds.length === 0) {
+      if (itemIds.length === 0 || !formData.cliente) {
         setLastOfferedPrices({})
         return
       }
       const result: Record<string, number> = {}
       const chunkSize = 50
-      const currentPotId = currentPotential?.id || null
+      const currentPotId = currentPotential?.id || ''
+      const clienteEscaped = formData.cliente.replace(/"/g, '')
       for (let i = 0; i < itemIds.length; i += chunkSize) {
         const chunk = itemIds.slice(i, i + chunkSize)
         const itemFilter = chunk.map((id) => `item_id="${id}"`).join(' || ')
-        const excludeFilter = currentPotId ? ` && potencial_id!="${currentPotId}"` : ''
+        let filter = `(${itemFilter}) && tipo="venda" && cliente="${clienteEscaped}"`
+        if (currentPotId) {
+          filter += ` && potencial_id!="${currentPotId}"`
+        }
         try {
-          const records = await pb.collection('potencial_itens').getFullList({
-            filter: `(${itemFilter})${excludeFilter} && preco_unitario > 0`,
-            sort: '-created',
-            fields: 'item_id,preco_unitario',
+          const records = await pb.collection('historico_precos').getFullList({
+            filter,
+            sort: '-data_cotacao,-created',
+            fields: 'item_id,preco',
           })
           for (const r of records) {
             if (!result[r.item_id]) {
-              result[r.item_id] = r.preco_unitario
+              result[r.item_id] = r.preco
             }
           }
         } catch (err) {
@@ -159,7 +163,7 @@ export default function AddItemsToPotential() {
       setLastOfferedPrices(result)
     }
     loadLastOfferedPrices()
-  }, [selectedItems, currentPotential])
+  }, [selectedItems, currentPotential, formData.cliente])
 
   const handleToggleItem = (item: Item) => {
     setSelectedItems((prev) => {

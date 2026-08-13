@@ -30,6 +30,7 @@ onRecordAfterUpdateSuccess((e) => {
         hp.set('preco', preco)
         hp.set('fornecedor', fornecedorNome)
         hp.set('data_cotacao', new Date().toISOString())
+        hp.set('tipo', 'compra')
         $app.save(hp)
       }
     }

@@ -5,7 +5,7 @@ onRecordCreate((e) => {
   try {
     const records = $app.findRecordsByFilter(
       'historico_precos',
-      `item_id = '${itemId}'`,
+      `item_id = '${itemId}' && tipo = 'compra'`,
       '-data_cotacao,-created',
       1,
       0,
