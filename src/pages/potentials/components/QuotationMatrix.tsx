@@ -71,6 +71,9 @@ export default function QuotationMatrix() {
 
   const [draftPrices, setDraftPrices] = useState<Record<string, number>>({})
   const [draftMoqs, setDraftMoqs] = useState<Record<string, number>>({})
+  const [cfDrafts, setCfDrafts] = useState<
+    Record<string, { incoterm?: string; tempo_fabricacao?: string; condicao_pagamento?: string }>
+  >({})
 
   const [suppliersWithHistory, setSuppliersWithHistory] = useState<Set<string>>(new Set())
   const [prioritizedSuppliers, setPrioritizedSuppliers] = useState<Set<string>>(new Set())
@@ -336,6 +339,7 @@ export default function QuotationMatrix() {
         data_solicitacao: new Date().toISOString(),
         incoterm: fornecedor.incoterm || '',
         tempo_fabricacao: fornecedor.tempo_fabricacao || '',
+        condicao_pagamento: fornecedor.condicao_pagamento || '',
       })
       setIsAddOpen(false)
       toast({ title: 'Fabricante adicionado' })
@@ -988,35 +992,91 @@ export default function QuotationMatrix() {
                               <Settings2 className="w-3 h-3" />
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-64 p-3" align="center">
+                          <PopoverContent className="w-72 p-3" align="center">
                             <div className="space-y-3">
                               <h4 className="font-medium text-sm">Opções do Fabricante</h4>
                               <div className="space-y-1">
                                 <Label className="text-xs flex items-center gap-1">
                                   Incoterm
                                   <span className="text-[9px] font-normal text-muted-foreground">
-                                    (do fabricante)
+                                    (desta cotação)
                                   </span>
                                 </Label>
                                 <Input
-                                  className="h-7 text-xs bg-muted/40"
-                                  value={cf.expand?.fornecedor_id?.incoterm || ''}
-                                  readOnly
-                                  title="Informação vinculada ao fabricante selecionado"
+                                  className="h-7 text-xs"
+                                  value={
+                                    cfDrafts[cf.id]?.incoterm !== undefined
+                                      ? cfDrafts[cf.id].incoterm!
+                                      : cf.incoterm || ''
+                                  }
+                                  disabled={isFrozen}
+                                  onChange={(e) =>
+                                    setCfDrafts((prev) => ({
+                                      ...prev,
+                                      [cf.id]: {
+                                        ...prev[cf.id],
+                                        incoterm: e.target.value,
+                                      },
+                                    }))
+                                  }
+                                  onBlur={() => handleSaveCfField(cf.id, 'incoterm')}
+                                  title="Editar para esta cotação (não altera o cadastro do fabricante)"
                                 />
                               </div>
                               <div className="space-y-1">
                                 <Label className="text-xs flex items-center gap-1">
                                   Tempo de Fabricação
                                   <span className="text-[9px] font-normal text-muted-foreground">
-                                    (do fabricante)
+                                    (desta cotação)
                                   </span>
                                 </Label>
                                 <Input
-                                  className="h-7 text-xs bg-muted/40"
-                                  value={cf.expand?.fornecedor_id?.tempo_fabricacao || ''}
-                                  readOnly
-                                  title="Informação vinculada ao fabricante selecionado"
+                                  className="h-7 text-xs"
+                                  value={
+                                    cfDrafts[cf.id]?.tempo_fabricacao !== undefined
+                                      ? cfDrafts[cf.id].tempo_fabricacao!
+                                      : cf.tempo_fabricacao || ''
+                                  }
+                                  disabled={isFrozen}
+                                  onChange={(e) =>
+                                    setCfDrafts((prev) => ({
+                                      ...prev,
+                                      [cf.id]: {
+                                        ...prev[cf.id],
+                                        tempo_fabricacao: e.target.value,
+                                      },
+                                    }))
+                                  }
+                                  onBlur={() => handleSaveCfField(cf.id, 'tempo_fabricacao')}
+                                  title="Editar para esta cotação (não altera o cadastro do fabricante)"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs flex items-center gap-1">
+                                  Condição de Pagamento
+                                  <span className="text-[9px] font-normal text-muted-foreground">
+                                    (desta cotação)
+                                  </span>
+                                </Label>
+                                <Input
+                                  className="h-7 text-xs"
+                                  value={
+                                    cfDrafts[cf.id]?.condicao_pagamento !== undefined
+                                      ? cfDrafts[cf.id].condicao_pagamento!
+                                      : cf.condicao_pagamento || ''
+                                  }
+                                  disabled={isFrozen}
+                                  onChange={(e) =>
+                                    setCfDrafts((prev) => ({
+                                      ...prev,
+                                      [cf.id]: {
+                                        ...prev[cf.id],
+                                        condicao_pagamento: e.target.value,
+                                      },
+                                    }))
+                                  }
+                                  onBlur={() => handleSaveCfField(cf.id, 'condicao_pagamento')}
+                                  title="Editar para esta cotação (não altera o cadastro do fabricante)"
                                 />
                               </div>
                               <div className="pt-2 border-t flex flex-col gap-2">

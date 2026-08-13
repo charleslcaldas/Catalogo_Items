@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-13T14:21:22.127Z",
+  "generatedAt": "2026-08-13T17:00:07.369Z",
   "collections": [
     {
       "name": "users",
@@ -1396,19 +1396,13 @@
           "system": false
         },
         {
-          "name": "auditado",
-          "type": "bool",
-          "required": false,
-          "system": false
-        },
-        {
-          "name": "incoterm",
+          "name": "tempo_fabricacao",
           "type": "text",
           "required": false,
           "system": false
         },
         {
-          "name": "tempo_fabricacao",
+          "name": "condicao_pagamento",
           "type": "text",
           "required": false,
           "system": false
@@ -1475,6 +1469,12 @@
         },
         {
           "name": "tempo_fabricacao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "condicao_pagamento",
           "type": "text",
           "required": false,
           "system": false

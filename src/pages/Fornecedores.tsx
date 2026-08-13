@@ -177,6 +177,7 @@ export default function Fornecedores() {
               <TableHead>E-mail</TableHead>
               <TableHead>Incoterm</TableHead>
               <TableHead>Tempo de Fabricação</TableHead>
+              <TableHead>Condição de Pagamento</TableHead>
               <TableHead className="w-[120px]">Status</TableHead>
               <TableHead className="w-[100px] text-right">Ações</TableHead>
             </TableRow>
@@ -184,7 +185,7 @@ export default function Fornecedores() {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
                   Nenhum fabricante encontrado.
                 </TableCell>
               </TableRow>
@@ -197,6 +198,9 @@ export default function Fornecedores() {
                   <TableCell className="text-muted-foreground">{f.incoterm || '-'}</TableCell>
                   <TableCell className="text-muted-foreground">
                     {f.tempo_fabricacao || '-'}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {f.condicao_pagamento || '-'}
                   </TableCell>
                   <TableCell>
                     {f.ativo ? (

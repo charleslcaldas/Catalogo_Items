@@ -10,9 +10,13 @@ import {
   Copy,
   Check,
   ChevronsUpDown,
+  Truck,
+  CreditCard,
+  Clock,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Card } from '@/components/ui/card'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Command,
@@ -80,6 +84,7 @@ export default function AddItemsToPotential() {
   const [itemToEdit, setItemToEdit] = useState<Partial<Item> | undefined>(undefined)
   const [unidades, setUnidades] = useState<UnidadeMedida[]>([])
   const [statuses, setStatuses] = useState<StatusPotencial[]>([])
+  const [fornecedorCotacoes, setFornecedorCotacoes] = useState<any[]>([])
 
   // Quick Search state
   const [quickSearchOpen, setQuickSearchOpen] = useState(false)
@@ -100,6 +105,21 @@ export default function AddItemsToPotential() {
       .catch(console.error)
     loadStatuses()
   }, [])
+
+  useEffect(() => {
+    if (!currentPotential?.id) {
+      setFornecedorCotacoes([])
+      return
+    }
+    pb.collection('cotacoes_fornecedor')
+      .getFullList({
+        filter: `potencial_id="${currentPotential.id}"`,
+        expand: 'fornecedor_id',
+        sort: 'created',
+      })
+      .then(setFornecedorCotacoes)
+      .catch(console.error)
+  }, [currentPotential?.id])
 
   useEffect(() => {
     const delay = setTimeout(() => {
@@ -612,6 +632,59 @@ export default function AddItemsToPotential() {
         statuses={statuses}
         onManageStatuses={() => setIsStatusModalOpen(true)}
       />
+
+      {fornecedorCotacoes.length > 0 && (
+        <Card className="p-4 shadow-sm">
+          <div className="flex flex-col gap-1 mb-3">
+            <h3 className="text-sm font-semibold">Condições Comerciais dos Fabricantes</h3>
+            <p className="text-[11px] text-muted-foreground">
+              Incoterm, condição de pagamento e tempo de fabricação informados na cotação.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            {fornecedorCotacoes.map((cf) => {
+              const nome = cf.expand?.fornecedor_id?.nome || 'Fabricante'
+              return (
+                <div
+                  key={cf.id}
+                  className="flex flex-col gap-2 border rounded-lg p-3 min-w-[200px] bg-slate-50/60"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-xs text-foreground truncate">{nome}</span>
+                    <Badge
+                      variant="outline"
+                      className={`text-[9px] h-4 px-1 ${
+                        cf.status === 'finalizada'
+                          ? 'bg-muted-foreground/10 text-muted-foreground'
+                          : 'border-amber-300 text-amber-700 bg-amber-50'
+                      }`}
+                    >
+                      {cf.status === 'finalizada' ? 'Finalizada' : 'Pendente'}
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-1 gap-1 text-[11px]">
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Truck className="w-3 h-3 shrink-0" />
+                      <span className="font-medium text-foreground">Incoterm:</span>
+                      <span className="truncate">{cf.incoterm || '—'}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <CreditCard className="w-3 h-3 shrink-0" />
+                      <span className="font-medium text-foreground">Pagamento:</span>
+                      <span className="truncate">{cf.condicao_pagamento || '—'}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Clock className="w-3 h-3 shrink-0" />
+                      <span className="font-medium text-foreground">Fabricação:</span>
+                      <span className="truncate">{cf.tempo_fabricacao || '—'}</span>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </Card>
+      )}
 
       <div className="bg-white rounded-lg border shadow-sm flex flex-col flex-1 min-h-0">
         <div className="p-3 border-b flex items-center justify-between bg-slate-50/50 rounded-t-lg shrink-0">
