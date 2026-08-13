@@ -177,15 +177,6 @@ export default function QuotationMatrix() {
   useRealtime('cotacoes_fornecedor', loadData)
   useRealtime('cotacoes_itens', loadData)
 
-  const handleUpdateCf = async (cfId: string, data: any) => {
-    try {
-      await pb.collection('cotacoes_fornecedor').update(cfId, data)
-      toast({ title: 'Logística atualizada' })
-    } catch (err: any) {
-      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
-    }
-  }
-
   const handleSelectAllFor = async (cfId: string) => {
     try {
       const itemsToSelect = potencialItens.filter((pi) => {
@@ -335,11 +326,16 @@ export default function QuotationMatrix() {
   const handleAddFornecedor = async (id: string) => {
     if (!potencialId || !id) return
     try {
+      // Pull the Incoterm and Tempo de Fabricação registered on the fornecedor
+      // so they are automatically linked to this quotation.
+      const fornecedor = await pb.collection('fornecedores').getOne(id)
       await pb.collection('cotacoes_fornecedor').create({
         potencial_id: potencialId,
         fornecedor_id: id,
         status: 'pendente',
         data_solicitacao: new Date().toISOString(),
+        incoterm: fornecedor.incoterm || '',
+        tempo_fabricacao: fornecedor.tempo_fabricacao || '',
       })
       setIsAddOpen(false)
       toast({ title: 'Fabricante adicionado' })
@@ -996,25 +992,31 @@ export default function QuotationMatrix() {
                             <div className="space-y-3">
                               <h4 className="font-medium text-sm">Opções do Fabricante</h4>
                               <div className="space-y-1">
-                                <Label className="text-xs">Incoterm</Label>
+                                <Label className="text-xs flex items-center gap-1">
+                                  Incoterm
+                                  <span className="text-[9px] font-normal text-muted-foreground">
+                                    (do fabricante)
+                                  </span>
+                                </Label>
                                 <Input
-                                  className="h-7 text-xs"
-                                  defaultValue={cf.incoterm}
-                                  onBlur={(e) =>
-                                    handleUpdateCf(cf.id, { incoterm: e.target.value })
-                                  }
-                                  disabled={isFrozen}
+                                  className="h-7 text-xs bg-muted/40"
+                                  value={cf.expand?.fornecedor_id?.incoterm || ''}
+                                  readOnly
+                                  title="Informação vinculada ao fabricante selecionado"
                                 />
                               </div>
                               <div className="space-y-1">
-                                <Label className="text-xs">Tempo de Fabricação</Label>
+                                <Label className="text-xs flex items-center gap-1">
+                                  Tempo de Fabricação
+                                  <span className="text-[9px] font-normal text-muted-foreground">
+                                    (do fabricante)
+                                  </span>
+                                </Label>
                                 <Input
-                                  className="h-7 text-xs"
-                                  defaultValue={cf.tempo_fabricacao}
-                                  onBlur={(e) =>
-                                    handleUpdateCf(cf.id, { tempo_fabricacao: e.target.value })
-                                  }
-                                  disabled={isFrozen}
+                                  className="h-7 text-xs bg-muted/40"
+                                  value={cf.expand?.fornecedor_id?.tempo_fabricacao || ''}
+                                  readOnly
+                                  title="Informação vinculada ao fabricante selecionado"
                                 />
                               </div>
                               <div className="pt-2 border-t flex flex-col gap-2">
@@ -1093,14 +1095,14 @@ export default function QuotationMatrix() {
                       })()}
 
                       <div className="flex gap-1 mt-1 text-[9px] text-muted-foreground">
-                        {cf.incoterm && (
+                        {cf.expand?.fornecedor_id?.incoterm && (
                           <span className="bg-muted px-1 rounded truncate max-w-[60px]">
-                            {cf.incoterm}
+                            {cf.expand.fornecedor_id.incoterm}
                           </span>
                         )}
-                        {cf.tempo_fabricacao && (
+                        {cf.expand?.fornecedor_id?.tempo_fabricacao && (
                           <span className="bg-muted px-1 rounded truncate max-w-[60px]">
-                            {cf.tempo_fabricacao}
+                            {cf.expand.fornecedor_id.tempo_fabricacao}
                           </span>
                         )}
                       </div>

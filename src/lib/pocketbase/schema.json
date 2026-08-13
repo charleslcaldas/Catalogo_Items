@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-13T13:44:35.509Z",
+  "generatedAt": "2026-08-13T14:21:22.127Z",
   "collections": [
     {
       "name": "users",
@@ -1386,6 +1386,30 @@
         {
           "name": "auditado",
           "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "incoterm",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "auditado",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "incoterm",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tempo_fabricacao",
+          "type": "text",
           "required": false,
           "system": false
         }

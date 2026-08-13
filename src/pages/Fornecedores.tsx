@@ -53,6 +53,8 @@ export default function Fornecedores() {
       contato: fd.get('contato'),
       email: fd.get('email'),
       ativo: fd.get('ativo') === 'on',
+      incoterm: fd.get('incoterm'),
+      tempo_fabricacao: fd.get('tempo_fabricacao'),
     }
 
     try {
@@ -128,6 +130,24 @@ export default function Fornecedores() {
                 <Switch name="ativo" defaultChecked={editing ? editing.ativo : true} />
                 <Label>Ativo</Label>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Incoterm (Opcional)</Label>
+                  <Input
+                    name="incoterm"
+                    defaultValue={editing?.incoterm}
+                    placeholder="Ex.: FOB, EXW, CIF"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Tempo de Fabricação (Opcional)</Label>
+                  <Input
+                    name="tempo_fabricacao"
+                    defaultValue={editing?.tempo_fabricacao}
+                    placeholder="Ex.: 30 dias"
+                  />
+                </div>
+              </div>
               <div className="flex justify-end pt-4">
                 <Button type="submit">Salvar Fabricante</Button>
               </div>
@@ -155,14 +175,16 @@ export default function Fornecedores() {
               <TableHead>Nome</TableHead>
               <TableHead>Contato</TableHead>
               <TableHead>E-mail</TableHead>
+              <TableHead>Incoterm</TableHead>
+              <TableHead>Tempo de Fabricação</TableHead>
               <TableHead className="w-[120px]">Status</TableHead>
               <TableHead className="w-[100px] text-right">Ações</TableHead>
             </TableRow>
-          </TableHeader>
+          </TableHeader>{' '}
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                   Nenhum fabricante encontrado.
                 </TableCell>
               </TableRow>
@@ -172,6 +194,10 @@ export default function Fornecedores() {
                   <TableCell className="font-semibold text-foreground">{f.nome}</TableCell>
                   <TableCell className="text-muted-foreground">{f.contato || '-'}</TableCell>
                   <TableCell className="text-muted-foreground">{f.email || '-'}</TableCell>
+                  <TableCell className="text-muted-foreground">{f.incoterm || '-'}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {f.tempo_fabricacao || '-'}
+                  </TableCell>
                   <TableCell>
                     {f.ativo ? (
                       <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
