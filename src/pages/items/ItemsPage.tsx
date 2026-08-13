@@ -15,9 +15,27 @@ import {
   ChevronLeft,
   ChevronRight,
   ImagePlus,
+  ChevronDown,
+  FileText,
+  Database,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -158,7 +176,7 @@ export default function ItemsPage() {
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
-  const perPage = 50
+  const [perPage, setPerPage] = useState(50)
 
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set())
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false)
@@ -291,6 +309,7 @@ export default function ItemsPage() {
     debouncedSearch,
     filterLinhaId,
     filterNcmId,
+    perPage,
   })
 
   // Clear selections when page changes to avoid cross-page selection inconsistencies
@@ -305,7 +324,8 @@ export default function ItemsPage() {
       prev.sortDirection !== sortDirection ||
       prev.debouncedSearch !== debouncedSearch ||
       prev.filterLinhaId !== filterLinhaId ||
-      prev.filterNcmId !== filterNcmId
+      prev.filterNcmId !== filterNcmId ||
+      prev.perPage !== perPage
 
     prevFiltersRef.current = {
       sortColumn,
@@ -313,6 +333,7 @@ export default function ItemsPage() {
       debouncedSearch,
       filterLinhaId,
       filterNcmId,
+      perPage,
     }
 
     if (filtersChanged && page !== 1) {
@@ -321,7 +342,7 @@ export default function ItemsPage() {
     }
 
     fetchApiItens(debouncedSearch, filtersChanged ? 1 : page)
-  }, [sortColumn, sortDirection, debouncedSearch, filterLinhaId, filterNcmId, page])
+  }, [sortColumn, sortDirection, debouncedSearch, filterLinhaId, filterNcmId, page, perPage])
 
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -472,10 +493,9 @@ export default function ItemsPage() {
     }
   }
 
-  const handleExportCSV = () => {
-    if (apiItens.length === 0) return toast.warning('Nenhum item para exportar')
+  const buildItemsCSV = (items: any[]) => {
     const headers = ['SKU', 'Quantidade', 'Unidade', 'Description', 'Size', 'Finish']
-    const rows = apiItens.map((i) => {
+    const rows = items.map((i) => {
       const description = [i.descricao_curta, i.descricao_extra]
         .map((s) => String(s || '').trim())
         .filter(Boolean)
@@ -493,18 +513,53 @@ export default function ItemsPage() {
         finish,
       ]
     })
-    const csv = [
+    return [
       headers.join(','),
       ...rows.map((r) => r.map((c) => `"${String(c || '').replace(/"/g, '""')}"`).join(',')),
     ].join('\n')
-    // Add BOM for correct UTF-8 handling in Excel
+  }
+
+  // Add BOM for correct UTF-8 handling in Excel
+  const downloadCSV = (csv: string, filename = 'itens_export.csv') => {
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'itens_export.csv'
+    a.download = filename
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  const handleExportCurrentPage = () => {
+    if (apiItens.length === 0) return toast.warning('Nenhum item para exportar')
+    downloadCSV(buildItemsCSV(apiItens))
+  }
+
+  const handleExportAll = async () => {
+    const tid = toast.loading('Buscando todos os itens para exportação...')
+    try {
+      let allItems: any[]
+      try {
+        allItems = await pb.collection('itens').getFullList({
+          sort: 'sku',
+          expand:
+            'linha_id,linha_id.categoria_id,acabamento_id,ncm_id,descricao_base_id,unidade_id,foto_catalogo_id',
+        })
+      } catch {
+        // Fallback: retry without expand if relations fail (same strategy as fetchApiItens)
+        allItems = await pb.collection('itens').getFullList({ sort: 'sku' })
+      }
+      if (allItems.length === 0) {
+        toast.warning('Nenhum item para exportar', { id: tid })
+        return
+      }
+      downloadCSV(buildItemsCSV(allItems))
+      toast.success(`Exportados ${allItems.length} itens.`, { id: tid })
+    } catch (err: any) {
+      toast.error('Erro ao buscar todos os itens: ' + (err?.message || 'erro desconhecido'), {
+        id: tid,
+      })
+    }
   }
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -570,14 +625,28 @@ export default function ItemsPage() {
             >
               <ImagePlus className="w-4 h-4 mr-1.5" /> Upload de Imagens
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportCSV}
-              className="h-9 rounded-full px-3 text-sm hidden lg:flex"
-            >
-              <Download className="w-4 h-4 mr-1.5" /> Exportar
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 rounded-full px-3 text-sm hidden lg:flex"
+                >
+                  <Download className="w-4 h-4 mr-1.5" /> Exportar
+                  <ChevronDown className="w-3.5 h-3.5 ml-1 opacity-70" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Exportar CSV</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleExportCurrentPage}>
+                  <FileText className="w-4 h-4 mr-2" /> Exportar esta página
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportAll}>
+                  <Database className="w-4 h-4 mr-2" /> Exportar tudo
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <label className="cursor-pointer hidden lg:inline-flex items-center justify-center whitespace-nowrap rounded-full text-sm font-medium transition-colors border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-3">
               <Upload className="w-4 h-4 mr-1.5" /> Importar
               <input
@@ -1040,33 +1109,48 @@ export default function ItemsPage() {
             </Table>
           </div>
 
-          {totalPages > 1 && (
-            <div className="bg-card border-t p-3 flex flex-wrap items-center justify-between gap-4 shrink-0">
-              <div className="text-sm text-muted-foreground whitespace-nowrap">
-                Página {page} de {totalPages} | {totalItems} itens no total
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1 || isLoading}
-                >
-                  <ChevronLeft className="w-4 h-4 sm:mr-1" />
-                  <span className="hidden sm:inline">Anterior</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages || isLoading}
-                >
-                  <span className="hidden sm:inline">Próxima</span>
-                  <ChevronRight className="w-4 h-4 sm:ml-1" />
-                </Button>
-              </div>
+          <div className="bg-card border-t p-3 flex flex-wrap items-center justify-between gap-4 shrink-0">
+            <div className="text-sm text-muted-foreground whitespace-nowrap">
+              Página {page} de {totalPages} | {totalItems} itens no total
             </div>
-          )}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 mr-1">
+                <span className="text-sm text-muted-foreground hidden sm:inline">
+                  Itens por página
+                </span>
+                <Select value={String(perPage)} onValueChange={(v) => setPerPage(Number(v))}>
+                  <SelectTrigger className="h-8 w-[80px] text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[50, 100, 150, 200].map((n) => (
+                      <SelectItem key={n} value={String(n)}>
+                        {n}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1 || isLoading}
+              >
+                <ChevronLeft className="w-4 h-4 sm:mr-1" />
+                <span className="hidden sm:inline">Anterior</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages || isLoading}
+              >
+                <span className="hidden sm:inline">Próxima</span>
+                <ChevronRight className="w-4 h-4 sm:ml-1" />
+              </Button>
+            </div>
+          </div>
         </div>
 
         <div
