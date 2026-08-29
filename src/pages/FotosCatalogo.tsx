@@ -303,8 +303,10 @@ export default function FotosCatalogo() {
     return filtered
   }, [fotos, searchTerm, selectedTipo, selectedSubtipo, sortBy])
 
-  const toggleSelectFoto = (id: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation()
+  const toggleSelectFoto = (id: string, e?: React.SyntheticEvent) => {
+    if (e) {
+      e.stopPropagation()
+    }
     setSelectedFotoIds((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -530,9 +532,9 @@ export default function FotosCatalogo() {
                     className={`absolute top-2 left-2 z-10 p-1 rounded-md transition-opacity ${
                       isSelected
                         ? 'opacity-100 bg-background/90 shadow-sm'
-                        : 'opacity-0 group-hover:opacity-100 bg-background/80'
+                        : 'opacity-70 group-hover:opacity-100 bg-background/80'
                     }`}
-                    onClick={(e) => toggleSelectFoto(f.id, e)}
+                    onClick={(e) => e.stopPropagation()}
                   >
                     <Checkbox
                       checked={isSelected}
@@ -719,7 +721,7 @@ export default function FotosCatalogo() {
                 const isSelected = selectedFotoIds.has(f.id)
                 return (
                   <TableRow key={f.id} className={isSelected ? 'bg-primary/[0.04]' : undefined}>
-                    <TableCell className="px-2 text-center">
+                    <TableCell className="px-2 text-center" onClick={(e) => e.stopPropagation()}>
                       <Checkbox
                         checked={isSelected}
                         onCheckedChange={() => toggleSelectFoto(f.id)}
