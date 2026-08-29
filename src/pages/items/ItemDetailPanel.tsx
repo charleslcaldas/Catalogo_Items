@@ -87,8 +87,8 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
   const [newDescBaseModalOpen, setNewDescBaseModalOpen] = useState(false)
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('')
 
-  const lastTranslatedInfoExtra = useRef<string | undefined>()
-  const lastTranslatedDescExtra = useRef<string | undefined>()
+  const lastTranslatedInfoExtra = useRef<string | undefined>(undefined)
+  const lastTranslatedDescExtra = useRef<string | undefined>(undefined)
   const imageClickTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {

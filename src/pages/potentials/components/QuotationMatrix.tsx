@@ -655,6 +655,20 @@ export default function QuotationMatrix() {
     URL.revokeObjectURL(url)
   }
 
+  const handleSaveCfField = async (
+    cfId: string,
+    field: 'incoterm' | 'tempo_fabricacao' | 'condicao_pagamento',
+  ) => {
+    try {
+      const draftVal = cfDrafts[cfId]?.[field]
+      if (draftVal === undefined) return
+      await pb.collection('cotacoes_fornecedor').update(cfId, { [field]: draftVal })
+      toast({ title: 'Campo atualizado' })
+    } catch (err: any) {
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
+    }
+  }
+
   const handleExportForSupplier = (cf: any) => {
     let csv = 'SKU;Description;Size;Finish;Quantity;Unit;MOQ;Offered Price;Target Price\n'
     potencialItens.forEach((pi) => {
@@ -888,17 +902,15 @@ export default function QuotationMatrix() {
                                 </Badge>
                               )}
                               {f.auditado && (
-                                <ShieldCheck
-                                  className="w-3.5 h-3.5 text-blue-600"
-                                  title="Auditado"
-                                />
+                                <span title="Auditado">
+                                  <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                                </span>
                               )}
                               {(suppliersWithHistory.has(f.id) ||
                                 suppliersWithHistory.has(f.nome)) && (
-                                <History
-                                  className="w-3.5 h-3.5 text-muted-foreground"
-                                  title="Possui Histórico"
-                                />
+                                <span title="Possui Histórico">
+                                  <History className="w-3.5 h-3.5 text-muted-foreground" />
+                                </span>
                               )}
                             </div>
                           </div>

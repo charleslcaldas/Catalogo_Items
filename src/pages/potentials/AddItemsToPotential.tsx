@@ -73,7 +73,7 @@ export default function AddItemsToPotential() {
     status: 'Sem Itens',
   })
 
-  const [selectedItems, setSelectedItems] = useState<SelectedItemRecord[]>([])
+  const [selectedItems, setSelectedItems] = useState<any[]>([])
   const [lastOfferedPrices, setLastOfferedPrices] = useState<Record<string, number>>({})
 
   const [isSelecting, setIsSelecting] = useState(false)
@@ -397,7 +397,7 @@ export default function AddItemsToPotential() {
       const newPotencial = await duplicatePotencial(currentPotential.id)
       toast.success('Cotação duplicada com sucesso!')
       navigate(`/potenciais/adicionar?id=${newPotencial.id}`, { replace: true })
-      handleQuoteSelected(newPotencial)
+      handleQuoteSelected(newPotencial as unknown as Potencial)
     } catch (err) {
       toast.error('Erro ao duplicar cotação.')
     } finally {

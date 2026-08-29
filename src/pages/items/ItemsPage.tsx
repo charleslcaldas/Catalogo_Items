@@ -344,7 +344,7 @@ export default function ItemsPage() {
     fetchApiItens(debouncedSearch, filtersChanged ? 1 : page)
   }, [sortColumn, sortDirection, debouncedSearch, filterLinhaId, filterNcmId, page, perPage])
 
-  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Debounce realtime refreshes to avoid 429 when processing bulk operations
   useRealtime('itens', () => {
@@ -451,7 +451,7 @@ export default function ItemsPage() {
   }
 
   const [previewImage, setPreviewImage] = useState<{ url: string; alt: string } | null>(null)
-  const clickTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const handleImageClick = (e: React.MouseEvent, item: any) => {
     e.stopPropagation()
@@ -576,7 +576,7 @@ export default function ItemsPage() {
       toast.success(`Importação concluída: ${res.sucessos} sucessos, ${res.erros} erros.`, {
         id: tid,
       })
-      fetchApiItens(debouncedSearch)
+      fetchApiItens(debouncedSearch, page)
     } catch (err: any) {
       toast.error('Erro na importação: ' + err.message, { id: tid })
     }
@@ -849,7 +849,7 @@ export default function ItemsPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => fetchApiItens(debouncedSearch)}
+                          onClick={() => fetchApiItens(debouncedSearch, page)}
                         >
                           Tentar Novamente
                         </Button>
@@ -1220,7 +1220,7 @@ export default function ItemsPage() {
       <BulkEditDialog
         open={isBulkEditOpen}
         onOpenChange={setIsBulkEditOpen}
-        selectedItems={apiItens.filter((i) => selectedItemIds.has(i.id))}
+        selectedIds={Array.from(selectedItemIds)}
         onSuccess={handleBulkSuccess}
       />
 

@@ -3,9 +3,9 @@ import { Categoria, Linha, Acabamento, NCM, Item } from '@/types'
 const now = new Date().toISOString()
 
 export const mockCategorias: Categoria[] = [
-  { id: 'cat-1', nome_pt: 'Fixadores', nome_en: 'Fasteners', criado_em: now, atualizado_em: now },
-  { id: 'cat-2', nome_pt: 'Máquinas', nome_en: 'Machines', criado_em: now, atualizado_em: now },
-  { id: 'cat-3', nome_pt: 'Ferramentas', nome_en: 'Tools', criado_em: now, atualizado_em: now },
+  { id: 'cat-1', nome_pt: 'Fixadores', nome_en: 'Fasteners', created: now, updated: now },
+  { id: 'cat-2', nome_pt: 'Máquinas', nome_en: 'Machines', created: now, updated: now },
+  { id: 'cat-3', nome_pt: 'Ferramentas', nome_en: 'Tools', created: now, updated: now },
 ]
 
 export const mockLinhas: Linha[] = [
@@ -16,8 +16,8 @@ export const mockLinhas: Linha[] = [
     nome_en: 'Hex Bolt',
     superlinha_pt: 'Parafusos',
     superlinha_en: 'Bolts',
-    criado_em: now,
-    atualizado_em: now,
+    created: now,
+    updated: now,
   },
   {
     id: 'lin-2',
@@ -26,8 +26,8 @@ export const mockLinhas: Linha[] = [
     nome_en: 'Flat Washer',
     superlinha_pt: 'Arruelas',
     superlinha_en: 'Washers',
-    criado_em: now,
-    atualizado_em: now,
+    created: now,
+    updated: now,
   },
 ]
 
@@ -37,24 +37,24 @@ export const mockAcabamentos: Acabamento[] = [
     codigo: 'PO',
     nome_pt: 'Polido',
     nome_en: 'Polished',
-    criado_em: now,
-    atualizado_em: now,
+    created: now,
+    updated: now,
   },
   {
     id: 'aca-2',
     codigo: 'ZB',
     nome_pt: 'Zincado Branco',
     nome_en: 'White Zinc',
-    criado_em: now,
-    atualizado_em: now,
+    created: now,
+    updated: now,
   },
   {
     id: 'aca-3',
     codigo: 'PT',
     nome_pt: 'Preto',
     nome_en: 'Black',
-    criado_em: now,
-    atualizado_em: now,
+    created: now,
+    updated: now,
   },
 ]
 
@@ -66,8 +66,8 @@ export const mockNCM: NCM[] = [
     ipi: 5,
     pis: 2,
     cofins: 10,
-    criado_em: now,
-    atualizado_em: now,
+    created: now,
+    updated: now,
   },
   {
     id: 'ncm-2',
@@ -76,14 +76,16 @@ export const mockNCM: NCM[] = [
     ipi: 5,
     pis: 2,
     cofins: 10,
-    criado_em: now,
-    atualizado_em: now,
+    created: now,
+    updated: now,
   },
 ]
 
 export const mockItens: Item[] = [
   {
     id: 'itm-1',
+    collectionId: 'pbc_24446053',
+    collectionName: 'itens',
     sku: 'PAR-SEX-8X30-ZB',
     linha_id: 'lin-1',
     descr_pt: 'Parafuso Sextavado M8x30',
@@ -99,11 +101,13 @@ export const mockItens: Item[] = [
     ativo: true,
     sincronizado_com_zoho: true,
     data_sincronizacao: now,
-    criado_em: now,
-    atualizado_em: now,
+    created: now,
+    updated: now,
   },
   {
     id: 'itm-2',
+    collectionId: 'pbc_24446053',
+    collectionName: 'itens',
     sku: 'ARR-LIS-M8-ZB',
     linha_id: 'lin-2',
     descr_pt: 'Arruela Lisa M8',
@@ -119,7 +123,7 @@ export const mockItens: Item[] = [
     ativo: true,
     sincronizado_com_zoho: false,
     data_sincronizacao: null,
-    criado_em: now,
-    atualizado_em: now,
+    created: now,
+    updated: now,
   },
 ]

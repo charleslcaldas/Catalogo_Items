@@ -215,7 +215,7 @@ export default function Dashboard() {
                         <Cell key={`cell-${index}`} fill={`hsl(var(--chart-${(index % 5) + 1}))`} />
                       ))}
                     </Pie>
-                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <ChartTooltip content={(props: any) => <ChartTooltipContent {...props} />} />
                   </PieChart>
                 </ResponsiveContainer>
               </ChartContainer>
@@ -251,7 +251,7 @@ export default function Dashboard() {
                       axisLine={false}
                       tickLine={false}
                     />
-                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <ChartTooltip content={(props: any) => <ChartTooltipContent {...props} />} />
                     <Bar
                       dataKey="value"
                       fill="hsl(var(--primary))"

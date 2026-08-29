@@ -141,11 +141,14 @@ export type EstagioPotencial = {
 
 export type Potencial = {
   id: string
+  collectionId?: string
+  collectionName?: string
   numero_potencial: string
   cliente: string
   status: string
   nome_potencial?: string
   proprietario?: string
+  estagio?: string
   estagio_id?: string
   observacoes?: string
   nome_comprador?: string
@@ -179,6 +182,8 @@ export type PotencialItem = {
 
 export type Item = {
   id: string
+  collectionId: string
+  collectionName: string
   sku: string
   linha_id: string
   descr_pt: string
@@ -186,7 +191,7 @@ export type Item = {
   tamanho: string
   acabamento_id: string
   ncm_id: string
-  material: string
+  material?: string
   preco_compra: number
   preco_venda: number
   item_id_books: string
@@ -203,12 +208,16 @@ export type Item = {
   tipo_rosca?: string
   tipo_rosca_en?: string
   comprimento_rosca?: string
+  comprimento_rosca_en?: string
+  grau?: string
   informacao_extra?: string
   informacao_extra_en?: string
   descricao_extra?: string
   descricao_extra_en?: string
   descricao_curta?: string
   descricao_curta_en?: string
+  descricao_catalogo_pt?: string
+  descricao_catalogo_en?: string
   tipo?: string
   subtipo?: string
   foto_arquivo?: string
@@ -217,7 +226,12 @@ export type Item = {
   unidade_id?: string
   descricao_base_id?: string
   foto_catalogo_id?: string
+  data_atualizacao?: string
   validade_preco?: string
+  ii?: number
+  ipi?: number
+  pis?: number
+  cofins?: number
   created: string
   updated: string
   expand?: {
@@ -226,5 +240,6 @@ export type Item = {
     ncm_id?: NCM
     unidade_id?: UnidadeMedida
     foto_catalogo_id?: FotoCatalogo
+    descricao_base_id?: any
   }
 }

@@ -10,10 +10,15 @@ import {
   Search,
   ArrowUpDown,
   Eye,
+  Sparkles,
+  CheckSquare,
+  Square,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
@@ -42,6 +47,7 @@ import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 import { useData } from '@/contexts/data-context'
 import { ImagePreviewModal } from '@/components/ImagePreviewModal'
+import { MergeFotosModal } from '@/components/MergeFotosModal'
 import { useAuth } from '@/hooks/use-auth'
 import { ResizableHeader } from '@/components/ui/resizable-header'
 import { useNavigate } from 'react-router-dom'
@@ -51,6 +57,9 @@ export default function FotosCatalogo() {
   const { acabamentos } = useData()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingFoto, setEditingFoto] = useState<any>(null)
+
+  const [selectedFotoIds, setSelectedFotoIds] = useState<Set<string>>(new Set())
+  const [isMergeModalOpen, setIsMergeModalOpen] = useState(false)
 
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [searchTerm, setSearchTerm] = useState('')
@@ -63,6 +72,7 @@ export default function FotosCatalogo() {
 
   const defaultFotosWidths = useMemo(
     () => ({
+      select: 48,
       imagem: 80,
       descricao: 300,
       tipo: 120,
@@ -293,18 +303,76 @@ export default function FotosCatalogo() {
     return filtered
   }, [fotos, searchTerm, selectedTipo, selectedSubtipo, sortBy])
 
+  const toggleSelectFoto = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
+    setSelectedFotoIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const isAllFilteredSelected = useMemo(() => {
+    if (filteredAndSortedFotos.length === 0) return false
+    return filteredAndSortedFotos.every((f) => selectedFotoIds.has(f.id))
+  }, [filteredAndSortedFotos, selectedFotoIds])
+
+  const toggleSelectAllFiltered = () => {
+    if (isAllFilteredSelected) {
+      // Desmarcar todas as filtradas
+      setSelectedFotoIds((prev) => {
+        const next = new Set(prev)
+        filteredAndSortedFotos.forEach((f) => next.delete(f.id))
+        return next
+      })
+    } else {
+      // Marcar todas as filtradas
+      setSelectedFotoIds((prev) => {
+        const next = new Set(prev)
+        filteredAndSortedFotos.forEach((f) => next.add(f.id))
+        return next
+      })
+    }
+  }
+
+  const clearSelection = () => {
+    setSelectedFotoIds(new Set())
+  }
+
+  const selectedFotosObjects = useMemo(() => {
+    return fotos.filter((f) => selectedFotoIds.has(f.id))
+  }, [fotos, selectedFotoIds])
+
+  const handleMergeSuccess = () => {
+    setSelectedFotoIds(new Set())
+    fetchFotos()
+  }
+
   return (
     <div className="p-6 max-w-6xl mx-auto animate-fade-in flex flex-col gap-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Catálogo de Fotos</h1>
           <p className="text-muted-foreground text-sm">
-            Gerencie as imagens do catálogo de produtos.
+            Gerencie as imagens do catálogo de produtos e unifique fotos duplicadas.
           </p>
         </div>
-        <Button onClick={openNew}>
-          <Plus className="w-4 h-4 mr-2" /> Adicionar Foto
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {selectedFotoIds.size >= 2 && (
+            <Button
+              variant="default"
+              onClick={() => setIsMergeModalOpen(true)}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm animate-fade-in"
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              Mesclar selecionadas ({selectedFotoIds.size})
+            </Button>
+          )}
+          <Button onClick={openNew}>
+            <Plus className="w-4 h-4 mr-2" /> Adicionar Foto
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col md:flex-row items-center gap-4 bg-card p-4 rounded-xl border shadow-sm flex-wrap">
@@ -377,6 +445,63 @@ export default function FotosCatalogo() {
         </div>
       </div>
 
+      {/* Barra de ações em lote para seleção */}
+      <div className="flex items-center justify-between gap-4 bg-muted/40 px-4 py-2.5 rounded-lg border text-sm flex-wrap">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleSelectAllFiltered}
+            className="h-8 px-2 text-xs font-medium gap-1.5"
+          >
+            {isAllFilteredSelected ? (
+              <CheckSquare className="w-4 h-4 text-primary" />
+            ) : (
+              <Square className="w-4 h-4 text-muted-foreground" />
+            )}
+            {isAllFilteredSelected ? 'Desmarcar todas' : 'Selecionar todas'}
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            {filteredAndSortedFotos.length}{' '}
+            {filteredAndSortedFotos.length === 1 ? 'foto exibida' : 'fotos exibidas'}
+          </span>
+        </div>
+
+        {selectedFotoIds.size > 0 && (
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="font-normal text-xs">
+              {selectedFotoIds.size}{' '}
+              {selectedFotoIds.size === 1 ? 'foto selecionada' : 'fotos selecionadas'}
+            </Badge>
+
+            {selectedFotoIds.size >= 2 ? (
+              <Button
+                size="sm"
+                variant="default"
+                onClick={() => setIsMergeModalOpen(true)}
+                className="h-8 gap-1.5 text-xs shadow-sm"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                Mesclar fotos ({selectedFotoIds.size})
+              </Button>
+            ) : (
+              <span className="text-xs text-muted-foreground italic">
+                (Selecione 2 ou mais para mesclar)
+              </span>
+            )}
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearSelection}
+              className="h-8 text-xs text-muted-foreground hover:text-foreground"
+            >
+              Limpar seleção
+            </Button>
+          </div>
+        )}
+      </div>
+
       {filteredAndSortedFotos.length === 0 ? (
         <div className="py-12 text-center border rounded-xl bg-card border-dashed">
           <ImageIcon className="w-12 h-12 mx-auto text-muted-foreground opacity-20 mb-3" />
@@ -384,97 +509,134 @@ export default function FotosCatalogo() {
         </div>
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {filteredAndSortedFotos.map((f) => (
-            <div
-              key={f.id}
-              className="border rounded-xl bg-card overflow-hidden shadow-sm flex flex-col group relative"
-            >
+          {filteredAndSortedFotos.map((f) => {
+            const isSelected = selectedFotoIds.has(f.id)
+            return (
               <div
-                className="aspect-square bg-muted relative border-b cursor-pointer hover:opacity-90 transition-opacity"
-                onClick={() => navigate(`/fotos-catalogo/${f.id}`)}
-                title="Clique para ver itens vinculados"
+                key={f.id}
+                className={`border rounded-xl bg-card overflow-hidden shadow-sm flex flex-col group relative transition-all ${
+                  isSelected
+                    ? 'ring-2 ring-primary border-primary bg-primary/[0.02]'
+                    : 'hover:border-muted-foreground/30'
+                }`}
               >
-                {f.arquivo ? (
-                  <img
-                    src={pb.files.getURL(f, f.arquivo, { thumb: '400x400' })}
-                    alt={f.descricao}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <ImageIcon className="w-8 h-8 text-muted-foreground opacity-30" />
+                <div
+                  className="aspect-square bg-muted relative border-b cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={() => navigate(`/fotos-catalogo/${f.id}`)}
+                  title="Clique para ver itens vinculados"
+                >
+                  {/* Checkbox no topo esquerdo do card */}
+                  <div
+                    className={`absolute top-2 left-2 z-10 p-1 rounded-md transition-opacity ${
+                      isSelected
+                        ? 'opacity-100 bg-background/90 shadow-sm'
+                        : 'opacity-0 group-hover:opacity-100 bg-background/80'
+                    }`}
+                    onClick={(e) => toggleSelectFoto(f.id, e)}
+                  >
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={() => toggleSelectFoto(f.id)}
+                      className="h-4 w-4 data-[state=checked]:bg-primary"
+                    />
                   </div>
-                )}
-                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={(e) => handleImageClick(e, f)}
-                    title="Ampliar imagem"
-                  >
-                    <Maximize2 className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      openEdit(f)
-                    }}
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleDelete(f.id)
-                    }}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+
+                  {f.arquivo ? (
+                    <img
+                      src={pb.files.getURL(f, f.arquivo, { thumb: '400x400' })}
+                      alt={f.descricao}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <ImageIcon className="w-8 h-8 text-muted-foreground opacity-30" />
+                    </div>
+                  )}
+                  <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="h-8 w-8 shadow-sm"
+                      onClick={(e) => handleImageClick(e, f)}
+                      title="Ampliar imagem"
+                    >
+                      <Maximize2 className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="h-8 w-8 shadow-sm"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openEdit(f)
+                      }}
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      className="h-8 w-8 shadow-sm"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDelete(f.id)
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="p-3 flex-1 flex flex-col gap-1 text-sm">
+                  <p className="font-medium line-clamp-2" title={f.descricao}>
+                    {f.descricao || 'Sem descrição'}
+                  </p>
+                  <div className="text-xs text-muted-foreground mt-auto pt-2 grid grid-cols-2 gap-x-2 gap-y-1">
+                    {f.tipo && (
+                      <span>
+                        <span className="font-semibold">Tipo:</span> {f.tipo}
+                      </span>
+                    )}
+                    {f.subtipo && (
+                      <span>
+                        <span className="font-semibold">Sub:</span> {f.subtipo}
+                      </span>
+                    )}
+                    {f.tamanho && (
+                      <span>
+                        <span className="font-semibold">Tam:</span> {f.tamanho}
+                      </span>
+                    )}
+                    {f.acabamento_id && (
+                      <span className="col-span-2 truncate">
+                        <span className="font-semibold">Acab:</span>{' '}
+                        {getAcabamentoName(f.acabamento_id)}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-              <div className="p-3 flex-1 flex flex-col gap-1 text-sm">
-                <p className="font-medium line-clamp-2" title={f.descricao}>
-                  {f.descricao || 'Sem descrição'}
-                </p>
-                <div className="text-xs text-muted-foreground mt-auto pt-2 grid grid-cols-2 gap-x-2 gap-y-1">
-                  {f.tipo && (
-                    <span>
-                      <span className="font-semibold">Tipo:</span> {f.tipo}
-                    </span>
-                  )}
-                  {f.subtipo && (
-                    <span>
-                      <span className="font-semibold">Sub:</span> {f.subtipo}
-                    </span>
-                  )}
-                  {f.tamanho && (
-                    <span>
-                      <span className="font-semibold">Tam:</span> {f.tamanho}
-                    </span>
-                  )}
-                  {f.acabamento_id && (
-                    <span className="col-span-2 truncate">
-                      <span className="font-semibold">Acab:</span>{' '}
-                      {getAcabamentoName(f.acabamento_id)}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       ) : (
         <div className="border rounded-xl bg-card overflow-x-auto shadow-sm">
           <Table style={{ tableLayout: 'fixed', width: 'max-content', minWidth: '100%' }}>
             <TableHeader>
               <TableRow>
+                <TableHead
+                  style={{
+                    width: colWidths.select || 48,
+                    minWidth: colWidths.select || 48,
+                    maxWidth: colWidths.select || 48,
+                  }}
+                  className="px-2 text-center"
+                >
+                  <Checkbox
+                    checked={isAllFilteredSelected}
+                    onCheckedChange={toggleSelectAllFiltered}
+                    aria-label="Selecionar todas as fotos"
+                  />
+                </TableHead>
                 <TableHead
                   style={{
                     width: colWidths.imagem,
@@ -553,92 +715,102 @@ export default function FotosCatalogo() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredAndSortedFotos.map((f) => (
-                <TableRow key={f.id}>
-                  <TableCell className="px-2">
-                    {f.arquivo ? (
-                      <div
-                        className="w-12 h-12 rounded bg-muted overflow-hidden border cursor-pointer hover:opacity-80 transition-opacity"
-                        onClick={() => navigate(`/fotos-catalogo/${f.id}`)}
-                        title="Ver itens vinculados"
-                      >
-                        <img
-                          src={pb.files.getURL(f, f.arquivo, { thumb: '100x100' })}
-                          alt={f.descricao}
-                          className="w-full h-full object-cover"
-                        />
+              {filteredAndSortedFotos.map((f) => {
+                const isSelected = selectedFotoIds.has(f.id)
+                return (
+                  <TableRow key={f.id} className={isSelected ? 'bg-primary/[0.04]' : undefined}>
+                    <TableCell className="px-2 text-center">
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => toggleSelectFoto(f.id)}
+                        aria-label={`Selecionar foto ${f.descricao || f.id}`}
+                      />
+                    </TableCell>
+                    <TableCell className="px-2">
+                      {f.arquivo ? (
+                        <div
+                          className="w-12 h-12 rounded bg-muted overflow-hidden border cursor-pointer hover:opacity-80 transition-opacity"
+                          onClick={() => navigate(`/fotos-catalogo/${f.id}`)}
+                          title="Ver itens vinculados"
+                        >
+                          <img
+                            src={pb.files.getURL(f, f.arquivo, { thumb: '100x100' })}
+                            alt={f.descricao}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div
+                          className="w-12 h-12 rounded bg-muted flex items-center justify-center border cursor-pointer hover:bg-muted/80 transition-colors"
+                          onClick={() => navigate(`/fotos-catalogo/${f.id}`)}
+                          title="Ver itens vinculados"
+                        >
+                          <ImageIcon className="w-5 h-5 text-muted-foreground opacity-30" />
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell
+                      className="font-medium overflow-hidden text-ellipsis whitespace-nowrap px-2"
+                      title={f.descricao}
+                    >
+                      {f.descricao || '-'}
+                    </TableCell>
+                    <TableCell
+                      className="overflow-hidden text-ellipsis whitespace-nowrap px-2"
+                      title={f.tipo}
+                    >
+                      {f.tipo || '-'}
+                    </TableCell>
+                    <TableCell
+                      className="overflow-hidden text-ellipsis whitespace-nowrap px-2"
+                      title={f.subtipo}
+                    >
+                      {f.subtipo || '-'}
+                    </TableCell>
+                    <TableCell
+                      className="overflow-hidden text-ellipsis whitespace-nowrap px-2"
+                      title={f.tamanho}
+                    >
+                      {f.tamanho || '-'}
+                    </TableCell>
+                    <TableCell
+                      className="overflow-hidden text-ellipsis whitespace-nowrap px-2"
+                      title={getAcabamentoName(f.acabamento_id)}
+                    >
+                      {getAcabamentoName(f.acabamento_id)}
+                    </TableCell>
+                    <TableCell className="text-right px-2">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => navigate(`/fotos-catalogo/${f.id}`)}
+                          title="Ver itens vinculados"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => openEdit(f)}
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => handleDelete(f.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
-                    ) : (
-                      <div
-                        className="w-12 h-12 rounded bg-muted flex items-center justify-center border cursor-pointer hover:bg-muted/80 transition-colors"
-                        onClick={() => navigate(`/fotos-catalogo/${f.id}`)}
-                        title="Ver itens vinculados"
-                      >
-                        <ImageIcon className="w-5 h-5 text-muted-foreground opacity-30" />
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell
-                    className="font-medium overflow-hidden text-ellipsis whitespace-nowrap px-2"
-                    title={f.descricao}
-                  >
-                    {f.descricao || '-'}
-                  </TableCell>
-                  <TableCell
-                    className="overflow-hidden text-ellipsis whitespace-nowrap px-2"
-                    title={f.tipo}
-                  >
-                    {f.tipo || '-'}
-                  </TableCell>
-                  <TableCell
-                    className="overflow-hidden text-ellipsis whitespace-nowrap px-2"
-                    title={f.subtipo}
-                  >
-                    {f.subtipo || '-'}
-                  </TableCell>
-                  <TableCell
-                    className="overflow-hidden text-ellipsis whitespace-nowrap px-2"
-                    title={f.tamanho}
-                  >
-                    {f.tamanho || '-'}
-                  </TableCell>
-                  <TableCell
-                    className="overflow-hidden text-ellipsis whitespace-nowrap px-2"
-                    title={getAcabamentoName(f.acabamento_id)}
-                  >
-                    {getAcabamentoName(f.acabamento_id)}
-                  </TableCell>
-                  <TableCell className="text-right px-2">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => navigate(`/fotos-catalogo/${f.id}`)}
-                        title="Ver itens vinculados"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => openEdit(f)}
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => handleDelete(f.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
             </TableBody>
           </Table>
         </div>
@@ -650,6 +822,17 @@ export default function FotosCatalogo() {
           onClose={() => setPreviewImage(null)}
           imageUrl={previewImage.url}
           altText={previewImage.alt}
+        />
+      )}
+
+      {/* Modal para mesclar fotos repetidas */}
+      {isMergeModalOpen && (
+        <MergeFotosModal
+          open={isMergeModalOpen}
+          onOpenChange={setIsMergeModalOpen}
+          selectedFotos={selectedFotosObjects}
+          acabamentos={acabamentos}
+          onSuccess={handleMergeSuccess}
         />
       )}
 
