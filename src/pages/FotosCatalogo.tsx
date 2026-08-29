@@ -54,6 +54,8 @@ export default function FotosCatalogo() {
 
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [searchTerm, setSearchTerm] = useState('')
+  const [selectedTipo, setSelectedTipo] = useState<string>('ALL')
+  const [selectedSubtipo, setSelectedSubtipo] = useState<string>('ALL')
   const [sortBy, setSortBy] = useState('created-desc')
 
   const { user, updatePreferences } = useAuth()
@@ -93,7 +95,7 @@ export default function FotosCatalogo() {
   }
 
   const [previewImage, setPreviewImage] = useState<{ url: string; alt: string } | null>(null)
-  const clickTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const handleImageClick = (e: React.MouseEvent, f: any) => {
     e.stopPropagation()
@@ -210,12 +212,48 @@ export default function FotosCatalogo() {
     return acabamentos.find((a: any) => a.id === id)?.nome_pt || '-'
   }
 
+  const uniqueTipos = useMemo(() => {
+    const tipos = new Set<string>()
+    fotos.forEach((f) => {
+      if (f.tipo && typeof f.tipo === 'string' && f.tipo.trim()) {
+        tipos.add(f.tipo.trim())
+      }
+    })
+    return Array.from(tipos).sort((a, b) => a.localeCompare(b))
+  }, [fotos])
+
+  const uniqueSubtipos = useMemo(() => {
+    const subtipos = new Set<string>()
+    fotos.forEach((f) => {
+      if (f.subtipo && typeof f.subtipo === 'string' && f.subtipo.trim()) {
+        subtipos.add(f.subtipo.trim())
+      }
+    })
+    return Array.from(subtipos).sort((a, b) => a.localeCompare(b))
+  }, [fotos])
+
   const filteredAndSortedFotos = useMemo(() => {
     const terms = searchTerm.split(' ').filter(Boolean)
     const includes = terms.filter((t) => !t.startsWith('-')).map((t) => t.toLowerCase())
     const excludes = terms.filter((t) => t.startsWith('-')).map((t) => t.substring(1).toLowerCase())
 
     const filtered = fotos.filter((f) => {
+      // Filtro de Tipo
+      if (selectedTipo !== 'ALL') {
+        const fotoTipo = (f.tipo || '').trim()
+        if (fotoTipo !== selectedTipo) {
+          return false
+        }
+      }
+
+      // Filtro de Subtipo
+      if (selectedSubtipo !== 'ALL') {
+        const fotoSubtipo = (f.subtipo || '').trim()
+        if (fotoSubtipo !== selectedSubtipo) {
+          return false
+        }
+      }
+
       const searchableText = `${f.descricao || ''} ${f.tipo || ''} ${f.subtipo || ''}`.toLowerCase()
 
       const hasAllIncludes = includes.every((inc) => searchableText.includes(inc))
@@ -230,6 +268,8 @@ export default function FotosCatalogo() {
       const descB = (b.descricao || '').toLowerCase()
       const tipoA = (a.tipo || '').toLowerCase()
       const tipoB = (b.tipo || '').toLowerCase()
+      const subtipoA = (a.subtipo || '').toLowerCase()
+      const subtipoB = (b.subtipo || '').toLowerCase()
 
       switch (sortBy) {
         case 'descricao-asc':
@@ -240,6 +280,10 @@ export default function FotosCatalogo() {
           return tipoA.localeCompare(tipoB)
         case 'tipo-desc':
           return tipoB.localeCompare(tipoA)
+        case 'subtipo-asc':
+          return subtipoA.localeCompare(subtipoB)
+        case 'subtipo-desc':
+          return subtipoB.localeCompare(subtipoA)
         case 'created-desc':
         default:
           return new Date(b.created).getTime() - new Date(a.created).getTime()
@@ -247,7 +291,7 @@ export default function FotosCatalogo() {
     })
 
     return filtered
-  }, [fotos, searchTerm, sortBy])
+  }, [fotos, searchTerm, selectedTipo, selectedSubtipo, sortBy])
 
   return (
     <div className="p-6 max-w-6xl mx-auto animate-fade-in flex flex-col gap-6">
@@ -263,8 +307,8 @@ export default function FotosCatalogo() {
         </Button>
       </div>
 
-      <div className="flex flex-col md:flex-row items-center gap-4 bg-card p-4 rounded-xl border shadow-sm">
-        <div className="relative flex-1 w-full">
+      <div className="flex flex-col md:flex-row items-center gap-4 bg-card p-4 rounded-xl border shadow-sm flex-wrap">
+        <div className="relative flex-1 min-w-[220px] w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Buscar fotos... (use '-' para excluir termos, ex: parafuso -SS304)"
@@ -273,9 +317,38 @@ export default function FotosCatalogo() {
             className="pl-9"
           />
         </div>
-        <div className="flex items-center gap-4 w-full md:w-auto">
+
+        <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
+          <Select value={selectedTipo} onValueChange={setSelectedTipo}>
+            <SelectTrigger className="w-full sm:w-[150px]">
+              <SelectValue placeholder="Tipo: Todos" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Tipo: Todos</SelectItem>
+              {uniqueTipos.map((tipo) => (
+                <SelectItem key={tipo} value={tipo}>
+                  {tipo}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedSubtipo} onValueChange={setSelectedSubtipo}>
+            <SelectTrigger className="w-full sm:w-[150px]">
+              <SelectValue placeholder="Subtipo: Todos" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Subtipo: Todos</SelectItem>
+              {uniqueSubtipos.map((subtipo) => (
+                <SelectItem key={subtipo} value={subtipo}>
+                  {subtipo}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[170px]">
               <SelectValue placeholder="Ordenar por" />
             </SelectTrigger>
             <SelectContent>
@@ -284,6 +357,8 @@ export default function FotosCatalogo() {
               <SelectItem value="descricao-desc">Descrição (Z-A)</SelectItem>
               <SelectItem value="tipo-asc">Tipo (A-Z)</SelectItem>
               <SelectItem value="tipo-desc">Tipo (Z-A)</SelectItem>
+              <SelectItem value="subtipo-asc">Subtipo (A-Z)</SelectItem>
+              <SelectItem value="subtipo-desc">Subtipo (Z-A)</SelectItem>
             </SelectContent>
           </Select>
 
@@ -442,7 +517,14 @@ export default function FotosCatalogo() {
                   onResize={(w) => handleResize('subtipo', w)}
                   onResizeEnd={(w) => handleResizeEnd('subtipo', w)}
                 >
-                  Subtipo
+                  <button
+                    className="flex items-center gap-1 font-semibold hover:text-foreground"
+                    onClick={() =>
+                      setSortBy(sortBy === 'subtipo-asc' ? 'subtipo-desc' : 'subtipo-asc')
+                    }
+                  >
+                    Subtipo {sortBy.startsWith('subtipo') && <ArrowUpDown className="w-3 h-3" />}
+                  </button>
                 </ResizableHeader>
                 <ResizableHeader
                   width={colWidths.tamanho}
