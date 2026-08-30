@@ -122,6 +122,18 @@ export function FornecedorFormModal({
     })
   }
 
+  const selectAllFilteredLinhas = () => {
+    setFormData((prev) => {
+      const filteredIds = filteredLinhas.map((l) => l.id)
+      const combined = Array.from(new Set([...prev.linhas_ids, ...filteredIds]))
+      return { ...prev, linhas_ids: combined }
+    })
+  }
+
+  const clearLinhas = () => {
+    setFormData((prev) => ({ ...prev, linhas_ids: [] }))
+  }
+
   const filteredLinhas = linhas.filter((l) => {
     if (!linhaSearch.trim()) return true
     const term = linhaSearch.toLowerCase()
@@ -377,8 +389,38 @@ export function FornecedorFormModal({
                 </div>
               )}
 
+              {/* Ações rápidas de seleção */}
+              <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
+                <span>
+                  Mostrando {filteredLinhas.length} de {linhas.length} linha(s)
+                </span>
+                <div className="flex items-center gap-2">
+                  {filteredLinhas.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={selectAllFilteredLinhas}
+                      className="text-primary hover:underline font-medium"
+                    >
+                      Selecionar visíveis
+                    </button>
+                  )}
+                  {formData.linhas_ids.length > 0 && (
+                    <>
+                      <span>•</span>
+                      <button
+                        type="button"
+                        onClick={clearLinhas}
+                        className="text-destructive hover:underline font-medium"
+                      >
+                        Limpar todas
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
               {/* Seletor de Linhas */}
-              <ScrollArea className="h-32 rounded-md border p-2">
+              <ScrollArea className="h-44 rounded-md border p-2 bg-muted/10">
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                   {filteredLinhas.map((linha) => {
                     const isSelected = formData.linhas_ids.includes(linha.id)
