@@ -18,6 +18,7 @@ import {
   ChevronDown,
   FileText,
   Database,
+  AlignJustify,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -62,6 +63,7 @@ import { ItemDetailPanel } from './ItemDetailPanel'
 import { BulkEditDialog } from './BulkEditDialog'
 import { UploadImagesModal } from './UploadImagesModal'
 import { PhotoPickerModal } from '@/components/PhotoPickerModal'
+import { LinePickerModal } from '@/components/LinePickerModal'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { cn, getContrastColor } from '@/lib/utils'
 import pb from '@/lib/pocketbase/client'
@@ -184,6 +186,7 @@ export default function ItemsPage() {
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false)
   const [isUploadImagesOpen, setIsUploadImagesOpen] = useState(false)
   const [isPhotoPickerOpen, setIsPhotoPickerOpen] = useState(false)
+  const [isLinePickerOpen, setIsLinePickerOpen] = useState(false)
 
   const [historyMap, setHistoryMap] = useState<Record<string, any>>({})
 
@@ -464,6 +467,28 @@ export default function ItemsPage() {
       fetchApiItens(debouncedSearch, page)
     } catch (err: any) {
       toast.error('Erro ao atualizar fotos: ' + (err.message || 'erro desconhecido'))
+    }
+  }
+
+  const handleBulkLineUpdate = async (linhaId: string) => {
+    const ids = Array.from(selectedItemIds)
+    if (ids.length === 0) return
+    try {
+      const res = await pb.send('/backend/v1/linha/bulk-update', {
+        method: 'POST',
+        body: JSON.stringify({
+          itemIds: ids,
+          linhaId: linhaId,
+        }),
+        headers: { 'Content-Type': 'application/json' },
+      })
+      const count = res.updated || 0
+      toast.success(`${count} ${count === 1 ? 'item atualizado' : 'itens atualizados'} com sucesso`)
+      setSelectedItemIds(new Set())
+      setIsLinePickerOpen(false)
+      fetchApiItens(debouncedSearch, page)
+    } catch (err: any) {
+      toast.error('Erro ao atualizar linhas: ' + (err.message || 'erro desconhecido'))
     }
   }
 
@@ -1212,6 +1237,14 @@ export default function ItemsPage() {
           >
             <ImagePlus className="w-3.5 h-3.5 mr-1.5" /> Trocar foto
           </Button>
+          <Button
+            onClick={() => setIsLinePickerOpen(true)}
+            size="sm"
+            variant="secondary"
+            className="rounded-full"
+          >
+            <AlignJustify className="w-3.5 h-3.5 mr-1.5" /> Trocar linha
+          </Button>
           <Button onClick={() => setIsBulkEditOpen(true)} size="sm" className="rounded-full">
             <Layers className="w-3.5 h-3.5 mr-1.5" /> Editar
           </Button>
@@ -1251,6 +1284,12 @@ export default function ItemsPage() {
         open={isPhotoPickerOpen}
         onOpenChange={setIsPhotoPickerOpen}
         onSelect={handleBulkPhotoUpdate}
+      />
+
+      <LinePickerModal
+        open={isLinePickerOpen}
+        onOpenChange={setIsLinePickerOpen}
+        onSelect={handleBulkLineUpdate}
       />
 
       {previewImage && (
