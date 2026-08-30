@@ -137,6 +137,17 @@ export type Fornecedor = {
   nome: string
   contato?: string
   email?: string
+  cnpj?: string
+  telefone?: string
+  website?: string
+  endereco?: string
+  cidade?: string
+  estado?: string
+  pais?: string
+  cep?: string
+  itens_base_produz?: string
+  linhas_ids?: string[]
+  observacoes?: string
   ativo: boolean
   auditado?: boolean
   incoterm?: string
@@ -144,6 +155,10 @@ export type Fornecedor = {
   condicao_pagamento?: string
   created: string
   updated: string
+  expand?: {
+    linhas_ids?: Linha[]
+    [key: string]: any
+  }
   [key: string]: any
 }
 

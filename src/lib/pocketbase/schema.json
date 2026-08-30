@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-30T20:51:36.536Z",
+  "generatedAt": "2026-08-30T20:58:37.560Z",
   "collections": [
     {
       "name": "users",
@@ -1403,6 +1403,73 @@
         },
         {
           "name": "condicao_pagamento",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cnpj",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "telefone",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "website",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "endereco",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cidade",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "estado",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pais",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cep",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "itens_base_produz",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "linhas_ids",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "linhas"
+        },
+        {
+          "name": "observacoes",
           "type": "text",
           "required": false,
           "system": false

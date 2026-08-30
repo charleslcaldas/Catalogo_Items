@@ -85,7 +85,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
           pb.collection('atributos_linha').getFullList<AtributoLinha>(),
           pb.collection('unidades_medida').getFullList<UnidadeMedida>(),
           pb.collection('descricoes_base').getFullList<DescricaoBase>(),
-          pb.collection('fornecedores').getFullList<Fornecedor>({ sort: 'nome' }),
+          pb
+            .collection('fornecedores')
+            .getFullList<Fornecedor>({ sort: 'nome', expand: 'linhas_ids' }),
           pb
             .collection('contatos_fornecedor')
             .getFullList<ContatoFornecedor>({ sort: 'nome,sobrenome', expand: 'fabricante_id' }),
@@ -124,7 +126,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const reloadFornecedoresEContatos = async () => {
     try {
       const [forns, conts] = await Promise.all([
-        pb.collection('fornecedores').getFullList<Fornecedor>({ sort: 'nome' }),
+        pb
+          .collection('fornecedores')
+          .getFullList<Fornecedor>({ sort: 'nome', expand: 'linhas_ids' }),
         pb
           .collection('contatos_fornecedor')
           .getFullList<ContatoFornecedor>({ sort: 'nome,sobrenome', expand: 'fabricante_id' }),
@@ -147,7 +151,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
           pb.collection('atributos_linha').getFullList<AtributoLinha>(),
           pb.collection('unidades_medida').getFullList<UnidadeMedida>(),
           pb.collection('descricoes_base').getFullList<DescricaoBase>(),
-          pb.collection('fornecedores').getFullList<Fornecedor>({ sort: 'nome' }),
+          pb
+            .collection('fornecedores')
+            .getFullList<Fornecedor>({ sort: 'nome', expand: 'linhas_ids' }),
           pb
             .collection('contatos_fornecedor')
             .getFullList<ContatoFornecedor>({ sort: 'nome,sobrenome', expand: 'fabricante_id' }),
