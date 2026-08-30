@@ -21,6 +21,277 @@ import { useData } from '@/contexts/data-context'
 import { toast } from 'sonner'
 import pb from '@/lib/pocketbase/client'
 import { Plus } from 'lucide-react'
+import { ContatoFornecedor } from '@/types'
+
+export const CARGOS_SUGERIDOS = [
+  'Diretor',
+  'Gerente',
+  'Analista',
+  'Comprador',
+  'Vendas',
+  'Engenharia',
+  'Outros',
+]
+
+export function ContatoModal({
+  open,
+  onOpenChange,
+  onSaved,
+  initialData,
+  defaultFabricanteId,
+}: {
+  open: boolean
+  onOpenChange: (o: boolean) => void
+  onSaved?: (contato: ContatoFornecedor) => void
+  initialData?: ContatoFornecedor | null
+  defaultFabricanteId?: string
+}) {
+  const { fornecedores, reloadFornecedoresEContatos } = useData()
+  const [data, setData] = useState({
+    fabricante_id: '',
+    nome: '',
+    sobrenome: '',
+    cargo: 'Gerente',
+    cargoLivre: '',
+    telefone: '',
+    email: '',
+    whatsapp: '',
+    wechat: '',
+    observacoes: '',
+    ativo: true,
+  })
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      if (initialData) {
+        const isStandardCargo = CARGOS_SUGERIDOS.includes(initialData.cargo || '')
+        setData({
+          fabricante_id: initialData.fabricante_id || defaultFabricanteId || '',
+          nome: initialData.nome || '',
+          sobrenome: initialData.sobrenome || '',
+          cargo: isStandardCargo ? initialData.cargo || 'Outros' : 'Outros',
+          cargoLivre: isStandardCargo ? '' : initialData.cargo || '',
+          telefone: initialData.telefone || '',
+          email: initialData.email || '',
+          whatsapp: initialData.whatsapp || '',
+          wechat: initialData.wechat || '',
+          observacoes: initialData.observacoes || '',
+          ativo: initialData.ativo !== false,
+        })
+      } else {
+        setData({
+          fabricante_id: defaultFabricanteId || fornecedores[0]?.id || '',
+          nome: '',
+          sobrenome: '',
+          cargo: 'Gerente',
+          cargoLivre: '',
+          telefone: '',
+          email: '',
+          whatsapp: '',
+          wechat: '',
+          observacoes: '',
+          ativo: true,
+        })
+      }
+    }
+  }, [open, initialData, defaultFabricanteId, fornecedores])
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!data.fabricante_id) return toast.error('Selecione um fabricante.')
+    if (!data.nome.trim()) return toast.error('O nome do contato é obrigatório.')
+
+    setSaving(true)
+    const finalCargo =
+      data.cargo === 'Outros' && data.cargoLivre.trim() ? data.cargoLivre.trim() : data.cargo
+
+    const payload = {
+      fabricante_id: data.fabricante_id,
+      nome: data.nome.trim(),
+      sobrenome: data.sobrenome.trim(),
+      cargo: finalCargo,
+      telefone: data.telefone.trim(),
+      email: data.email.trim(),
+      whatsapp: data.whatsapp.trim(),
+      wechat: data.wechat.trim(),
+      observacoes: data.observacoes.trim(),
+      ativo: data.ativo,
+    }
+
+    try {
+      let saved: ContatoFornecedor
+      if (initialData?.id) {
+        saved = await pb
+          .collection('contatos_fornecedor')
+          .update<ContatoFornecedor>(initialData.id, payload, { expand: 'fabricante_id' })
+        toast.success('Contato atualizado com sucesso!')
+      } else {
+        saved = await pb
+          .collection('contatos_fornecedor')
+          .create<ContatoFornecedor>(payload, { expand: 'fabricante_id' })
+        toast.success('Contato adicionado com sucesso!')
+      }
+      await reloadFornecedoresEContatos()
+      onSaved?.(saved)
+      onOpenChange(false)
+    } catch (err: any) {
+      toast.error('Erro ao salvar contato', { description: err.message })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{initialData ? 'Editar Contato' : 'Novo Contato do Fabricante'}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-4 pt-2">
+          <div className="space-y-2">
+            <Label>
+              Fabricante / Fornecedor <span className="text-destructive">*</span>
+            </Label>
+            <Select
+              value={data.fabricante_id}
+              onValueChange={(v) => setData({ ...data, fabricante_id: v })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o Fabricante..." />
+              </SelectTrigger>
+              <SelectContent>
+                {fornecedores.map((f) => (
+                  <SelectItem key={f.id} value={f.id}>
+                    {f.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>
+                Nome <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                required
+                placeholder="Ex: João"
+                value={data.nome}
+                onChange={(e) => setData({ ...data, nome: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Sobrenome</Label>
+              <Input
+                placeholder="Ex: Silva"
+                value={data.sobrenome}
+                onChange={(e) => setData({ ...data, sobrenome: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Cargo / Função</Label>
+              <Select value={data.cargo} onValueChange={(v) => setData({ ...data, cargo: v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o Cargo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CARGOS_SUGERIDOS.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {data.cargo === 'Outros' ? (
+              <div className="space-y-2">
+                <Label>Especifique o Cargo (Livre)</Label>
+                <Input
+                  placeholder="Ex: Especialista em Comércio Exterior"
+                  value={data.cargoLivre}
+                  onChange={(e) => setData({ ...data, cargoLivre: e.target.value })}
+                />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>E-mail</Label>
+                <Input
+                  type="email"
+                  placeholder="contato@fabricante.com"
+                  value={data.email}
+                  onChange={(e) => setData({ ...data, email: e.target.value })}
+                />
+              </div>
+            )}
+          </div>
+
+          {data.cargo === 'Outros' && (
+            <div className="space-y-2">
+              <Label>E-mail</Label>
+              <Input
+                type="email"
+                placeholder="contato@fabricante.com"
+                value={data.email}
+                onChange={(e) => setData({ ...data, email: e.target.value })}
+              />
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Telefone</Label>
+              <Input
+                placeholder="+55 11 9999-9999"
+                value={data.telefone}
+                onChange={(e) => setData({ ...data, telefone: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>WhatsApp</Label>
+              <Input
+                placeholder="+55 11 99999-9999"
+                value={data.whatsapp}
+                onChange={(e) => setData({ ...data, whatsapp: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>WeChat ID / Contato</Label>
+              <Input
+                placeholder="ex: wxid_12345"
+                value={data.wechat}
+                onChange={(e) => setData({ ...data, wechat: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Observações</Label>
+            <Textarea
+              placeholder="Notas adicionais sobre o contato, horários de atendimento, idiomas falados..."
+              rows={3}
+              value={data.observacoes}
+              onChange={(e) => setData({ ...data, observacoes: e.target.value })}
+            />
+          </div>
+
+          <DialogFooter className="pt-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? 'Salvando...' : initialData ? 'Salvar Alterações' : 'Criar Contato'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 export function CategoryModal({
   open,

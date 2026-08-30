@@ -1,5 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { Categoria, Linha, Acabamento, NCM, Item as BaseItem, AtributoLinha } from '@/types'
+import {
+  Categoria,
+  Linha,
+  Acabamento,
+  NCM,
+  Item as BaseItem,
+  AtributoLinha,
+  Fornecedor,
+  ContatoFornecedor,
+} from '@/types'
 import { toast } from '@/hooks/use-toast'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
@@ -40,11 +49,14 @@ interface DataContextType {
   atributosLinha: AtributoLinha[]
   unidadesMedida: UnidadeMedida[]
   descricoesBase: DescricaoBase[]
+  fornecedores: Fornecedor[]
+  contatosFornecedor: ContatoFornecedor[]
   saveItem: (item: Partial<Item>) => Promise<void>
   deleteItem: (id: string) => Promise<void>
   saveCategoria: (cat: Partial<Categoria>) => Promise<void>
   deleteCategoria: (id: string) => Promise<void>
   reloadMetadata: () => Promise<void>
+  reloadFornecedoresEContatos: () => Promise<void>
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined)
@@ -58,19 +70,26 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [atributosLinha, setAtributosLinha] = useState<AtributoLinha[]>([])
   const [unidadesMedida, setUnidadesMedida] = useState<UnidadeMedida[]>([])
   const [descricoesBase, setDescricoesBase] = useState<DescricaoBase[]>([])
+  const [fornecedores, setFornecedores] = useState<Fornecedor[]>([])
+  const [contatosFornecedor, setContatosFornecedor] = useState<ContatoFornecedor[]>([])
   const { isAuthenticated } = useAuth()
 
   const loadData = async () => {
     try {
-      const [cats, lins, acabs, ncmData, atributosData, unids, descs] = await Promise.all([
-        pb.collection('categorias').getFullList<Categoria>(),
-        pb.collection('linhas').getFullList<Linha>({ expand: 'categoria_id' }),
-        pb.collection('acabamentos').getFullList<Acabamento>(),
-        pb.collection('ncm').getFullList<NCM>(),
-        pb.collection('atributos_linha').getFullList<AtributoLinha>(),
-        pb.collection('unidades_medida').getFullList<UnidadeMedida>(),
-        pb.collection('descricoes_base').getFullList<DescricaoBase>(),
-      ])
+      const [cats, lins, acabs, ncmData, atributosData, unids, descs, forns, conts] =
+        await Promise.all([
+          pb.collection('categorias').getFullList<Categoria>(),
+          pb.collection('linhas').getFullList<Linha>({ expand: 'categoria_id' }),
+          pb.collection('acabamentos').getFullList<Acabamento>(),
+          pb.collection('ncm').getFullList<NCM>(),
+          pb.collection('atributos_linha').getFullList<AtributoLinha>(),
+          pb.collection('unidades_medida').getFullList<UnidadeMedida>(),
+          pb.collection('descricoes_base').getFullList<DescricaoBase>(),
+          pb.collection('fornecedores').getFullList<Fornecedor>({ sort: 'nome' }),
+          pb
+            .collection('contatos_fornecedor')
+            .getFullList<ContatoFornecedor>({ sort: 'nome,sobrenome', expand: 'fabricante_id' }),
+        ])
       setCategorias(cats)
       setLinhas(lins)
       setAcabamentos(acabs)
@@ -78,6 +97,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setAtributosLinha(atributosData)
       setUnidadesMedida(unids)
       setDescricoesBase(descs)
+      setFornecedores(forns)
+      setContatosFornecedor(conts)
     } catch (e) {
       console.error('Error loading base metadata', e)
     }
@@ -100,17 +121,37 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const reloadFornecedoresEContatos = async () => {
+    try {
+      const [forns, conts] = await Promise.all([
+        pb.collection('fornecedores').getFullList<Fornecedor>({ sort: 'nome' }),
+        pb
+          .collection('contatos_fornecedor')
+          .getFullList<ContatoFornecedor>({ sort: 'nome,sobrenome', expand: 'fabricante_id' }),
+      ])
+      setFornecedores(forns)
+      setContatosFornecedor(conts)
+    } catch (e) {
+      console.error('Error reloading fornecedores & contatos', e)
+    }
+  }
+
   const reloadMetadata = async () => {
     try {
-      const [cats, lins, acabs, ncmData, atributosData, unids, descs] = await Promise.all([
-        pb.collection('categorias').getFullList<Categoria>(),
-        pb.collection('linhas').getFullList<Linha>({ expand: 'categoria_id' }),
-        pb.collection('acabamentos').getFullList<Acabamento>(),
-        pb.collection('ncm').getFullList<NCM>(),
-        pb.collection('atributos_linha').getFullList<AtributoLinha>(),
-        pb.collection('unidades_medida').getFullList<UnidadeMedida>(),
-        pb.collection('descricoes_base').getFullList<DescricaoBase>(),
-      ])
+      const [cats, lins, acabs, ncmData, atributosData, unids, descs, forns, conts] =
+        await Promise.all([
+          pb.collection('categorias').getFullList<Categoria>(),
+          pb.collection('linhas').getFullList<Linha>({ expand: 'categoria_id' }),
+          pb.collection('acabamentos').getFullList<Acabamento>(),
+          pb.collection('ncm').getFullList<NCM>(),
+          pb.collection('atributos_linha').getFullList<AtributoLinha>(),
+          pb.collection('unidades_medida').getFullList<UnidadeMedida>(),
+          pb.collection('descricoes_base').getFullList<DescricaoBase>(),
+          pb.collection('fornecedores').getFullList<Fornecedor>({ sort: 'nome' }),
+          pb
+            .collection('contatos_fornecedor')
+            .getFullList<ContatoFornecedor>({ sort: 'nome,sobrenome', expand: 'fabricante_id' }),
+        ])
       setCategorias(cats)
       setLinhas(lins)
       setAcabamentos(acabs)
@@ -118,6 +159,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setAtributosLinha(atributosData)
       setUnidadesMedida(unids)
       setDescricoesBase(descs)
+      setFornecedores(forns)
+      setContatosFornecedor(conts)
     } catch (e) {
       console.error('Error reloading metadata', e)
     }
@@ -135,8 +178,26 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setAtributosLinha([])
       setUnidadesMedida([])
       setDescricoesBase([])
+      setFornecedores([])
+      setContatosFornecedor([])
     }
   }, [isAuthenticated])
+
+  useRealtime<Fornecedor>(
+    'fornecedores',
+    () => {
+      if (isAuthenticated) reloadFornecedoresEContatos()
+    },
+    isAuthenticated,
+  )
+
+  useRealtime<ContatoFornecedor>(
+    'contatos_fornecedor',
+    () => {
+      if (isAuthenticated) reloadFornecedoresEContatos()
+    },
+    isAuthenticated,
+  )
 
   useRealtime<Item>(
     'itens',
@@ -216,11 +277,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
         atributosLinha,
         unidadesMedida,
         descricoesBase,
+        fornecedores,
+        contatosFornecedor,
         saveItem,
         deleteItem,
         saveCategoria,
         deleteCategoria,
         reloadMetadata,
+        reloadFornecedoresEContatos,
       }}
     >
       {children}

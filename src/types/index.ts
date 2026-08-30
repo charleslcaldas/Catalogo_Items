@@ -130,6 +130,45 @@ export type StatusPotencial = {
   updated: string
 }
 
+export type Fornecedor = {
+  id: string
+  collectionId: string
+  collectionName: string
+  nome: string
+  contato?: string
+  email?: string
+  ativo: boolean
+  auditado?: boolean
+  incoterm?: string
+  tempo_fabricacao?: string
+  condicao_pagamento?: string
+  created: string
+  updated: string
+  [key: string]: any
+}
+
+export type ContatoFornecedor = {
+  id: string
+  collectionId: string
+  collectionName: string
+  fabricante_id: string
+  nome: string
+  sobrenome?: string
+  cargo?: string
+  telefone?: string
+  email?: string
+  whatsapp?: string
+  wechat?: string
+  observacoes?: string
+  ativo?: boolean
+  created: string
+  updated: string
+  expand?: {
+    fabricante_id?: Fornecedor
+  }
+  [key: string]: any
+}
+
 export type EstagioPotencial = {
   id: string
   nome: string

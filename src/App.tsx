@@ -16,6 +16,7 @@ import PotentialDetailsWrapper from './pages/potentials/PotentialDetailsWrapper'
 import PotentialsPage from './pages/potentials/PotentialsPage'
 import Login from './pages/Login'
 import Fornecedores from './pages/Fornecedores'
+import ContactsPage from './pages/ContactsPage'
 import Unidades from './pages/Unidades'
 import FotosCatalogo from './pages/FotosCatalogo'
 import FotoCatalogoDetail from './pages/FotoCatalogoDetail'
@@ -45,6 +46,7 @@ const App = () => (
                 <Route path="/potenciais" element={<PotentialsPage />} />
                 <Route path="/potenciais/adicionar" element={<PotentialDetailsWrapper />} />
                 <Route path="/fornecedores" element={<Fornecedores />} />
+                <Route path="/contatos" element={<ContactsPage />} />
                 <Route path="/unidades" element={<Unidades />} />
                 <Route path="/fotos-catalogo" element={<FotosCatalogo />} />
                 <Route path="/fotos-catalogo/:fotoId" element={<FotoCatalogoDetail />} />

@@ -14,6 +14,7 @@ import {
   Image as ImageIcon,
   Ruler,
   Factory,
+  Users,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -41,6 +42,7 @@ const items = [
   { title: 'Fotos Catálogo', url: '/fotos-catalogo', icon: ImageIcon },
   { title: 'Unidades de Medida', url: '/unidades', icon: Ruler },
   { title: 'Fabricantes', url: '/fornecedores', icon: Factory },
+  { title: 'Contatos', url: '/contatos', icon: Users },
   { title: 'Potenciais', url: '/potenciais', icon: Target },
   { title: 'Importar do Airtable', url: '/importar', icon: UploadCloud },
 ]
