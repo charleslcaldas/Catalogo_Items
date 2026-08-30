@@ -122,6 +122,7 @@ export default function ItemsPage() {
 
   const filterLinhaId = searchParams.get('linha_id')
   const filterNcmId = searchParams.get('ncm_id')
+  const filterUnidadeId = searchParams.get('unidade_id')
 
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -237,6 +238,10 @@ export default function ItemsPage() {
       filters.push(`ncm_id = "${filterNcmId}"`)
     }
 
+    if (filterUnidadeId) {
+      filters.push(`unidade_id = "${filterUnidadeId}"`)
+    }
+
     if (searchStr.trim()) {
       const normalizedTerm = searchStr.toLowerCase().replace(/["']/g, '')
       const tokens = normalizedTerm.split(/\s+/).filter(Boolean)
@@ -309,6 +314,7 @@ export default function ItemsPage() {
     debouncedSearch,
     filterLinhaId,
     filterNcmId,
+    filterUnidadeId,
     perPage,
   })
 
@@ -325,6 +331,7 @@ export default function ItemsPage() {
       prev.debouncedSearch !== debouncedSearch ||
       prev.filterLinhaId !== filterLinhaId ||
       prev.filterNcmId !== filterNcmId ||
+      prev.filterUnidadeId !== filterUnidadeId ||
       prev.perPage !== perPage
 
     prevFiltersRef.current = {
@@ -333,6 +340,7 @@ export default function ItemsPage() {
       debouncedSearch,
       filterLinhaId,
       filterNcmId,
+      filterUnidadeId,
       perPage,
     }
 
@@ -342,7 +350,16 @@ export default function ItemsPage() {
     }
 
     fetchApiItens(debouncedSearch, filtersChanged ? 1 : page)
-  }, [sortColumn, sortDirection, debouncedSearch, filterLinhaId, filterNcmId, page, perPage])
+  }, [
+    sortColumn,
+    sortDirection,
+    debouncedSearch,
+    filterLinhaId,
+    filterNcmId,
+    filterUnidadeId,
+    page,
+    perPage,
+  ])
 
   const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 

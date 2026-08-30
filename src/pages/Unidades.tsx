@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Edit2 } from 'lucide-react'
+import { Plus, Trash2, Edit2, ArrowRight } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
 import {
   Table,
   TableBody,
@@ -20,8 +22,11 @@ import {
 import { toast } from 'sonner'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
+import { useData } from '@/contexts/data-context'
 
 export default function Unidades() {
+  const navigate = useNavigate()
+  const { itens, reloadMetadata } = useData()
   const [unidades, setUnidades] = useState<any[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingUnidade, setEditingUnidade] = useState<any>(null)
@@ -42,6 +47,7 @@ export default function Unidades() {
 
   useRealtime('unidades_medida', () => {
     fetchUnidades()
+    reloadMetadata()
   })
 
   const handleSave = async (e: React.FormEvent) => {
@@ -59,6 +65,7 @@ export default function Unidades() {
         toast.success('Unidade criada com sucesso')
       }
       setIsModalOpen(false)
+      reloadMetadata()
     } catch (e) {
       toast.error('Erro ao salvar unidade')
     }
@@ -73,6 +80,7 @@ export default function Unidades() {
       }
       await pb.collection('unidades_medida').delete(id)
       toast.success('Unidade excluída com sucesso')
+      reloadMetadata()
     } catch (e) {
       toast.error('Erro ao excluir unidade')
     }
@@ -109,42 +117,79 @@ export default function Unidades() {
           <TableHeader>
             <TableRow>
               <TableHead>Nome da Unidade</TableHead>
-              <TableHead className="w-[100px] text-right">Ações</TableHead>
+              <TableHead className="text-center">Total de Itens</TableHead>
+              <TableHead className="w-[180px] text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {unidades.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={2} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
                   Nenhuma unidade cadastrada.
                 </TableCell>
               </TableRow>
             ) : (
-              unidades.map((u) => (
-                <TableRow key={u.id}>
-                  <TableCell className="font-medium">{u.nome}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEdit(u)}
-                        title="Editar"
+              unidades.map((u) => {
+                const itensCount = itens.filter((i) => i.unidade_id === u.id).length
+
+                return (
+                  <TableRow
+                    key={u.id}
+                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => navigate(`/itens?unidade_id=${u.id}`)}
+                  >
+                    <TableCell className="font-medium">
+                      <span className="font-semibold text-sm hover:underline">{u.nome}</span>
+                    </TableCell>
+                    <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                      <Badge
+                        variant="secondary"
+                        className="font-medium cursor-pointer hover:bg-secondary/80 transition-colors"
+                        onClick={() => navigate(`/itens?unidade_id=${u.id}`)}
+                        title={`Ver ${itensCount} item(ns) desta unidade`}
                       >
-                        <Edit2 className="w-4 h-4 text-muted-foreground" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(u.id)}
-                        title="Excluir"
-                      >
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+                        {itensCount} {itensCount === 1 ? 'item' : 'itens'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            openEdit(u)
+                          }}
+                          title="Editar"
+                        >
+                          <Edit2 className="w-4 h-4 text-muted-foreground" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            navigate(`/itens?unidade_id=${u.id}`)
+                          }}
+                        >
+                          Itens <ArrowRight className="ml-2 h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDelete(u.id)
+                          }}
+                          title="Excluir"
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>
