@@ -29,9 +29,10 @@ import {
 import pb from '@/lib/pocketbase/client'
 import { toast } from 'sonner'
 import { Linha } from '@/types'
+import { Badge } from '@/components/ui/badge'
 
 export default function Lines() {
-  const { linhas, categorias } = useData()
+  const { linhas, categorias, itens } = useData()
   const [modalOpen, setModalOpen] = useState(false)
   const [editData, setEditData] = useState<Linha | null>(null)
   const [attrModalOpen, setAttrModalOpen] = useState(false)
@@ -120,6 +121,7 @@ export default function Lines() {
                 <TableHead>Nome (PT)</TableHead>
                 <TableHead>Name (EN)</TableHead>
                 <TableHead>Categoria</TableHead>
+                <TableHead className="text-center">Total de Itens</TableHead>
                 <TableHead>Margem Padrão</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -127,101 +129,115 @@ export default function Lines() {
             <TableBody>
               {filteredLinhas.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     Nenhuma linha encontrada.
                   </TableCell>
                 </TableRow>
               )}
-              {filteredLinhas.map((lin) => (
-                <TableRow
-                  key={lin.id}
-                  className="cursor-pointer hover:bg-muted/50 transition-colors"
-                  onClick={() => {
-                    setEditData(lin)
-                    setModalOpen(true)
-                  }}
-                >
-                  <TableCell>
-                    <span className="font-semibold text-sm">{lin.nome_pt}</span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-muted-foreground">{lin.nome_en || '-'}</span>
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold w-fit"
-                      style={
-                        getCatColor(lin.categoria_id)
-                          ? {
-                              backgroundColor: getCatColor(lin.categoria_id)!,
-                              color: getContrastColor(getCatColor(lin.categoria_id)!),
-                            }
-                          : { backgroundColor: '#E5E7EB', color: '#1F2937' }
-                      }
-                    >
-                      {getCatName(lin.categoria_id)}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">
-                        {lin.margem_padrao != null ? `${lin.margem_padrao}%` : '7.5% (Global)'}
+              {filteredLinhas.map((lin) => {
+                const itensCount = itens.filter((i) => i.linha_id === lin.id).length
+
+                return (
+                  <TableRow
+                    key={lin.id}
+                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => {
+                      setEditData(lin)
+                      setModalOpen(true)
+                    }}
+                  >
+                    <TableCell>
+                      <span className="font-semibold text-sm">{lin.nome_pt}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm text-muted-foreground">{lin.nome_en || '-'}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold w-fit"
+                        style={
+                          getCatColor(lin.categoria_id)
+                            ? {
+                                backgroundColor: getCatColor(lin.categoria_id)!,
+                                color: getContrastColor(getCatColor(lin.categoria_id)!),
+                              }
+                            : { backgroundColor: '#E5E7EB', color: '#1F2937' }
+                        }
+                      >
+                        {getCatName(lin.categoria_id)}
                       </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setMarginData(lin)
-                          setTempMargin(lin.margem_padrao?.toString() || '')
-                          setMarginModalOpen(true)
-                        }}
-                        title="Configurar Margem Padrão"
+                    </TableCell>
+                    <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                      <Badge
+                        variant="secondary"
+                        className="font-medium cursor-pointer hover:bg-secondary/80 transition-colors"
+                        onClick={() => navigate(`/itens?linha_id=${lin.id}`)}
+                        title={`Ver ${itensCount} item(ns) desta linha`}
                       >
-                        <Percent className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setAttrData(lin)
-                          setAttrModalOpen(true)
-                        }}
-                        title="Configurar Campos Técnicos"
-                      >
-                        <Settings className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          navigate(`/itens?linha_id=${lin.id}`)
-                        }}
-                      >
-                        Itens <ArrowRight className="ml-2 h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setLineToDelete(lin)
-                        }}
-                        title="Excluir Linha"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                        {itensCount} {itensCount === 1 ? 'item' : 'itens'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">
+                          {lin.margem_padrao != null ? `${lin.margem_padrao}%` : '7.5% (Global)'}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setMarginData(lin)
+                            setTempMargin(lin.margem_padrao?.toString() || '')
+                            setMarginModalOpen(true)
+                          }}
+                          title="Configurar Margem Padrão"
+                        >
+                          <Percent className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setAttrData(lin)
+                            setAttrModalOpen(true)
+                          }}
+                          title="Configurar Campos Técnicos"
+                        >
+                          <Settings className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            navigate(`/itens?linha_id=${lin.id}`)
+                          }}
+                        >
+                          Itens <ArrowRight className="ml-2 h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setLineToDelete(lin)
+                          }}
+                          title="Excluir Linha"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
             </TableBody>
           </Table>
         </CardContent>
