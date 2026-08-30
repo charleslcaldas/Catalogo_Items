@@ -139,9 +139,9 @@ export function FornecedorDetailModal({
 
               <div className="flex items-center gap-2">
                 <Button
-                  variant="outline"
+                  variant="default"
                   size="sm"
-                  className="gap-1.5"
+                  className="gap-1.5 shadow-sm"
                   onClick={() => {
                     onEditFornecedor?.(fornecedor)
                   }}

@@ -2,18 +2,12 @@ import { useState } from 'react'
 import {
   Factory,
   Plus,
-  Edit2,
   Trash2,
   Search,
   Users,
   UserPlus,
   MapPin,
-  Globe,
-  Layers,
-  Eye,
   Building2,
-  Phone,
-  Mail,
   FilterX,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -149,6 +143,11 @@ export default function Fornecedores() {
     ? fornecedores.find((f) => f.id === selectedFornecedor.id) || selectedFornecedor
     : null
 
+  const handleSavedFornecedor = (saved: Fornecedor) => {
+    setSelectedFornecedor(saved)
+    // Se o modal de ficha estiver aberto ou for reaberto, ele mostrará o fabricante atualizado
+  }
+
   return (
     <div className="space-y-4 animate-fade-in">
       {/* Header Principal */}
@@ -258,7 +257,7 @@ export default function Fornecedores() {
                   <TableHead className="text-center w-[130px]">Contatos</TableHead>
                   <TableHead className="w-[140px]">Incoterm / Lead</TableHead>
                   <TableHead className="w-[90px]">Status</TableHead>
-                  <TableHead className="w-[170px] text-right">Ações</TableHead>
+                  <TableHead className="w-[80px] text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -415,29 +414,6 @@ export default function Fornecedores() {
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1">
                             <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-8 gap-1 text-xs px-2.5"
-                              onClick={() => {
-                                setSelectedFornecedor(f)
-                                setDetailModalOpen(true)
-                              }}
-                            >
-                              <Eye className="w-3.5 h-3.5" /> Ver Ficha
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => {
-                                setEditingFornecedor(f)
-                                setIsFormOpen(true)
-                              }}
-                              title="Editar Fabricante"
-                            >
-                              <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
-                            </Button>
-                            <Button
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
@@ -466,6 +442,7 @@ export default function Fornecedores() {
           if (!v) setEditingFornecedor(null)
         }}
         initialData={editingFornecedor}
+        onSaved={handleSavedFornecedor}
       />
 
       {/* Modal/Ficha de Detalhe Completo do Fabricante + Contatos */}
