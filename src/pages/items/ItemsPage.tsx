@@ -87,12 +87,10 @@ function AcabamentoBadge({
 
   return (
     <span
-      className="inline-flex items-center px-2.5 py-0.5 rounded-[12px] text-xs font-medium border border-black/10 shadow-sm max-w-full"
+      className="inline-flex items-center px-2.5 py-0.5 rounded-[12px] text-xs font-medium border border-black/10 shadow-sm max-w-full truncate"
       style={{ backgroundColor: bgColor, color: textColor }}
     >
-      <span className={cn(selectedItemId ? 'truncate' : 'whitespace-normal break-words text-left')}>
-        {acabamento.nome_pt}
-      </span>
+      <span className="truncate text-left">{acabamento.nome_pt}</span>
     </span>
   )
 }
@@ -713,11 +711,11 @@ export default function ItemsPage() {
       <div className="flex gap-4 flex-1 items-start overflow-hidden">
         <div
           className={cn(
-            'border rounded-xl bg-card relative transition-all duration-300 shadow-sm h-full flex flex-col',
+            'border rounded-xl bg-card relative transition-all duration-300 shadow-sm h-full flex flex-col min-w-0',
             selectedItemId ? 'w-[40%] hidden lg:block' : 'flex-1',
           )}
         >
-          <div className="flex-1 overflow-auto relative">
+          <div className="flex-1 overflow-auto relative min-w-0">
             {isLoading && apiItens.length > 0 && (
               <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/50 backdrop-blur-[1px]">
                 <div className="flex items-center gap-2 bg-background border shadow-md px-4 py-2 rounded-full text-sm font-medium">
@@ -727,8 +725,39 @@ export default function ItemsPage() {
               </div>
             )}
             <Table style={{ tableLayout: 'fixed', width: 'max-content', minWidth: '100%' }}>
+              <colgroup>
+                <col style={{ width: colWidths.checkbox, minWidth: colWidths.checkbox }} />
+                <col style={{ width: colWidths.foto, minWidth: colWidths.foto }} />
+                <col style={{ width: colWidths.sku, minWidth: colWidths.sku }} />
+                <col style={{ width: colWidths.linha_id, minWidth: colWidths.linha_id }} />
+                <col
+                  style={{ width: colWidths.descricao_curta, minWidth: colWidths.descricao_curta }}
+                />
+                <col style={{ width: colWidths.tamanho, minWidth: colWidths.tamanho }} />
+                <col
+                  style={{ width: colWidths.acabamento_id, minWidth: colWidths.acabamento_id }}
+                />
+                <col style={{ width: colWidths.ncm_id, minWidth: colWidths.ncm_id }} />
+                <col
+                  style={{
+                    width: colWidths.descricao_base_id,
+                    minWidth: colWidths.descricao_base_id,
+                  }}
+                />
+                {!selectedItemId && (
+                  <>
+                    <col
+                      style={{ width: colWidths.preco_compra, minWidth: colWidths.preco_compra }}
+                    />
+                    <col
+                      style={{ width: colWidths.preco_venda, minWidth: colWidths.preco_venda }}
+                    />
+                    <col style={{ width: colWidths.status, minWidth: colWidths.status }} />
+                  </>
+                )}
+              </colgroup>
               <TableHeader className="sticky top-0 bg-card z-10 shadow-sm">
-                <TableRow className="h-8">
+                <TableRow className="h-9">
                   <TableHead
                     style={{
                       width: colWidths.checkbox,
@@ -928,7 +957,7 @@ export default function ItemsPage() {
                       <TableRow
                         key={item.id}
                         className={cn(
-                          'cursor-pointer transition-colors',
+                          'cursor-pointer transition-colors h-11',
                           !item.ativo && 'opacity-60 grayscale-[0.3]',
                           isRowActive
                             ? 'bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40'
@@ -938,37 +967,39 @@ export default function ItemsPage() {
                       >
                         <TableCell
                           onClick={(e) => e.stopPropagation()}
-                          className="text-center py-1 px-2"
+                          className="text-center py-1.5 px-2 align-middle"
                         >
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={() => toggleSelect(item.id)}
-                          />
+                          <div className="flex items-center justify-center">
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleSelect(item.id)}
+                            />
+                          </div>
                         </TableCell>
-                        <TableCell className="py-1 px-2">
-                          <img
-                            src={getItemImageUrl(item, 100)}
-                            alt={item.sku}
-                            className="w-6 h-6 rounded object-cover border bg-muted mx-auto cursor-pointer hover:opacity-80 transition-opacity"
-                            title="Clique para ampliar / Duplo clique para editar"
-                            onClick={(e) => handleImageClick(e, item)}
-                          />
+                        <TableCell className="py-1.5 px-2 align-middle">
+                          <div className="flex items-center justify-center">
+                            <img
+                              src={getItemImageUrl(item, 100)}
+                              alt={item.sku}
+                              className="w-7 h-7 rounded object-cover border bg-muted cursor-pointer hover:opacity-80 transition-opacity"
+                              title="Clique para ampliar / Duplo clique para editar"
+                              onClick={(e) => handleImageClick(e, item)}
+                            />
+                          </div>
                         </TableCell>
-                        <TableCell className="font-medium whitespace-nowrap py-1 px-2 text-sm overflow-hidden text-ellipsis">
+                        <TableCell className="font-medium py-1.5 px-2 text-sm overflow-hidden text-ellipsis whitespace-nowrap align-middle">
                           {item.sku}
                         </TableCell>
-                        <TableCell className="whitespace-nowrap py-1 px-2 text-sm overflow-hidden text-ellipsis">
+                        <TableCell className="py-1.5 px-2 text-sm overflow-hidden text-ellipsis whitespace-nowrap align-middle">
                           {item.expand?.linha_id?.nome_pt || '-'}
                         </TableCell>
-                        <TableCell className={cn('py-1 px-2 text-sm overflow-hidden')}>
+                        <TableCell className="py-1.5 px-2 text-sm overflow-hidden align-middle">
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <div
                                 className={cn(
                                   'cursor-default w-full',
-                                  selectedItemId
-                                    ? 'truncate'
-                                    : 'whitespace-normal break-words leading-snug',
+                                  selectedItemId ? 'truncate' : 'truncate',
                                 )}
                               >
                                 {item.descricao_curta || '-'}
@@ -985,15 +1016,13 @@ export default function ItemsPage() {
                             )}
                           </Tooltip>
                         </TableCell>
-                        <TableCell className={cn('py-1 px-2 text-sm overflow-hidden')}>
+                        <TableCell className="py-1.5 px-2 text-sm overflow-hidden align-middle">
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <div
                                 className={cn(
                                   'cursor-default w-full',
-                                  selectedItemId
-                                    ? 'truncate'
-                                    : 'whitespace-normal break-words leading-snug',
+                                  selectedItemId ? 'truncate' : 'truncate',
                                 )}
                               >
                                 {item.tamanho || '-'}
@@ -1010,7 +1039,7 @@ export default function ItemsPage() {
                             )}
                           </Tooltip>
                         </TableCell>
-                        <TableCell className={cn('py-1 px-2 overflow-hidden')}>
+                        <TableCell className="py-1.5 px-2 overflow-hidden align-middle">
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <div className="w-full flex items-center">
@@ -1031,17 +1060,17 @@ export default function ItemsPage() {
                             )}
                           </Tooltip>
                         </TableCell>
-                        <TableCell className="whitespace-nowrap py-1 px-2 text-sm overflow-hidden text-ellipsis">
+                        <TableCell className="py-1.5 px-2 text-sm overflow-hidden text-ellipsis whitespace-nowrap align-middle">
                           {item.expand?.ncm_id?.codigo || '-'}
                         </TableCell>
-                        <TableCell className="whitespace-nowrap py-1 px-2 text-sm overflow-hidden text-ellipsis">
+                        <TableCell className="py-1.5 px-2 text-sm overflow-hidden text-ellipsis whitespace-nowrap align-middle">
                           {item.expand?.descricao_base_id?.codigo ||
                             item.expand?.descricao_base_id?.nome_pt ||
                             '-'}
                         </TableCell>
                         {!selectedItemId && (
                           <>
-                            <TableCell className="py-1 px-2 text-xs overflow-hidden text-ellipsis">
+                            <TableCell className="py-1.5 px-2 text-xs overflow-hidden align-middle">
                               {(() => {
                                 const hist = historyMap[item.id]
                                 const refPrice = hist?.preco ?? item.preco_compra
@@ -1053,17 +1082,13 @@ export default function ItemsPage() {
                                   return (
                                     <Tooltip>
                                       <TooltipTrigger asChild>
-                                        <div className="flex flex-col cursor-help items-start">
+                                        <div className="flex items-center gap-1.5 cursor-help whitespace-nowrap truncate leading-tight">
                                           <span className="font-semibold text-amber-600">
                                             $ {refPrice.toFixed(2)}
                                           </span>
-                                          {refSupplier ? (
-                                            <span className="text-[9px] text-muted-foreground truncate max-w-[100px]">
-                                              {refSupplier}
-                                            </span>
-                                          ) : (
-                                            <span className="text-[9px] text-muted-foreground">
-                                              -
+                                          {refSupplier && (
+                                            <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">
+                                              ({refSupplier})
                                             </span>
                                           )}
                                         </div>
@@ -1083,7 +1108,7 @@ export default function ItemsPage() {
                                 return '-'
                               })()}
                             </TableCell>
-                            <TableCell className="whitespace-nowrap py-1 px-2 text-xs overflow-hidden text-ellipsis">
+                            <TableCell className="py-1.5 px-2 text-xs overflow-hidden text-ellipsis whitespace-nowrap align-middle">
                               {typeof item.preco_venda === 'number' ? (
                                 <Tooltip>
                                   <TooltipTrigger asChild>
@@ -1105,7 +1130,7 @@ export default function ItemsPage() {
                                 '-'
                               )}
                             </TableCell>
-                            <TableCell className="py-1 px-2 overflow-hidden text-ellipsis whitespace-nowrap">
+                            <TableCell className="py-1.5 px-2 overflow-hidden text-ellipsis whitespace-nowrap align-middle">
                               <div className="flex items-center gap-1.5">
                                 {item.ativo ? (
                                   <Badge
