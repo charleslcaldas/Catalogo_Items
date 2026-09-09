@@ -442,14 +442,14 @@ export function LineModal({
           categoria_id: initialData.categoria_id || '',
           nome_pt: initialData.nome_pt || '',
           nome_en: initialData.nome_en || '',
-          color: initialData.color || '#000000',
+          color: initialData.color || '',
         })
       } else {
         setData({
           categoria_id: '',
           nome_pt: '',
           nome_en: '',
-          color: '#000000',
+          color: '',
         })
       }
     }
@@ -544,16 +544,27 @@ export function LineModal({
                 <div className="flex gap-2 items-center">
                   <Input
                     type="color"
-                    value={data.color}
+                    value={data.color || '#EAB308'}
                     onChange={(e) => setData({ ...data, color: e.target.value })}
                     className="h-10 w-16 p-1 cursor-pointer"
                   />
                   <Input
                     value={data.color}
                     onChange={(e) => setData({ ...data, color: e.target.value })}
-                    className="uppercase font-mono"
-                    placeholder="#000000"
+                    className="uppercase font-mono flex-1"
+                    placeholder="Ex: #FFFF00 ou #EAB308"
                   />
+                  {data.color && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setData({ ...data, color: '' })}
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Limpar
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>

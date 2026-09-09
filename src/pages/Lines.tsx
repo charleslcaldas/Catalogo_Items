@@ -11,7 +11,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useData } from '@/contexts/data-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, Trash2, ArrowRight, FilterX, Search, Settings, Percent } from 'lucide-react'
+import {
+  Plus,
+  Trash2,
+  FilterX,
+  Search,
+  Settings,
+  Percent,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Edit2,
+} from 'lucide-react'
 import { LineAttributesModal } from '@/components/LineAttributesModal'
 import { LineModal } from '@/components/MetadataModals'
 import { getContrastColor } from '@/lib/utils'
@@ -29,10 +40,9 @@ import {
 import pb from '@/lib/pocketbase/client'
 import { toast } from 'sonner'
 import { Linha } from '@/types'
-import { Badge } from '@/components/ui/badge'
 
 export default function Lines() {
-  const { linhas, categorias, itens } = useData()
+  const { linhas, categorias } = useData()
   const [modalOpen, setModalOpen] = useState(false)
   const [editData, setEditData] = useState<Linha | null>(null)
   const [attrModalOpen, setAttrModalOpen] = useState(false)
@@ -42,6 +52,10 @@ export default function Lines() {
   const [marginModalOpen, setMarginModalOpen] = useState(false)
   const [marginData, setMarginData] = useState<Linha | null>(null)
   const [tempMargin, setTempMargin] = useState('')
+  const [sortField, setSortField] = useState<
+    'nome_pt' | 'nome_en' | 'categoria' | 'margem_padrao' | null
+  >('nome_pt')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -58,14 +72,70 @@ export default function Lines() {
     return c?.color || null
   }
 
+  const handleSort = (field: 'nome_pt' | 'nome_en' | 'categoria' | 'margem_padrao') => {
+    if (sortField === field) {
+      if (sortOrder === 'asc') {
+        setSortOrder('desc')
+      } else {
+        // Toggle back to asc
+        setSortOrder('asc')
+      }
+    } else {
+      setSortField(field)
+      setSortOrder('asc')
+    }
+  }
+
+  const SortIcon = ({
+    field,
+  }: {
+    field: 'nome_pt' | 'nome_en' | 'categoria' | 'margem_padrao'
+  }) => {
+    if (sortField !== field)
+      return <ArrowUpDown className="ml-1.5 h-3.5 w-3.5 opacity-50 inline-block" />
+    return sortOrder === 'asc' ? (
+      <ArrowUp className="ml-1.5 h-3.5 w-3.5 inline-block text-primary" />
+    ) : (
+      <ArrowDown className="ml-1.5 h-3.5 w-3.5 inline-block text-primary" />
+    )
+  }
+
   const filteredLinhas = linhas.filter((l) => {
     if (filterCatId && l.categoria_id !== filterCatId) return false
-    const term = searchTerm.toLowerCase()
+    const term = searchTerm.toLowerCase().trim()
+    if (!term) return true
     return (
-      l.nome_pt.toLowerCase().includes(term) ||
+      (l.nome_pt && l.nome_pt.toLowerCase().includes(term)) ||
       (l.nome_en && l.nome_en.toLowerCase().includes(term)) ||
       getCatName(l.categoria_id).toLowerCase().includes(term)
     )
+  })
+
+  const sortedLinhas = [...filteredLinhas].sort((a, b) => {
+    if (!sortField) return 0
+
+    if (sortField === 'margem_padrao') {
+      const valA = a.margem_padrao != null ? a.margem_padrao : 7.5
+      const valB = b.margem_padrao != null ? b.margem_padrao : 7.5
+      return sortOrder === 'asc' ? valA - valB : valB - valA
+    }
+
+    let valA = ''
+    let valB = ''
+
+    if (sortField === 'nome_pt') {
+      valA = a.nome_pt || ''
+      valB = b.nome_pt || ''
+    } else if (sortField === 'nome_en') {
+      valA = a.nome_en || ''
+      valB = b.nome_en || ''
+    } else if (sortField === 'categoria') {
+      valA = getCatName(a.categoria_id) || ''
+      valB = getCatName(b.categoria_id) || ''
+    }
+
+    const comparison = valA.localeCompare(valB, 'pt-BR', { sensitivity: 'base' })
+    return sortOrder === 'asc' ? comparison : -comparison
   })
 
   return (
@@ -118,36 +188,69 @@ export default function Lines() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nome (PT)</TableHead>
-                <TableHead>Name (EN)</TableHead>
-                <TableHead>Categoria</TableHead>
-                <TableHead className="text-center">Total de Itens</TableHead>
-                <TableHead>Margem Padrão</TableHead>
+                <TableHead
+                  className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                  onClick={() => handleSort('nome_pt')}
+                >
+                  Nome (PT) <SortIcon field="nome_pt" />
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                  onClick={() => handleSort('nome_en')}
+                >
+                  Name (EN) <SortIcon field="nome_en" />
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                  onClick={() => handleSort('categoria')}
+                >
+                  Categoria <SortIcon field="categoria" />
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                  onClick={() => handleSort('margem_padrao')}
+                >
+                  Margem Padrão <SortIcon field="margem_padrao" />
+                </TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredLinhas.length === 0 && (
+              {sortedLinhas.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                     Nenhuma linha encontrada.
                   </TableCell>
                 </TableRow>
               )}
-              {filteredLinhas.map((lin) => {
-                const itensCount = itens.filter((i) => i.linha_id === lin.id).length
-
+              {sortedLinhas.map((lin) => {
                 return (
                   <TableRow
                     key={lin.id}
-                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    className="cursor-pointer hover:bg-muted/50 transition-colors group"
                     onClick={() => {
-                      setEditData(lin)
-                      setModalOpen(true)
+                      navigate(`/itens?linha_id=${lin.id}`)
                     }}
+                    title={`Clique para visualizar os itens da linha ${lin.nome_pt}`}
                   >
                     <TableCell>
-                      <span className="font-semibold text-sm">{lin.nome_pt}</span>
+                      <div className="flex items-center gap-2.5">
+                        {lin.color ? (
+                          <div
+                            className="w-3.5 h-3.5 rounded-full border border-black/15 shrink-0 shadow-sm"
+                            style={{ backgroundColor: lin.color }}
+                            title={`Cor da linha: ${lin.color}`}
+                          />
+                        ) : (
+                          <div
+                            className="w-3.5 h-3.5 rounded-full bg-muted border border-border shrink-0"
+                            title="Sem cor definida"
+                          />
+                        )}
+                        <span className="font-semibold text-sm group-hover:text-primary transition-colors">
+                          {lin.nome_pt}
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <span className="text-sm text-muted-foreground">{lin.nome_en || '-'}</span>
@@ -167,16 +270,6 @@ export default function Lines() {
                         {getCatName(lin.categoria_id)}
                       </span>
                     </TableCell>
-                    <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                      <Badge
-                        variant="secondary"
-                        className="font-medium cursor-pointer hover:bg-secondary/80 transition-colors"
-                        onClick={() => navigate(`/itens?linha_id=${lin.id}`)}
-                        title={`Ver ${itensCount} item(ns) desta linha`}
-                      >
-                        {itensCount} {itensCount === 1 ? 'item' : 'itens'}
-                      </Badge>
-                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium">
@@ -185,7 +278,19 @@ export default function Lines() {
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1 sm:gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setEditData(lin)
+                            setModalOpen(true)
+                          }}
+                          title="Editar Linha"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -210,16 +315,6 @@ export default function Lines() {
                           title="Configurar Campos Técnicos"
                         >
                           <Settings className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            navigate(`/itens?linha_id=${lin.id}`)
-                          }}
-                        >
-                          Itens <ArrowRight className="ml-2 h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
