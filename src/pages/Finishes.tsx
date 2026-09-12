@@ -11,24 +11,81 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useData } from '@/contexts/data-context'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { getContrastColor } from '@/lib/utils'
+import { getContrastColor, cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Plus, Pencil, Search } from 'lucide-react'
+import { Plus, Pencil, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { FinishModal } from '@/components/MetadataModals'
+import { Acabamento } from '@/types'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+
+type SortField = 'codigo' | 'nome_pt' | 'nome_en' | 'created'
 
 export default function Finishes() {
   const { acabamentos } = useData()
   const [modalOpen, setModalOpen] = useState(false)
-  const [editData, setEditData] = useState<any>(null)
+  const [editData, setEditData] = useState<Acabamento | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [sortField, setSortField] = useState<SortField | null>('nome_pt')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      if (sortOrder === 'asc') {
+        setSortOrder('desc')
+      } else {
+        setSortOrder('asc')
+      }
+    } else {
+      setSortField(field)
+      setSortOrder('asc')
+    }
+  }
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field)
+      return <ArrowUpDown className="ml-1.5 h-3.5 w-3.5 opacity-50 inline-block" />
+    return sortOrder === 'asc' ? (
+      <ArrowUp className="ml-1.5 h-3.5 w-3.5 inline-block text-primary" />
+    ) : (
+      <ArrowDown className="ml-1.5 h-3.5 w-3.5 inline-block text-primary" />
+    )
+  }
 
   const filteredAcabamentos = acabamentos.filter((a) => {
-    const term = searchTerm.toLowerCase()
+    const term = searchTerm.toLowerCase().trim()
+    if (!term) return true
     return (
       a.nome_pt.toLowerCase().includes(term) ||
       (a.nome_en && a.nome_en.toLowerCase().includes(term)) ||
       a.codigo.toLowerCase().includes(term)
     )
+  })
+
+  const sortedAcabamentos = [...filteredAcabamentos].sort((a, b) => {
+    if (!sortField) return 0
+
+    if (sortField === 'created') {
+      const timeA = a.created ? new Date(a.created).getTime() : 0
+      const timeB = b.created ? new Date(b.created).getTime() : 0
+      return sortOrder === 'asc' ? timeA - timeB : timeB - timeA
+    }
+
+    let valA = ''
+    let valB = ''
+
+    if (sortField === 'codigo') {
+      valA = a.codigo || ''
+      valB = b.codigo || ''
+    } else if (sortField === 'nome_pt') {
+      valA = a.nome_pt || ''
+      valB = b.nome_pt || ''
+    } else if (sortField === 'nome_en') {
+      valA = a.nome_en || ''
+      valB = b.nome_en || ''
+    }
+
+    const comparison = valA.localeCompare(valB, 'pt-BR', { sensitivity: 'base' })
+    return sortOrder === 'asc' ? comparison : -comparison
   })
 
   return (
@@ -70,66 +127,124 @@ export default function Finishes() {
         <CardContent>
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead className="w-[120px]">Código</TableHead>
-                <TableHead>Nome (PT)</TableHead>
-                <TableHead>Nome (EN)</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
+              <TableRow className="h-9">
+                <TableHead
+                  className="w-[120px] px-2 cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                  onClick={() => handleSort('codigo')}
+                >
+                  Código <SortIcon field="codigo" />
+                </TableHead>
+                <TableHead
+                  className="px-2 cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                  onClick={() => handleSort('nome_pt')}
+                >
+                  Nome (PT) <SortIcon field="nome_pt" />
+                </TableHead>
+                <TableHead
+                  className="px-2 cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                  onClick={() => handleSort('nome_en')}
+                >
+                  Nome (EN) <SortIcon field="nome_en" />
+                </TableHead>
+                <TableHead
+                  className="w-[140px] px-2 cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                  onClick={() => handleSort('created')}
+                >
+                  Criado Em <SortIcon field="created" />
+                </TableHead>
+                <TableHead className="w-[80px] px-2 text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredAcabamentos.map((aca) => (
-                <TableRow key={aca.id}>
-                  <TableCell>
-                    <Badge variant="secondary" className="font-mono">
-                      {aca.codigo}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium shadow-sm border border-black/5"
-                      style={
-                        aca.cor_hex
-                          ? { backgroundColor: aca.cor_hex, color: getContrastColor(aca.cor_hex) }
-                          : { backgroundColor: '#E5E7EB', color: '#1F2937' }
-                      }
-                    >
-                      {aca.nome_pt}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    {aca.nome_en ? (
-                      <span
-                        className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium shadow-sm border border-black/5 opacity-90"
-                        style={
-                          aca.cor_hex
-                            ? { backgroundColor: aca.cor_hex, color: getContrastColor(aca.cor_hex) }
-                            : { backgroundColor: '#E5E7EB', color: '#1F2937' }
-                        }
+              {sortedAcabamentos.map((aca) => {
+                const bgColor = aca.cor_hex || '#e2e8f0'
+                const textColor = getContrastColor(bgColor)
+
+                return (
+                  <TableRow key={aca.id} className="hover:bg-muted/50 transition-colors h-11">
+                    <TableCell className="font-medium py-1.5 px-2 text-sm overflow-hidden text-ellipsis whitespace-nowrap align-middle">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Badge variant="secondary" className="font-mono text-xs cursor-default">
+                            {aca.codigo}
+                          </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" align="start" className="text-xs">
+                          <p>{aca.codigo}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TableCell>
+                    <TableCell className="py-1.5 px-2 overflow-hidden align-middle">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="w-full flex items-center">
+                            <span
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-[12px] text-xs font-medium border border-black/10 shadow-sm max-w-full truncate cursor-default"
+                              style={{ backgroundColor: bgColor, color: textColor }}
+                            >
+                              <span className="truncate text-left">{aca.nome_pt}</span>
+                            </span>
+                          </div>
+                        </TooltipTrigger>
+                        {aca.nome_pt && (
+                          <TooltipContent
+                            side="bottom"
+                            align="start"
+                            className="max-w-xs break-words text-xs"
+                          >
+                            <p>{aca.nome_pt}</p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TableCell>
+                    <TableCell className="py-1.5 px-2 text-sm overflow-hidden text-ellipsis whitespace-nowrap align-middle">
+                      {aca.nome_en ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="truncate cursor-default">
+                              <span
+                                className="inline-flex items-center px-2.5 py-0.5 rounded-[12px] text-xs font-medium border border-black/10 shadow-sm max-w-full truncate opacity-90"
+                                style={{ backgroundColor: bgColor, color: textColor }}
+                              >
+                                <span className="truncate text-left">{aca.nome_en}</span>
+                              </span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent
+                            side="bottom"
+                            align="start"
+                            className="max-w-xs break-words text-xs"
+                          >
+                            <p>{aca.nome_en}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="py-1.5 px-2 text-sm text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap align-middle">
+                      {aca.created ? new Date(aca.created).toLocaleDateString('pt-BR') : '-'}
+                    </TableCell>
+                    <TableCell className="py-1.5 px-2 text-right align-middle">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => {
+                          setEditData(aca)
+                          setModalOpen(true)
+                        }}
+                        title="Editar Acabamento"
                       >
-                        {aca.nome_en}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        setEditData(aca)
-                        setModalOpen(true)
-                      }}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {filteredAcabamentos.length === 0 && (
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+              {sortedAcabamentos.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                     Nenhum acabamento encontrado.
                   </TableCell>
                 </TableRow>
