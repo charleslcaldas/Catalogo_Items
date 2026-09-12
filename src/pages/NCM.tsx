@@ -11,11 +11,23 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useData } from '@/contexts/data-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, Pencil, Search, History, UploadCloud, Download } from 'lucide-react'
+import {
+  Plus,
+  Pencil,
+  Search,
+  History,
+  UploadCloud,
+  Download,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+} from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { NcmModal } from '@/components/MetadataModals'
 import { NcmHistoryModal } from '@/components/NcmHistoryModal'
 import { NcmImportModal } from '@/components/NcmImportModal'
+
+type SortField = 'codigo' | 'itens' | 'ii' | 'ipi' | 'pis' | 'cofins' | 'observacoes'
 
 export default function NCMPage() {
   const { ncms, itens } = useData()
@@ -26,6 +38,31 @@ export default function NCMPage() {
   const [historyNcmId, setHistoryNcmId] = useState<string | null>(null)
   const [editData, setEditData] = useState<any>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [sortField, setSortField] = useState<SortField | null>('codigo')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      if (sortOrder === 'asc') {
+        setSortOrder('desc')
+      } else {
+        setSortOrder('asc')
+      }
+    } else {
+      setSortField(field)
+      setSortOrder('asc')
+    }
+  }
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field)
+      return <ArrowUpDown className="ml-1.5 h-3.5 w-3.5 opacity-50 inline-block" />
+    return sortOrder === 'asc' ? (
+      <ArrowUp className="ml-1.5 h-3.5 w-3.5 inline-block text-primary" />
+    ) : (
+      <ArrowDown className="ml-1.5 h-3.5 w-3.5 inline-block text-primary" />
+    )
+  }
 
   const filteredNcms = ncms.filter((n) => {
     const term = searchTerm.toLowerCase()
@@ -33,6 +70,41 @@ export default function NCMPage() {
       n.codigo.toLowerCase().includes(term) ||
       (n.observacoes && n.observacoes.toLowerCase().includes(term))
     )
+  })
+
+  const sortedNcms = [...filteredNcms].sort((a, b) => {
+    if (!sortField) return 0
+
+    if (sortField === 'itens') {
+      const countA = itens.filter((i) => i.ncm_id === a.id).length
+      const countB = itens.filter((i) => i.ncm_id === b.id).length
+      return sortOrder === 'asc' ? countA - countB : countB - countA
+    }
+
+    if (
+      sortField === 'ii' ||
+      sortField === 'ipi' ||
+      sortField === 'pis' ||
+      sortField === 'cofins'
+    ) {
+      const valA = a[sortField] ?? 0
+      const valB = b[sortField] ?? 0
+      return sortOrder === 'asc' ? valA - valB : valB - valA
+    }
+
+    let valA = ''
+    let valB = ''
+
+    if (sortField === 'codigo') {
+      valA = a.codigo || ''
+      valB = b.codigo || ''
+    } else if (sortField === 'observacoes') {
+      valA = a.observacoes || ''
+      valB = b.observacoes || ''
+    }
+
+    const comparison = valA.localeCompare(valB, 'pt-BR', { sensitivity: 'base' })
+    return sortOrder === 'asc' ? comparison : -comparison
   })
 
   const handleExport = () => {
@@ -112,18 +184,53 @@ export default function NCMPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Código NCM</TableHead>
-                <TableHead className="text-right">Itens Associados</TableHead>
-                <TableHead className="text-right">II (%)</TableHead>
-                <TableHead className="text-right">IPI (%)</TableHead>
-                <TableHead className="text-right">PIS (%)</TableHead>
-                <TableHead className="text-right">COFINS (%)</TableHead>
-                <TableHead>Observações</TableHead>
+                <TableHead
+                  className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                  onClick={() => handleSort('codigo')}
+                >
+                  Código NCM <SortIcon field="codigo" />
+                </TableHead>
+                <TableHead
+                  className="text-right cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                  onClick={() => handleSort('itens')}
+                >
+                  Itens Associados <SortIcon field="itens" />
+                </TableHead>
+                <TableHead
+                  className="text-right cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                  onClick={() => handleSort('ii')}
+                >
+                  II (%) <SortIcon field="ii" />
+                </TableHead>
+                <TableHead
+                  className="text-right cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                  onClick={() => handleSort('ipi')}
+                >
+                  IPI (%) <SortIcon field="ipi" />
+                </TableHead>
+                <TableHead
+                  className="text-right cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                  onClick={() => handleSort('pis')}
+                >
+                  PIS (%) <SortIcon field="pis" />
+                </TableHead>
+                <TableHead
+                  className="text-right cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                  onClick={() => handleSort('cofins')}
+                >
+                  COFINS (%) <SortIcon field="cofins" />
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                  onClick={() => handleSort('observacoes')}
+                >
+                  Observações <SortIcon field="observacoes" />
+                </TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredNcms.map((ncm) => {
+              {sortedNcms.map((ncm) => {
                 const associatedCount = itens.filter((i) => i.ncm_id === ncm.id).length
                 return (
                   <TableRow key={ncm.id}>
@@ -179,7 +286,7 @@ export default function NCMPage() {
                   </TableRow>
                 )
               })}
-              {filteredNcms.length === 0 && (
+              {sortedNcms.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     Nenhum NCM encontrado.
