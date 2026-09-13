@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { TabsContent } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { useData } from '@/contexts/data-context'
 import type { Item } from '@/types'
@@ -19,24 +19,16 @@ import {
   Copy,
   ImageIcon,
   History as HistoryIcon,
-  Activity,
   Edit2,
   Sparkles,
   RefreshCcw,
-  LineChart,
+  AlertCircle,
 } from 'lucide-react'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { toast } from 'sonner'
 import pb from '@/lib/pocketbase/client'
 import { getItemImageUrl } from '@/lib/item-image'
 import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Label } from '@/components/ui/label'
 import { GalleryModal } from './GalleryModal'
 import { CategoryModal, LineModal } from '@/components/MetadataModals'
@@ -47,6 +39,13 @@ import { PriceInput } from '@/components/PriceInput'
 import { useAtributosLinha } from '@/hooks/use-atributos-linha'
 import { extractFieldErrors, getErrorMessage } from '@/lib/pocketbase/errors'
 import { useRealtime } from '@/hooks/use-realtime'
+import { ItemDomainTabs } from './components/ItemDomainTabs'
+import { ItemPartnersTab } from './components/ItemPartnersTab'
+import { ItemCommercialTab } from './components/ItemCommercialTab'
+import { ItemDocumentsApplicationsTab } from './components/ItemDocumentsApplicationsTab'
+import { ItemC2DataTabs } from './components/ItemC2DataTabs'
+import { selectLatestLegacyCostReference } from '@/lib/item-intelligence/commercial-events'
+import { useItemDetailReadData } from './use-item-detail-read-data'
 
 function Field({
   label,
@@ -78,9 +77,17 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
   const [formData, setFormData] = useState<Partial<Item>>({})
   const [galleryOpen, setGalleryOpen] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
-  const [transactions, setTransactions] = useState<any[]>([])
   const [isEditing, setIsEditing] = useState(false)
-  const [priceHistory, setPriceHistory] = useState<any[]>([])
+  const {
+    transactions,
+    priceHistory,
+    commercialEvents,
+    clientLinks,
+    supplierLinks,
+    documentLinks,
+    readError,
+    refreshCommercialHistory,
+  } = useItemDetailReadData(item?.id)
 
   const [catModalOpen, setCatModalOpen] = useState(false)
   const [lineModalOpen, setLineModalOpen] = useState(false)
@@ -93,6 +100,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
 
   useEffect(() => {
     if (!isEditing) return
+    let active = true
 
     const translate = async (
       text: string,
@@ -117,7 +125,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
             target: 'en',
           }),
         })
-        if (res.text) {
+        if (res.text && active) {
           setFormData((prev) => ({ ...prev, [targetField]: res.text }))
           ref.current = text
         }
@@ -141,20 +149,11 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
       }
     }, 800)
 
-    return () => clearTimeout(timer)
-  }, [formData.informacao_extra, formData.descricao_extra, isEditing])
-
-  const fetchPriceHistory = async (itemId: string) => {
-    try {
-      const res = await pb.collection('historico_precos').getList(1, 50, {
-        filter: `item_id="${itemId}"`,
-        sort: '-data_cotacao',
-      })
-      setPriceHistory(res.items)
-    } catch (err) {
-      console.error('Failed to fetch price history', err)
+    return () => {
+      active = false
+      clearTimeout(timer)
     }
-  }
+  }, [formData.informacao_extra, formData.descricao_extra, isEditing, item?.id])
 
   useEffect(() => {
     if (item) {
@@ -162,20 +161,11 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
       lastTranslatedInfoExtra.current = item.informacao_extra
       lastTranslatedDescExtra.current = item.descricao_extra
       const linha = linhas.find((l) => l.id === item.linha_id)
-      if (linha) setSelectedCategoryId(linha.categoria_id)
+      setSelectedCategoryId(linha?.categoria_id || '')
       setIsEditing(false)
-
-      pb.collection('potencial_itens')
-        .getList(1, 20, { filter: `item_id="${item.id}"`, expand: 'potencial_id' })
-        .then((res) => setTransactions(res.items))
-        .catch(() => {})
-
-      fetchPriceHistory(item.id)
     } else {
       setFormData({ ativo: true, sincronizado_com_zoho: false })
       setSelectedCategoryId('')
-      setTransactions([])
-      setPriceHistory([])
       setIsEditing(true)
     }
   }, [item, linhas])
@@ -184,7 +174,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
     'historico_precos',
     (e) => {
       if (e.record.item_id === item?.id) {
-        fetchPriceHistory(item.id)
+        void refreshCommercialHistory()
       }
     },
     !!item?.id,
@@ -454,7 +444,7 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
 
   const confTamanho = getFieldConfig('tamanho', 'Tamanho', 'Size')
 
-  const latestHist = priceHistory.length > 0 ? priceHistory[0] : null
+  const latestHist = selectLatestLegacyCostReference(priceHistory)
   const displayPrecoCompra = !isEditing && latestHist ? latestHist.preco : formData.preco_compra
   const displayFornecedor =
     !isEditing && latestHist ? latestHist.fornecedor : formData.fornecedor_ultima_atualizacao
@@ -623,806 +613,725 @@ export function ItemDetailPanel({ item, onClose }: { item?: Item; onClose: () =>
         </div>
       </div>
 
-      <Tabs defaultValue="pt" className="flex flex-col flex-1 bg-muted/10">
-        <div className="px-4 pt-3 shrink-0 z-10 flex flex-col gap-3">
-          <TabsList className="flex w-full bg-muted border-border p-1 h-auto rounded-full justify-start overflow-x-auto gap-1">
-            <TabsTrigger
-              value="pt"
-              className="rounded-full px-4 py-1 text-xs transition-all font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
-            >
-              Português
-            </TabsTrigger>
-            <TabsTrigger
-              value="en"
-              className="rounded-full px-4 py-1 text-xs transition-all font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
-            >
-              Inglês
-            </TabsTrigger>
-            <TabsTrigger
-              value="transactions"
-              className="rounded-full px-4 py-1 text-xs transition-all font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
-            >
-              Transações
-            </TabsTrigger>
-            <TabsTrigger
-              value="prices"
-              className="rounded-full px-4 py-1 text-xs transition-all font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
-            >
-              Histórico de Preços
-            </TabsTrigger>
-            <TabsTrigger
-              value="history"
-              className="rounded-full px-4 py-1 text-xs transition-all font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
-            >
-              Histórico
-            </TabsTrigger>
-          </TabsList>
-        </div>
+      {readError && (
+        <Alert variant="destructive" className="mx-3 mt-3 shrink-0">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{readError} Tente novamente.</AlertDescription>
+        </Alert>
+      )}
 
-        <div className="p-4 flex-1">
-          <TabsContent value="pt" className="m-0 space-y-4 animate-fade-in-up">
-            <div className="bg-card border rounded-lg p-4 shadow-sm flex flex-col gap-3">
-              <h4 className="font-semibold text-xs border-b pb-1 mb-1">Geral & Atributos</h4>
+      <ItemDomainTabs
+        dataContent={
+          <ItemC2DataTabs>
+            <TabsContent value="pt" className="m-0 space-y-4 animate-fade-in-up">
+              <div className="bg-card border rounded-lg p-4 shadow-sm flex flex-col gap-3">
+                <h4 className="font-semibold text-xs border-b pb-1 mb-1">Geral & Atributos</h4>
 
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <Field label="Descrição Base (Auto/Manual)" className="md:col-span-9">
-                  <div className="flex gap-2">
-                    <div className={cn('flex-1', !isEditing && 'pointer-events-none opacity-80')}>
-                      <SearchableSelect
-                        options={descBaseOptions}
-                        value={formData.descricao_base_id}
-                        onChange={(v) => {
-                          const desc = descricoesBase.find((d) => d.id === v)
-                          if (desc) {
-                            setFormData((f) => ({
-                              ...f,
-                              descricao_base_id: v,
-                              descricao_base_pt: desc.nome_pt,
-                              descricao_base_en: desc.nome_en,
-                              ...(desc.linha_id ? { linha_id: desc.linha_id } : {}),
-                              ...(desc.ncm_id ? { ncm_id: desc.ncm_id } : {}),
-                            }))
-                            if (desc.linha_id) {
-                              const linha = linhas.find((l) => l.id === desc.linha_id)
-                              if (linha) setSelectedCategoryId(linha.categoria_id)
-                            } else if (desc.categoria_id) {
-                              setSelectedCategoryId(desc.categoria_id)
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                  <Field label="Descrição Base (Auto/Manual)" className="md:col-span-9">
+                    <div className="flex gap-2">
+                      <div className={cn('flex-1', !isEditing && 'pointer-events-none opacity-80')}>
+                        <SearchableSelect
+                          options={descBaseOptions}
+                          value={formData.descricao_base_id}
+                          onChange={(v) => {
+                            const desc = descricoesBase.find((d) => d.id === v)
+                            if (desc) {
+                              setFormData((f) => ({
+                                ...f,
+                                descricao_base_id: v,
+                                descricao_base_pt: desc.nome_pt,
+                                descricao_base_en: desc.nome_en,
+                                ...(desc.linha_id ? { linha_id: desc.linha_id } : {}),
+                                ...(desc.ncm_id ? { ncm_id: desc.ncm_id } : {}),
+                              }))
+                              if (desc.linha_id) {
+                                const linha = linhas.find((l) => l.id === desc.linha_id)
+                                if (linha) setSelectedCategoryId(linha.categoria_id)
+                              } else if (desc.categoria_id) {
+                                setSelectedCategoryId(desc.categoria_id)
+                              }
                             }
-                          }
-                        }}
-                        onAddNew={() => setNewDescBaseModalOpen(true)}
+                          }}
+                          onAddNew={() => setNewDescBaseModalOpen(true)}
+                        />
+                      </div>
+                      <Input
+                        className="h-8 text-xs w-[140px] shrink-0"
+                        placeholder="Sobrescrever..."
+                        disabled={!isEditing}
+                        value={formData.descricao_base_pt || ''}
+                        onChange={(e) =>
+                          setFormData({ ...formData, descricao_base_pt: e.target.value })
+                        }
                       />
                     </div>
-                    <Input
-                      className="h-8 text-xs w-[140px] shrink-0"
-                      placeholder="Sobrescrever..."
-                      disabled={!isEditing}
-                      value={formData.descricao_base_pt || ''}
-                      onChange={(e) =>
-                        setFormData({ ...formData, descricao_base_pt: e.target.value })
-                      }
-                    />
-                  </div>
-                </Field>
-                {confTamanho.isVisible && (
-                  <Field label={confTamanho.labelPt} className="md:col-span-3">
-                    <Input
-                      className="h-8 text-xs"
-                      disabled={!isEditing}
-                      value={formData.tamanho || ''}
-                      onChange={(e) => setFormData({ ...formData, tamanho: e.target.value })}
-                    />
                   </Field>
-                )}
-              </div>
+                  {confTamanho.isVisible && (
+                    <Field label={confTamanho.labelPt} className="md:col-span-3">
+                      <Input
+                        className="h-8 text-xs"
+                        disabled={!isEditing}
+                        value={formData.tamanho || ''}
+                        onChange={(e) => setFormData({ ...formData, tamanho: e.target.value })}
+                      />
+                    </Field>
+                  )}
+                </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <Field label="Acabamento" className="md:col-span-3">
-                  <div className={cn(!isEditing && 'pointer-events-none opacity-80')}>
-                    <SearchableSelect
-                      options={acabamentoOptions}
-                      value={formData.acabamento_id}
-                      onChange={(v) => setFormData((f) => ({ ...f, acabamento_id: v }))}
-                    />
-                  </div>
-                </Field>
-                <Field label="SKU" className="md:col-span-3">
-                  <Input
-                    className="h-8 text-xs"
-                    disabled={!isEditing}
-                    value={formData.sku || ''}
-                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                  />
-                </Field>
-                {confGrau.isVisible && (
-                  <Field label={confGrau.labelPt} className="md:col-span-3">
-                    <Input
-                      className="h-8 text-xs"
-                      disabled={!isEditing}
-                      value={formData.grau || ''}
-                      onChange={(e) => setFormData({ ...formData, grau: e.target.value })}
-                    />
-                  </Field>
-                )}
-                {confNorma.isVisible && (
-                  <Field label={confNorma.labelPt} className="md:col-span-3">
-                    <Input
-                      className="h-8 text-xs"
-                      disabled={!isEditing}
-                      value={formData.norma || ''}
-                      onChange={(e) => setFormData({ ...formData, norma: e.target.value })}
-                    />
-                  </Field>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                {confTipoRosca.isVisible && (
-                  <Field label={confTipoRosca.labelPt} className="md:col-span-2">
-                    <Input
-                      className="h-8 text-xs"
-                      disabled={!isEditing}
-                      value={formData.tipo_rosca || ''}
-                      onChange={(e) => setFormData({ ...formData, tipo_rosca: e.target.value })}
-                    />
-                  </Field>
-                )}
-                {confCompRosca.isVisible && (
-                  <Field label={confCompRosca.labelPt} className="md:col-span-2">
-                    <Input
-                      className="h-8 text-xs"
-                      disabled={!isEditing}
-                      value={formData.comprimento_rosca || ''}
-                      onChange={(e) =>
-                        setFormData({ ...formData, comprimento_rosca: e.target.value })
-                      }
-                    />
-                  </Field>
-                )}
-                <Field label="Categoria" className="md:col-span-3">
-                  <div className={cn(!isEditing && 'pointer-events-none opacity-80')}>
-                    <SearchableSelect
-                      options={categoryOptions}
-                      value={selectedCategoryId}
-                      onChange={(v) => {
-                        setSelectedCategoryId(v)
-                        setFormData((f) => ({ ...f, linha_id: '' }))
-                      }}
-                      onAddNew={() => setCatModalOpen(true)}
-                    />
-                  </div>
-                </Field>
-                <Field label="Linha" className="md:col-span-3">
-                  <div className={cn(!isEditing && 'pointer-events-none opacity-80')}>
-                    <SearchableSelect
-                      options={lineOptions}
-                      value={formData.linha_id}
-                      onChange={(v) => setFormData((f) => ({ ...f, linha_id: v }))}
-                      onAddNew={() => setLineModalOpen(true)}
-                    />
-                  </div>
-                </Field>
-                <Field label="Status" className="md:col-span-2">
-                  <div className="flex items-center gap-2 h-8">
-                    <Switch
-                      checked={formData.ativo ?? true}
-                      disabled={!isEditing}
-                      onCheckedChange={(c) => setFormData({ ...formData, ativo: c })}
-                    />
-                    <span className="text-xs font-medium">
-                      {formData.ativo !== false ? 'Ativo' : 'Inativo'}
-                    </span>
-                  </div>
-                </Field>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <Field label="Unid. Medida" className="md:col-span-3">
-                  <Select
-                    value={formData.unidade_id || ''}
-                    disabled={!isEditing}
-                    onValueChange={(v) => setFormData((f) => ({ ...f, unidade_id: v }))}
-                  >
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {unidadesMedida.map((u) => (
-                        <SelectItem key={u.id} value={u.id} className="text-xs">
-                          {u.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field label="NCM (Seletor)" className="md:col-span-9">
-                  <div className={cn(!isEditing && 'pointer-events-none opacity-80')}>
-                    <SearchableSelect
-                      options={ncmOptions}
-                      value={formData.ncm_id}
-                      onChange={(v) => setFormData((f) => ({ ...f, ncm_id: v }))}
-                    />
-                  </div>
-                </Field>
-              </div>
-            </div>
-
-            <div className="bg-card border rounded-lg p-4 shadow-sm flex flex-col gap-3">
-              <h4 className="font-semibold text-xs border-b pb-1 mb-1">Preço e Texto</h4>
-
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <Field label="Último Preço (Compra)" className="md:col-span-3">
-                  <PriceInput
-                    disabled={!isEditing}
-                    value={displayPrecoCompra}
-                    onChange={(val) => setFormData({ ...formData, preco_compra: val })}
-                  />
-                </Field>
-                <Field label="Último Fornecedor" className="md:col-span-3">
-                  <Input
-                    className="h-8 text-xs"
-                    disabled={!isEditing}
-                    value={displayFornecedor || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, fornecedor_ultima_atualizacao: e.target.value })
-                    }
-                  />
-                </Field>
-                <Field label="Data do Preço" className="md:col-span-3">
-                  <Input
-                    type="date"
-                    className="h-8 text-xs"
-                    disabled={!isEditing}
-                    value={displayDataAtualizacao ? displayDataAtualizacao.substring(0, 10) : ''}
-                    onChange={(e) => setFormData({ ...formData, data_atualizacao: e.target.value })}
-                  />
-                </Field>
-                <Field label="Preço Venda" className="md:col-span-3">
-                  <PriceInput
-                    disabled={!isEditing}
-                    value={formData.preco_venda}
-                    onChange={(val) => setFormData({ ...formData, preco_venda: val })}
-                  />
-                </Field>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <Field label="Descrição Curta (PT) (Auto/Manual)" className="md:col-span-12">
-                  <Input
-                    className="h-8 text-xs font-medium"
-                    disabled={!isEditing}
-                    placeholder="Gerado automaticamente..."
-                    value={formData.descricao_curta || ''}
-                    onChange={(e) => setFormData({ ...formData, descricao_curta: e.target.value })}
-                  />
-                </Field>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <Field label="Informação Extra (PT)" className="md:col-span-6">
-                  <Textarea
-                    className="min-h-[50px] resize-y text-xs"
-                    disabled={!isEditing}
-                    value={formData.informacao_extra || ''}
-                    onChange={(e) => setFormData({ ...formData, informacao_extra: e.target.value })}
-                  />
-                </Field>
-                <Field label="Descrição Extra (PT)" className="md:col-span-6">
-                  <Textarea
-                    className="min-h-[50px] resize-y text-xs"
-                    disabled={!isEditing}
-                    value={formData.descricao_extra || ''}
-                    onChange={(e) => setFormData({ ...formData, descricao_extra: e.target.value })}
-                  />
-                </Field>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 opacity-80 pointer-events-none select-none">
-                <Field label="NCM" className="md:col-span-2">
-                  <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.codigo || ''} />
-                </Field>
-                <Field label="II" className="md:col-span-2">
-                  <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.ii ?? ''} />
-                </Field>
-                <Field label="IPI" className="md:col-span-2">
-                  <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.ipi ?? ''} />
-                </Field>
-                <Field label="PIS" className="md:col-span-2">
-                  <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.pis ?? ''} />
-                </Field>
-                <Field label="COFINS" className="md:col-span-2">
-                  <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.cofins ?? ''} />
-                </Field>
-                <Field label="Observações" className="md:col-span-2">
-                  <Input
-                    className="h-8 text-xs bg-muted"
-                    disabled
-                    value={ncmObj?.observacoes || ''}
-                    title={ncmObj?.observacoes || ''}
-                  />
-                </Field>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <Field label="Descrição Completa (PT)" className="md:col-span-12">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-[10px] text-muted-foreground opacity-70">
-                      Pode ser editada manualmente ou gerada com IA baseada nos atributos.
-                    </span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleAIGenerate}
-                      disabled={!isEditing}
-                      className="h-6 text-[10px] px-2"
-                    >
-                      <Sparkles className="w-3 h-3 mr-1 text-blue-500" /> Gerar IA
-                    </Button>
-                  </div>
-                  <Textarea
-                    className="min-h-[50px] resize-y text-xs font-medium"
-                    disabled={!isEditing}
-                    value={formData.descr_pt || ''}
-                    onChange={(e) => setFormData({ ...formData, descr_pt: e.target.value })}
-                  />
-                </Field>
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="en" className="m-0 space-y-4 animate-fade-in-up">
-            <div className="bg-card border rounded-lg p-4 shadow-sm flex flex-col gap-3">
-              <h4 className="font-semibold text-xs border-b pb-1 mb-1">Geral & Atributos (EN)</h4>
-
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <Field label="Base Description (EN)" className="md:col-span-9">
-                  <div className="flex gap-2">
-                    <div className={cn('flex-1', !isEditing && 'pointer-events-none opacity-80')}>
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                  <Field label="Acabamento" className="md:col-span-3">
+                    <div className={cn(!isEditing && 'pointer-events-none opacity-80')}>
                       <SearchableSelect
-                        options={descBaseOptions.map((o) => {
-                          const desc = descricoesBase.find((d) => d.id === o.value)
-                          return { ...o, label: desc?.nome_en || desc?.nome_pt || '' }
+                        options={acabamentoOptions}
+                        value={formData.acabamento_id}
+                        onChange={(v) => setFormData((f) => ({ ...f, acabamento_id: v }))}
+                      />
+                    </div>
+                  </Field>
+                  <Field label="SKU" className="md:col-span-3">
+                    <Input
+                      className="h-8 text-xs"
+                      disabled={!isEditing}
+                      value={formData.sku || ''}
+                      onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                    />
+                  </Field>
+                  {confGrau.isVisible && (
+                    <Field label={confGrau.labelPt} className="md:col-span-3">
+                      <Input
+                        className="h-8 text-xs"
+                        disabled={!isEditing}
+                        value={formData.grau || ''}
+                        onChange={(e) => setFormData({ ...formData, grau: e.target.value })}
+                      />
+                    </Field>
+                  )}
+                  {confNorma.isVisible && (
+                    <Field label={confNorma.labelPt} className="md:col-span-3">
+                      <Input
+                        className="h-8 text-xs"
+                        disabled={!isEditing}
+                        value={formData.norma || ''}
+                        onChange={(e) => setFormData({ ...formData, norma: e.target.value })}
+                      />
+                    </Field>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                  {confTipoRosca.isVisible && (
+                    <Field label={confTipoRosca.labelPt} className="md:col-span-2">
+                      <Input
+                        className="h-8 text-xs"
+                        disabled={!isEditing}
+                        value={formData.tipo_rosca || ''}
+                        onChange={(e) => setFormData({ ...formData, tipo_rosca: e.target.value })}
+                      />
+                    </Field>
+                  )}
+                  {confCompRosca.isVisible && (
+                    <Field label={confCompRosca.labelPt} className="md:col-span-2">
+                      <Input
+                        className="h-8 text-xs"
+                        disabled={!isEditing}
+                        value={formData.comprimento_rosca || ''}
+                        onChange={(e) =>
+                          setFormData({ ...formData, comprimento_rosca: e.target.value })
+                        }
+                      />
+                    </Field>
+                  )}
+                  <Field label="Categoria" className="md:col-span-3">
+                    <div className={cn(!isEditing && 'pointer-events-none opacity-80')}>
+                      <SearchableSelect
+                        options={categoryOptions}
+                        value={selectedCategoryId}
+                        onChange={(v) => {
+                          setSelectedCategoryId(v)
+                          setFormData((f) => ({ ...f, linha_id: '' }))
+                        }}
+                        onAddNew={() => setCatModalOpen(true)}
+                      />
+                    </div>
+                  </Field>
+                  <Field label="Linha" className="md:col-span-3">
+                    <div className={cn(!isEditing && 'pointer-events-none opacity-80')}>
+                      <SearchableSelect
+                        options={lineOptions}
+                        value={formData.linha_id}
+                        onChange={(v) => setFormData((f) => ({ ...f, linha_id: v }))}
+                        onAddNew={() => setLineModalOpen(true)}
+                      />
+                    </div>
+                  </Field>
+                  <Field label="Status" className="md:col-span-2">
+                    <div className="flex items-center gap-2 h-8">
+                      <Switch
+                        checked={formData.ativo ?? true}
+                        disabled={!isEditing}
+                        onCheckedChange={(c) => setFormData({ ...formData, ativo: c })}
+                      />
+                      <span className="text-xs font-medium">
+                        {formData.ativo !== false ? 'Ativo' : 'Inativo'}
+                      </span>
+                    </div>
+                  </Field>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                  <Field label="Unid. Medida" className="md:col-span-3">
+                    <Select
+                      value={formData.unidade_id || ''}
+                      disabled={!isEditing}
+                      onValueChange={(v) => setFormData((f) => ({ ...f, unidade_id: v }))}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {unidadesMedida.map((u) => (
+                          <SelectItem key={u.id} value={u.id} className="text-xs">
+                            {u.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field label="NCM (Seletor)" className="md:col-span-9">
+                    <div className={cn(!isEditing && 'pointer-events-none opacity-80')}>
+                      <SearchableSelect
+                        options={ncmOptions}
+                        value={formData.ncm_id}
+                        onChange={(v) => setFormData((f) => ({ ...f, ncm_id: v }))}
+                      />
+                    </div>
+                  </Field>
+                </div>
+              </div>
+
+              <div className="bg-card border rounded-lg p-4 shadow-sm flex flex-col gap-3">
+                <h4 className="font-semibold text-xs border-b pb-1 mb-1">Preço e Texto</h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                  <Field label="Referência de custo legada" className="md:col-span-3">
+                    <PriceInput
+                      disabled={!isEditing}
+                      value={displayPrecoCompra}
+                      onChange={(val) => setFormData({ ...formData, preco_compra: val })}
+                    />
+                  </Field>
+                  <Field label="Último Fornecedor" className="md:col-span-3">
+                    <Input
+                      className="h-8 text-xs"
+                      disabled={!isEditing}
+                      value={displayFornecedor || ''}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          fornecedor_ultima_atualizacao: e.target.value,
+                        })
+                      }
+                    />
+                  </Field>
+                  <Field label="Data do Preço" className="md:col-span-3">
+                    <Input
+                      type="date"
+                      className="h-8 text-xs"
+                      disabled={!isEditing}
+                      value={displayDataAtualizacao ? displayDataAtualizacao.substring(0, 10) : ''}
+                      onChange={(e) =>
+                        setFormData({ ...formData, data_atualizacao: e.target.value })
+                      }
+                    />
+                  </Field>
+                  <Field label="Preço Venda" className="md:col-span-3">
+                    <PriceInput
+                      disabled={!isEditing}
+                      value={formData.preco_venda}
+                      onChange={(val) => setFormData({ ...formData, preco_venda: val })}
+                    />
+                  </Field>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                  <Field label="Descrição Curta (PT) (Auto/Manual)" className="md:col-span-12">
+                    <Input
+                      className="h-8 text-xs font-medium"
+                      disabled={!isEditing}
+                      placeholder="Gerado automaticamente..."
+                      value={formData.descricao_curta || ''}
+                      onChange={(e) =>
+                        setFormData({ ...formData, descricao_curta: e.target.value })
+                      }
+                    />
+                  </Field>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                  <Field label="Informação Extra (PT)" className="md:col-span-6">
+                    <Textarea
+                      className="min-h-[50px] resize-y text-xs"
+                      disabled={!isEditing}
+                      value={formData.informacao_extra || ''}
+                      onChange={(e) =>
+                        setFormData({ ...formData, informacao_extra: e.target.value })
+                      }
+                    />
+                  </Field>
+                  <Field label="Descrição Extra (PT)" className="md:col-span-6">
+                    <Textarea
+                      className="min-h-[50px] resize-y text-xs"
+                      disabled={!isEditing}
+                      value={formData.descricao_extra || ''}
+                      onChange={(e) =>
+                        setFormData({ ...formData, descricao_extra: e.target.value })
+                      }
+                    />
+                  </Field>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 opacity-80 pointer-events-none select-none">
+                  <Field label="NCM" className="md:col-span-2">
+                    <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.codigo || ''} />
+                  </Field>
+                  <Field label="II" className="md:col-span-2">
+                    <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.ii ?? ''} />
+                  </Field>
+                  <Field label="IPI" className="md:col-span-2">
+                    <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.ipi ?? ''} />
+                  </Field>
+                  <Field label="PIS" className="md:col-span-2">
+                    <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.pis ?? ''} />
+                  </Field>
+                  <Field label="COFINS" className="md:col-span-2">
+                    <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.cofins ?? ''} />
+                  </Field>
+                  <Field label="Observações" className="md:col-span-2">
+                    <Input
+                      className="h-8 text-xs bg-muted"
+                      disabled
+                      value={ncmObj?.observacoes || ''}
+                      title={ncmObj?.observacoes || ''}
+                    />
+                  </Field>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                  <Field label="Descrição Completa (PT)" className="md:col-span-12">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-[10px] text-muted-foreground opacity-70">
+                        Pode ser editada manualmente ou gerada com IA baseada nos atributos.
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleAIGenerate}
+                        disabled={!isEditing}
+                        className="h-6 text-[10px] px-2"
+                      >
+                        <Sparkles className="w-3 h-3 mr-1 text-blue-500" /> Gerar IA
+                      </Button>
+                    </div>
+                    <Textarea
+                      className="min-h-[50px] resize-y text-xs font-medium"
+                      disabled={!isEditing}
+                      value={formData.descr_pt || ''}
+                      onChange={(e) => setFormData({ ...formData, descr_pt: e.target.value })}
+                    />
+                  </Field>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="en" className="m-0 space-y-4 animate-fade-in-up">
+              <div className="bg-card border rounded-lg p-4 shadow-sm flex flex-col gap-3">
+                <h4 className="font-semibold text-xs border-b pb-1 mb-1">Geral & Atributos (EN)</h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                  <Field label="Base Description (EN)" className="md:col-span-9">
+                    <div className="flex gap-2">
+                      <div className={cn('flex-1', !isEditing && 'pointer-events-none opacity-80')}>
+                        <SearchableSelect
+                          options={descBaseOptions.map((o) => {
+                            const desc = descricoesBase.find((d) => d.id === o.value)
+                            return { ...o, label: desc?.nome_en || desc?.nome_pt || '' }
+                          })}
+                          value={formData.descricao_base_id}
+                          onChange={(v) => {
+                            const desc = descricoesBase.find((d) => d.id === v)
+                            if (desc) {
+                              setFormData((f) => ({
+                                ...f,
+                                descricao_base_id: v,
+                                descricao_base_pt: desc.nome_pt,
+                                descricao_base_en: desc.nome_en,
+                                ...(desc.linha_id ? { linha_id: desc.linha_id } : {}),
+                                ...(desc.ncm_id ? { ncm_id: desc.ncm_id } : {}),
+                              }))
+                              if (desc.linha_id) {
+                                const linha = linhas.find((l) => l.id === desc.linha_id)
+                                if (linha) setSelectedCategoryId(linha.categoria_id)
+                              } else if (desc.categoria_id) {
+                                setSelectedCategoryId(desc.categoria_id)
+                              }
+                            }
+                          }}
+                          onAddNew={() => setNewDescBaseModalOpen(true)}
+                        />
+                      </div>
+                      <Input
+                        className="h-8 text-xs w-[140px] shrink-0"
+                        placeholder="Override text..."
+                        disabled={!isEditing}
+                        value={formData.descricao_base_en || ''}
+                        onChange={(e) =>
+                          setFormData({ ...formData, descricao_base_en: e.target.value })
+                        }
+                      />
+                    </div>
+                  </Field>
+                  {confTamanho.isVisible && (
+                    <Field label={confTamanho.labelEn} className="md:col-span-3">
+                      <Input
+                        className="h-8 text-xs"
+                        disabled={!isEditing}
+                        value={formData.tamanho || ''}
+                        onChange={(e) => setFormData({ ...formData, tamanho: e.target.value })}
+                      />
+                    </Field>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                  <Field label="Finish (EN)" className="md:col-span-3">
+                    <div className={cn(!isEditing && 'pointer-events-none opacity-80')}>
+                      <SearchableSelect
+                        options={acabamentoOptions.map((o) => {
+                          const ac = acabamentos.find((a) => a.id === o.value)
+                          return { ...o, label: ac?.nome_en || ac?.nome_pt || '' }
                         })}
-                        value={formData.descricao_base_id}
-                        onChange={(v) => {
-                          const desc = descricoesBase.find((d) => d.id === v)
-                          if (desc) {
-                            setFormData((f) => ({
-                              ...f,
-                              descricao_base_id: v,
-                              descricao_base_pt: desc.nome_pt,
-                              descricao_base_en: desc.nome_en,
-                              ...(desc.linha_id ? { linha_id: desc.linha_id } : {}),
-                              ...(desc.ncm_id ? { ncm_id: desc.ncm_id } : {}),
-                            }))
-                            if (desc.linha_id) {
-                              const linha = linhas.find((l) => l.id === desc.linha_id)
-                              if (linha) setSelectedCategoryId(linha.categoria_id)
-                            } else if (desc.categoria_id) {
-                              setSelectedCategoryId(desc.categoria_id)
-                            }
-                          }
-                        }}
-                        onAddNew={() => setNewDescBaseModalOpen(true)}
+                        value={formData.acabamento_id}
+                        onChange={(v) => setFormData((f) => ({ ...f, acabamento_id: v }))}
                       />
                     </div>
-                    <Input
-                      className="h-8 text-xs w-[140px] shrink-0"
-                      placeholder="Override text..."
-                      disabled={!isEditing}
-                      value={formData.descricao_base_en || ''}
-                      onChange={(e) =>
-                        setFormData({ ...formData, descricao_base_en: e.target.value })
-                      }
-                    />
-                  </div>
-                </Field>
-                {confTamanho.isVisible && (
-                  <Field label={confTamanho.labelEn} className="md:col-span-3">
+                  </Field>
+                  <Field label="SKU" className="md:col-span-3">
                     <Input
                       className="h-8 text-xs"
                       disabled={!isEditing}
-                      value={formData.tamanho || ''}
-                      onChange={(e) => setFormData({ ...formData, tamanho: e.target.value })}
+                      value={formData.sku || ''}
+                      onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                     />
                   </Field>
-                )}
-              </div>
+                  {confGrau.isVisible && (
+                    <Field label={confGrau.labelEn} className="md:col-span-3">
+                      <Input
+                        className="h-8 text-xs"
+                        disabled={!isEditing}
+                        value={formData.grau || ''}
+                        onChange={(e) => setFormData({ ...formData, grau: e.target.value })}
+                      />
+                    </Field>
+                  )}
+                  {confNorma.isVisible && (
+                    <Field label={confNorma.labelEn} className="md:col-span-3">
+                      <Input
+                        className="h-8 text-xs"
+                        disabled={!isEditing}
+                        value={formData.norma || ''}
+                        onChange={(e) => setFormData({ ...formData, norma: e.target.value })}
+                      />
+                    </Field>
+                  )}
+                </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <Field label="Finish (EN)" className="md:col-span-3">
-                  <div className={cn(!isEditing && 'pointer-events-none opacity-80')}>
-                    <SearchableSelect
-                      options={acabamentoOptions.map((o) => {
-                        const ac = acabamentos.find((a) => a.id === o.value)
-                        return { ...o, label: ac?.nome_en || ac?.nome_pt || '' }
-                      })}
-                      value={formData.acabamento_id}
-                      onChange={(v) => setFormData((f) => ({ ...f, acabamento_id: v }))}
-                    />
-                  </div>
-                </Field>
-                <Field label="SKU" className="md:col-span-3">
-                  <Input
-                    className="h-8 text-xs"
-                    disabled={!isEditing}
-                    value={formData.sku || ''}
-                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                  />
-                </Field>
-                {confGrau.isVisible && (
-                  <Field label={confGrau.labelEn} className="md:col-span-3">
-                    <Input
-                      className="h-8 text-xs"
-                      disabled={!isEditing}
-                      value={formData.grau || ''}
-                      onChange={(e) => setFormData({ ...formData, grau: e.target.value })}
-                    />
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                  {confTipoRosca.isVisible && (
+                    <Field label={confTipoRosca.labelEn} className="md:col-span-2">
+                      <Input
+                        className="h-8 text-xs"
+                        disabled={!isEditing}
+                        value={formData.tipo_rosca || ''}
+                        onChange={(e) => setFormData({ ...formData, tipo_rosca: e.target.value })}
+                      />
+                    </Field>
+                  )}
+                  {confCompRosca.isVisible && (
+                    <Field label={confCompRosca.labelEn} className="md:col-span-2">
+                      <Input
+                        className="h-8 text-xs"
+                        disabled={!isEditing}
+                        value={formData.comprimento_rosca_en || ''}
+                        onChange={(e) =>
+                          setFormData({ ...formData, comprimento_rosca_en: e.target.value })
+                        }
+                      />
+                    </Field>
+                  )}
+                  <Field label="Category (EN)" className="md:col-span-3">
+                    <div className={cn(!isEditing && 'pointer-events-none opacity-80')}>
+                      <SearchableSelect
+                        options={categoryOptions.map((o) => {
+                          const cat = categorias.find((c) => c.id === o.value)
+                          return { ...o, label: cat?.nome_en || cat?.nome_pt || '' }
+                        })}
+                        value={selectedCategoryId}
+                        onChange={(v) => {
+                          setSelectedCategoryId(v)
+                          setFormData((f) => ({ ...f, linha_id: '' }))
+                        }}
+                        onAddNew={() => setCatModalOpen(true)}
+                      />
+                    </div>
                   </Field>
-                )}
-                {confNorma.isVisible && (
-                  <Field label={confNorma.labelEn} className="md:col-span-3">
-                    <Input
-                      className="h-8 text-xs"
-                      disabled={!isEditing}
-                      value={formData.norma || ''}
-                      onChange={(e) => setFormData({ ...formData, norma: e.target.value })}
-                    />
+                  <Field label="Line (EN)" className="md:col-span-3">
+                    <div className={cn(!isEditing && 'pointer-events-none opacity-80')}>
+                      <SearchableSelect
+                        options={lineOptions.map((o) => {
+                          const l = linhas.find((line) => line.id === o.value)
+                          return { ...o, label: l?.nome_en || l?.nome_pt || '' }
+                        })}
+                        value={formData.linha_id}
+                        onChange={(v) => setFormData((f) => ({ ...f, linha_id: v }))}
+                        onAddNew={() => setLineModalOpen(true)}
+                      />
+                    </div>
                   </Field>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                {confTipoRosca.isVisible && (
-                  <Field label={confTipoRosca.labelEn} className="md:col-span-2">
-                    <Input
-                      className="h-8 text-xs"
-                      disabled={!isEditing}
-                      value={formData.tipo_rosca || ''}
-                      onChange={(e) => setFormData({ ...formData, tipo_rosca: e.target.value })}
-                    />
+                  <Field label="Status" className="md:col-span-2">
+                    <div className="flex items-center gap-2 h-8">
+                      <Switch
+                        checked={formData.ativo ?? true}
+                        disabled={!isEditing}
+                        onCheckedChange={(c) => setFormData({ ...formData, ativo: c })}
+                      />
+                      <span className="text-xs font-medium">
+                        {formData.ativo !== false ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
                   </Field>
-                )}
-                {confCompRosca.isVisible && (
-                  <Field label={confCompRosca.labelEn} className="md:col-span-2">
-                    <Input
-                      className="h-8 text-xs"
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                  <Field label="Unit of Measure" className="md:col-span-3">
+                    <Select
+                      value={formData.unidade_id || ''}
                       disabled={!isEditing}
-                      value={formData.comprimento_rosca_en || ''}
-                      onChange={(e) =>
-                        setFormData({ ...formData, comprimento_rosca_en: e.target.value })
-                      }
-                    />
-                  </Field>
-                )}
-                <Field label="Category (EN)" className="md:col-span-3">
-                  <div className={cn(!isEditing && 'pointer-events-none opacity-80')}>
-                    <SearchableSelect
-                      options={categoryOptions.map((o) => {
-                        const cat = categorias.find((c) => c.id === o.value)
-                        return { ...o, label: cat?.nome_en || cat?.nome_pt || '' }
-                      })}
-                      value={selectedCategoryId}
-                      onChange={(v) => {
-                        setSelectedCategoryId(v)
-                        setFormData((f) => ({ ...f, linha_id: '' }))
-                      }}
-                      onAddNew={() => setCatModalOpen(true)}
-                    />
-                  </div>
-                </Field>
-                <Field label="Line (EN)" className="md:col-span-3">
-                  <div className={cn(!isEditing && 'pointer-events-none opacity-80')}>
-                    <SearchableSelect
-                      options={lineOptions.map((o) => {
-                        const l = linhas.find((line) => line.id === o.value)
-                        return { ...o, label: l?.nome_en || l?.nome_pt || '' }
-                      })}
-                      value={formData.linha_id}
-                      onChange={(v) => setFormData((f) => ({ ...f, linha_id: v }))}
-                      onAddNew={() => setLineModalOpen(true)}
-                    />
-                  </div>
-                </Field>
-                <Field label="Status" className="md:col-span-2">
-                  <div className="flex items-center gap-2 h-8">
-                    <Switch
-                      checked={formData.ativo ?? true}
-                      disabled={!isEditing}
-                      onCheckedChange={(c) => setFormData({ ...formData, ativo: c })}
-                    />
-                    <span className="text-xs font-medium">
-                      {formData.ativo !== false ? 'Active' : 'Inactive'}
-                    </span>
-                  </div>
-                </Field>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <Field label="Unit of Measure" className="md:col-span-3">
-                  <Select
-                    value={formData.unidade_id || ''}
-                    disabled={!isEditing}
-                    onValueChange={(v) => setFormData((f) => ({ ...f, unidade_id: v }))}
-                  >
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue placeholder="Select..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {unidadesMedida.map((u) => (
-                        <SelectItem key={u.id} value={u.id} className="text-xs">
-                          {u.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field label="NCM (Selector)" className="md:col-span-9">
-                  <div className={cn(!isEditing && 'pointer-events-none opacity-80')}>
-                    <SearchableSelect
-                      options={ncmOptions}
-                      value={formData.ncm_id}
-                      onChange={(v) => setFormData((f) => ({ ...f, ncm_id: v }))}
-                    />
-                  </div>
-                </Field>
-              </div>
-            </div>
-
-            <div className="bg-card border rounded-lg p-4 shadow-sm flex flex-col gap-3">
-              <h4 className="font-semibold text-xs border-b pb-1 mb-1">Preço e Texto (EN)</h4>
-
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <Field label="Last Price (Purchase)" className="md:col-span-3">
-                  <PriceInput
-                    disabled={!isEditing}
-                    value={displayPrecoCompra}
-                    onChange={(val) => setFormData({ ...formData, preco_compra: val })}
-                  />
-                </Field>
-                <Field label="Last Supplier" className="md:col-span-3">
-                  <Input
-                    className="h-8 text-xs"
-                    disabled={!isEditing}
-                    value={displayFornecedor || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, fornecedor_ultima_atualizacao: e.target.value })
-                    }
-                  />
-                </Field>
-                <Field label="Price Date" className="md:col-span-3">
-                  <Input
-                    type="date"
-                    className="h-8 text-xs"
-                    disabled={!isEditing}
-                    value={displayDataAtualizacao ? displayDataAtualizacao.substring(0, 10) : ''}
-                    onChange={(e) => setFormData({ ...formData, data_atualizacao: e.target.value })}
-                  />
-                </Field>
-                <Field label="Selling Price" className="md:col-span-3">
-                  <PriceInput
-                    disabled={!isEditing}
-                    value={formData.preco_venda}
-                    onChange={(val) => setFormData({ ...formData, preco_venda: val })}
-                  />
-                </Field>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <Field label="Short Description (EN) (Auto/Manual)" className="md:col-span-12">
-                  <Input
-                    className="h-8 text-xs font-medium"
-                    disabled={!isEditing}
-                    placeholder="Auto-generated..."
-                    value={formData.descricao_curta_en || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, descricao_curta_en: e.target.value })
-                    }
-                  />
-                </Field>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <Field label="Extra Information (EN)" className="md:col-span-6">
-                  <Textarea
-                    className="min-h-[50px] resize-y text-xs"
-                    disabled={!isEditing}
-                    value={formData.informacao_extra_en || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, informacao_extra_en: e.target.value })
-                    }
-                  />
-                </Field>
-                <Field label="Extra Description (EN)" className="md:col-span-6">
-                  <Textarea
-                    className="min-h-[50px] resize-y text-xs"
-                    disabled={!isEditing}
-                    value={formData.descricao_extra_en || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, descricao_extra_en: e.target.value })
-                    }
-                  />
-                </Field>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 opacity-80 pointer-events-none select-none">
-                <Field label="NCM" className="md:col-span-2">
-                  <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.codigo || ''} />
-                </Field>
-                <Field label="II" className="md:col-span-2">
-                  <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.ii ?? ''} />
-                </Field>
-                <Field label="IPI" className="md:col-span-2">
-                  <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.ipi ?? ''} />
-                </Field>
-                <Field label="PIS" className="md:col-span-2">
-                  <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.pis ?? ''} />
-                </Field>
-                <Field label="COFINS" className="md:col-span-2">
-                  <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.cofins ?? ''} />
-                </Field>
-                <Field label="Observations" className="md:col-span-2">
-                  <Input
-                    className="h-8 text-xs bg-muted"
-                    disabled
-                    value={ncmObj?.observacoes || ''}
-                    title={ncmObj?.observacoes || ''}
-                  />
-                </Field>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <Field label="Full Description (EN)" className="md:col-span-12">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-[10px] text-muted-foreground opacity-70">
-                      Can be edited manually or generated by AI based on attributes.
-                    </span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleAIGenerate}
-                      disabled={!isEditing}
-                      className="h-6 text-[10px] px-2"
+                      onValueChange={(v) => setFormData((f) => ({ ...f, unidade_id: v }))}
                     >
-                      <Sparkles className="w-3 h-3 mr-1 text-blue-500" /> AI Generate
-                    </Button>
-                  </div>
-                  <Textarea
-                    className="min-h-[50px] resize-y text-xs font-medium"
-                    disabled={!isEditing}
-                    value={formData.descr_en || ''}
-                    onChange={(e) => setFormData({ ...formData, descr_en: e.target.value })}
-                  />
-                </Field>
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="transactions" className="m-0 animate-fade-in-up">
-            <div className="bg-card border rounded-lg shadow-sm divide-y">
-              <div className="p-3 bg-muted/30 flex items-center gap-3">
-                <Activity className="w-4 h-4 text-primary" />
-                <div>
-                  <h3 className="font-semibold text-xs">Transações</h3>
-                  <p className="text-[10px] text-muted-foreground">Onde este item foi cotado</p>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Select..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {unidadesMedida.map((u) => (
+                          <SelectItem key={u.id} value={u.id} className="text-xs">
+                            {u.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field label="NCM (Selector)" className="md:col-span-9">
+                    <div className={cn(!isEditing && 'pointer-events-none opacity-80')}>
+                      <SearchableSelect
+                        options={ncmOptions}
+                        value={formData.ncm_id}
+                        onChange={(v) => setFormData((f) => ({ ...f, ncm_id: v }))}
+                      />
+                    </div>
+                  </Field>
                 </div>
               </div>
-              {transactions.length === 0 ? (
-                <div className="p-8 text-center text-muted-foreground text-xs">
-                  Nenhuma transação encontrada.
-                </div>
-              ) : (
-                transactions.map((t) => (
-                  <div
-                    key={t.id}
-                    className="p-3 flex items-center justify-between hover:bg-muted/10 transition-colors"
-                  >
-                    <div>
-                      <p className="text-xs font-medium">
-                        Potencial {t.expand?.potencial_id?.numero_potencial}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">
-                        {t.expand?.potencial_id?.cliente}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <Badge variant="secondary" className="text-[10px]">
-                        {t.quantidade} un
-                      </Badge>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">
-                        {new Date(t.created).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </TabsContent>
 
-          <TabsContent value="prices" className="m-0 animate-fade-in-up h-full">
-            <div className="bg-card border rounded-lg shadow-sm divide-y flex flex-col max-h-[500px]">
-              <div className="p-3 bg-muted/30 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-3">
-                  <LineChart className="w-4 h-4 text-primary" />
+              <div className="bg-card border rounded-lg p-4 shadow-sm flex flex-col gap-3">
+                <h4 className="font-semibold text-xs border-b pb-1 mb-1">Preço e Texto (EN)</h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                  <Field label="Legacy Cost Reference" className="md:col-span-3">
+                    <PriceInput
+                      disabled={!isEditing}
+                      value={displayPrecoCompra}
+                      onChange={(val) => setFormData({ ...formData, preco_compra: val })}
+                    />
+                  </Field>
+                  <Field label="Last Supplier" className="md:col-span-3">
+                    <Input
+                      className="h-8 text-xs"
+                      disabled={!isEditing}
+                      value={displayFornecedor || ''}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          fornecedor_ultima_atualizacao: e.target.value,
+                        })
+                      }
+                    />
+                  </Field>
+                  <Field label="Price Date" className="md:col-span-3">
+                    <Input
+                      type="date"
+                      className="h-8 text-xs"
+                      disabled={!isEditing}
+                      value={displayDataAtualizacao ? displayDataAtualizacao.substring(0, 10) : ''}
+                      onChange={(e) =>
+                        setFormData({ ...formData, data_atualizacao: e.target.value })
+                      }
+                    />
+                  </Field>
+                  <Field label="Selling Price" className="md:col-span-3">
+                    <PriceInput
+                      disabled={!isEditing}
+                      value={formData.preco_venda}
+                      onChange={(val) => setFormData({ ...formData, preco_venda: val })}
+                    />
+                  </Field>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                  <Field label="Short Description (EN) (Auto/Manual)" className="md:col-span-12">
+                    <Input
+                      className="h-8 text-xs font-medium"
+                      disabled={!isEditing}
+                      placeholder="Auto-generated..."
+                      value={formData.descricao_curta_en || ''}
+                      onChange={(e) =>
+                        setFormData({ ...formData, descricao_curta_en: e.target.value })
+                      }
+                    />
+                  </Field>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                  <Field label="Extra Information (EN)" className="md:col-span-6">
+                    <Textarea
+                      className="min-h-[50px] resize-y text-xs"
+                      disabled={!isEditing}
+                      value={formData.informacao_extra_en || ''}
+                      onChange={(e) =>
+                        setFormData({ ...formData, informacao_extra_en: e.target.value })
+                      }
+                    />
+                  </Field>
+                  <Field label="Extra Description (EN)" className="md:col-span-6">
+                    <Textarea
+                      className="min-h-[50px] resize-y text-xs"
+                      disabled={!isEditing}
+                      value={formData.descricao_extra_en || ''}
+                      onChange={(e) =>
+                        setFormData({ ...formData, descricao_extra_en: e.target.value })
+                      }
+                    />
+                  </Field>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 opacity-80 pointer-events-none select-none">
+                  <Field label="NCM" className="md:col-span-2">
+                    <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.codigo || ''} />
+                  </Field>
+                  <Field label="II" className="md:col-span-2">
+                    <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.ii ?? ''} />
+                  </Field>
+                  <Field label="IPI" className="md:col-span-2">
+                    <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.ipi ?? ''} />
+                  </Field>
+                  <Field label="PIS" className="md:col-span-2">
+                    <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.pis ?? ''} />
+                  </Field>
+                  <Field label="COFINS" className="md:col-span-2">
+                    <Input className="h-8 text-xs bg-muted" disabled value={ncmObj?.cofins ?? ''} />
+                  </Field>
+                  <Field label="Observations" className="md:col-span-2">
+                    <Input
+                      className="h-8 text-xs bg-muted"
+                      disabled
+                      value={ncmObj?.observacoes || ''}
+                      title={ncmObj?.observacoes || ''}
+                    />
+                  </Field>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                  <Field label="Full Description (EN)" className="md:col-span-12">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-[10px] text-muted-foreground opacity-70">
+                        Can be edited manually or generated by AI based on attributes.
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleAIGenerate}
+                        disabled={!isEditing}
+                        className="h-6 text-[10px] px-2"
+                      >
+                        <Sparkles className="w-3 h-3 mr-1 text-blue-500" /> AI Generate
+                      </Button>
+                    </div>
+                    <Textarea
+                      className="min-h-[50px] resize-y text-xs font-medium"
+                      disabled={!isEditing}
+                      value={formData.descr_en || ''}
+                      onChange={(e) => setFormData({ ...formData, descr_en: e.target.value })}
+                    />
+                  </Field>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="record" className="m-0 animate-fade-in-up">
+              <div className="bg-card border rounded-lg shadow-sm">
+                <div className="p-3 bg-muted/30 flex items-center gap-3 border-b">
+                  <HistoryIcon className="w-4 h-4 text-primary" />
                   <div>
-                    <h3 className="font-semibold text-xs">Histórico de Preços</h3>
-                    <p className="text-[10px] text-muted-foreground">
-                      Flutuações de preço de compra e fornecedores
-                    </p>
+                    <h3 className="font-semibold text-xs">Registro</h3>
+                    <p className="text-[10px] text-muted-foreground">Últimas atualizações</p>
                   </div>
                 </div>
-              </div>
-              <div className="overflow-y-auto flex-1">
-                <Table>
-                  <TableHeader className="sticky top-0 bg-card z-10 shadow-sm">
-                    <TableRow className="h-8 hover:bg-transparent">
-                      <TableHead className="text-xs h-8">Data</TableHead>
-                      <TableHead className="text-xs h-8">Fornecedor</TableHead>
-                      <TableHead className="text-xs h-8 text-right">Preço</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {priceHistory.length === 0 ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={3}
-                          className="text-center py-8 text-muted-foreground text-xs"
-                        >
-                          Nenhum histórico de preço encontrado.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      priceHistory.map((h) => (
-                        <TableRow key={h.id} className="h-8 hover:bg-muted/50">
-                          <TableCell className="text-xs py-1.5 whitespace-nowrap">
-                            {h.data_cotacao ? new Date(h.data_cotacao).toLocaleDateString() : '-'}
-                          </TableCell>
-                          <TableCell className="text-xs py-1.5">{h.fornecedor || '-'}</TableCell>
-                          <TableCell className="text-xs py-1.5 text-right font-medium">
-                            {typeof h.preco === 'number' ? `$ ${h.preco.toFixed(2)}` : '-'}
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="history" className="m-0 animate-fade-in-up">
-            <div className="bg-card border rounded-lg shadow-sm">
-              <div className="p-3 bg-muted/30 flex items-center gap-3 border-b">
-                <HistoryIcon className="w-4 h-4 text-primary" />
-                <div>
-                  <h3 className="font-semibold text-xs">Histórico</h3>
-                  <p className="text-[10px] text-muted-foreground">Últimas atualizações</p>
+                <div className="p-4 text-xs text-muted-foreground space-y-3">
+                  {formData.data_atualizacao && (
+                    <p>
+                      Última atualização:{' '}
+                      <span className="font-medium text-foreground">
+                        {new Date(formData.data_atualizacao).toLocaleString()}
+                      </span>
+                    </p>
+                  )}
+                  {formData.created && (
+                    <p>
+                      Criado em:{' '}
+                      <span className="font-medium text-foreground">
+                        {new Date(formData.created).toLocaleString()}
+                      </span>
+                    </p>
+                  )}
                 </div>
               </div>
-              <div className="p-4 text-xs text-muted-foreground space-y-3">
-                {formData.data_atualizacao && (
-                  <p>
-                    Última atualização:{' '}
-                    <span className="font-medium text-foreground">
-                      {new Date(formData.data_atualizacao).toLocaleString()}
-                    </span>
-                  </p>
-                )}
-                {formData.created && (
-                  <p>
-                    Criado em:{' '}
-                    <span className="font-medium text-foreground">
-                      {new Date(formData.created).toLocaleString()}
-                    </span>
-                  </p>
-                )}
-              </div>
-            </div>
-          </TabsContent>
-        </div>
-      </Tabs>
+            </TabsContent>
+          </ItemC2DataTabs>
+        }
+        partnersContent={
+          readError ? (
+            <p className="text-xs text-muted-foreground">Dados complementares indisponíveis.</p>
+          ) : (
+            <ItemPartnersTab clients={clientLinks} suppliers={supplierLinks} />
+          )
+        }
+        commercialContent={
+          readError ? (
+            <p className="text-xs text-muted-foreground">Dados complementares indisponíveis.</p>
+          ) : (
+            <ItemCommercialTab events={commercialEvents} legacy={priceHistory} />
+          )
+        }
+        documentsContent={
+          readError ? (
+            <p className="text-xs text-muted-foreground">Dados complementares indisponíveis.</p>
+          ) : (
+            <ItemDocumentsApplicationsTab documents={documentLinks} transactions={transactions} />
+          )
+        }
+      />
 
       <GalleryModal
         open={galleryOpen}
