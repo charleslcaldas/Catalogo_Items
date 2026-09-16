@@ -489,21 +489,28 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
         try {
           const updatedItems = await pb.collection('potencial_itens').getFullList({
             filter: `potencial_id="${currentPotential.id}"`,
+            expand: 'item_id,item_id.linha_id,item_id.acabamento_id',
           })
-          const priceMap = new Map<string, number>()
+          const itemMap = new Map<string, any>()
           updatedItems.forEach((it) => {
-            if (typeof it.preco_unitario === 'number') {
-              priceMap.set(it.id, it.preco_unitario)
-            }
+            itemMap.set(it.id, it)
           })
           setSelectedItems((prev) =>
             prev.map((si) => {
-              if (si.recordId && priceMap.has(si.recordId)) {
+              if (si.recordId && itemMap.has(si.recordId)) {
+                const it = itemMap.get(si.recordId)!
                 return {
                   ...si,
                   data: {
                     ...si.data,
-                    preco_unitario: priceMap.get(si.recordId)!,
+                    quantidade: it.quantidade !== undefined ? it.quantidade : si.data.quantidade,
+                    preco_unitario:
+                      typeof it.preco_unitario === 'number'
+                        ? it.preco_unitario
+                        : si.data.preco_unitario,
+                    referencia_preco: it.referencia_preco,
+                    referencia_fornecedor: it.referencia_fornecedor,
+                    referencia_data: it.referencia_data,
                   },
                 }
               }

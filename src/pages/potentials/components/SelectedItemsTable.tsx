@@ -328,7 +328,7 @@ export function SelectedItemsTable({
                       ? formatCurrency(lastOfferedPrices[data.item.id])
                       : '—'}
                   </TableCell>
-                  <TableCell className="py-1 text-xs text-right font-mono text-amber-600 font-semibold whitespace-nowrap">
+                  <TableCell className="py-1 text-xs text-right font-mono text-amber-700 font-semibold whitespace-nowrap bg-amber-50/40">
                     {(() => {
                       const hasSnapshot =
                         typeof data.referencia_preco === 'number' && data.referencia_preco > 0
@@ -338,7 +338,9 @@ export function SelectedItemsTable({
 
                       if (!refPrice) {
                         return (
-                          <span className="font-mono text-xs text-amber-600 font-bold">N/A</span>
+                          <span className="font-mono text-xs text-amber-600/70 font-semibold">
+                            N/A
+                          </span>
                         )
                       }
 
@@ -346,9 +348,14 @@ export function SelectedItemsTable({
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <div className="flex flex-col cursor-help items-end">
-                              <span>{formatCurrency(refPrice)}</span>
+                              <span className="font-bold text-amber-700">
+                                {formatCurrency(refPrice)}
+                              </span>
                               {refSupplier ? (
-                                <span className="text-[9px] text-muted-foreground truncate max-w-[80px]">
+                                <span
+                                  className="text-[9px] text-amber-900/80 font-medium truncate max-w-[90px]"
+                                  title={refSupplier}
+                                >
                                   {refSupplier}
                                 </span>
                               ) : (
@@ -357,13 +364,20 @@ export function SelectedItemsTable({
                             </div>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p className="font-semibold">
+                            <p className="font-semibold text-xs">
+                              Custo de Referência: {formatCurrency(refPrice)}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
                               Fornecedor: {refSupplier || 'Não informado'}
                             </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Data: {refDate ? new Date(refDate).toLocaleDateString() : '-'}
+                            {refDate && (
+                              <p className="text-[10px] text-muted-foreground">
+                                Data: {new Date(refDate).toLocaleDateString()}
+                              </p>
+                            )}
+                            <p className="text-[10px] text-amber-600 font-medium mt-1">
+                              Definido na Cotação de Fabricantes
                             </p>
-                            <p className="text-[10px] text-amber-500 mt-1">Snapshot salvo</p>
                           </TooltipContent>
                         </Tooltip>
                       )

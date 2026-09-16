@@ -166,7 +166,14 @@ export default function PotentialDetailsWrapper() {
             tab === 'quotations' ? 'block' : 'hidden',
           )}
         >
-          <QuotationMatrix />
+          <QuotationMatrix
+            onAccepted={async () => {
+              if (addItemsRef.current) {
+                await addItemsRef.current.reloadItemsPrices()
+              }
+              loadTotals()
+            }}
+          />
         </div>
       </div>
     </div>

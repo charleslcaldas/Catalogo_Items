@@ -14,6 +14,8 @@ import {
   Lock,
   Unlock,
   Search,
+  Save,
+  Loader2,
 } from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
 import { Switch } from '@/components/ui/switch'
@@ -50,7 +52,11 @@ import { QuotationNotes } from './QuotationNotes'
 import { PriceCell } from './PriceCell'
 import { ImportMappingModal } from './ImportMappingModal'
 
-export default function QuotationMatrix() {
+interface QuotationMatrixProps {
+  onAccepted?: () => void
+}
+
+export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {}) {
   const [searchParams] = useSearchParams()
   const potencialId =
     searchParams.get('id') || searchParams.get('potencialId') || searchParams.get('potencial_id')
@@ -74,6 +80,7 @@ export default function QuotationMatrix() {
   const [cfDrafts, setCfDrafts] = useState<
     Record<string, { incoterm?: string; tempo_fabricacao?: string; condicao_pagamento?: string }>
   >({})
+  const [isSavingDraft, setIsSavingDraft] = useState(false)
 
   const [suppliersWithHistory, setSuppliersWithHistory] = useState<Set<string>>(new Set())
   const [prioritizedSuppliers, setPrioritizedSuppliers] = useState<Set<string>>(new Set())
@@ -388,6 +395,86 @@ export default function QuotationMatrix() {
     }
   }
 
+  const handleSaveDraftPrices = async () => {
+    try {
+      setIsSavingDraft(true)
+      const allDraftKeys = new Set([...Object.keys(draftPrices), ...Object.keys(draftMoqs)])
+
+      const promises: Promise<any>[] = []
+
+      for (const key of allDraftKeys) {
+        const separatorIdx = key.indexOf('_')
+        if (separatorIdx === -1) continue
+        const cfId = key.substring(0, separatorIdx)
+        const itemId = key.substring(separatorIdx + 1)
+
+        const existingCi = cotacoesI.find(
+          (c) => c.cotacao_fornecedor_id === cfId && c.item_id === itemId,
+        )
+
+        const preco =
+          draftPrices[key] !== undefined ? draftPrices[key] : existingCi?.preco_ofertado || 0
+
+        const moq =
+          draftMoqs[key] !== undefined ? draftMoqs[key] : existingCi?.quantidade_minima || 0
+
+        if (existingCi) {
+          promises.push(
+            pb.collection('cotacoes_itens').update(existingCi.id, {
+              preco_ofertado: preco,
+              quantidade_minima: moq,
+            }),
+          )
+        } else {
+          promises.push(
+            pb.collection('cotacoes_itens').create({
+              cotacao_fornecedor_id: cfId,
+              item_id: itemId,
+              preco_ofertado: preco,
+              quantidade_minima: moq,
+              vencedor: false,
+            }),
+          )
+        }
+      }
+
+      for (const [cfId, drafts] of Object.entries(cfDrafts)) {
+        if (!drafts || Object.keys(drafts).length === 0) continue
+        const updatePayload: Record<string, any> = {}
+        if (drafts.incoterm !== undefined) updatePayload.incoterm = drafts.incoterm
+        if (drafts.tempo_fabricacao !== undefined)
+          updatePayload.tempo_fabricacao = drafts.tempo_fabricacao
+        if (drafts.condicao_pagamento !== undefined)
+          updatePayload.condicao_pagamento = drafts.condicao_pagamento
+
+        if (Object.keys(updatePayload).length > 0) {
+          promises.push(pb.collection('cotacoes_fornecedor').update(cfId, updatePayload))
+        }
+      }
+
+      await Promise.all(promises)
+
+      setDraftPrices({})
+      setDraftMoqs({})
+      setCfDrafts({})
+
+      await loadData()
+
+      toast({
+        title: 'Edições salvas',
+        description: 'Edições da cotação salvas com sucesso.',
+      })
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao salvar cotação',
+        description: err.message,
+        variant: 'destructive',
+      })
+    } finally {
+      setIsSavingDraft(false)
+    }
+  }
+
   const handleToggleWinner = async (
     cotacaoFId: string,
     itemId: string,
@@ -539,6 +626,9 @@ export default function QuotationMatrix() {
       })
       userUnlockedRef.current = false
       setIsFrozen(true)
+      if (onAccepted) {
+        onAccepted()
+      }
     } catch (err: any) {
       toast({ title: 'Erro', description: err.message, variant: 'destructive' })
     } finally {
@@ -951,6 +1041,28 @@ export default function QuotationMatrix() {
           <Button
             variant="outline"
             size="sm"
+            onClick={handleSaveDraftPrices}
+            disabled={
+              isFrozen ||
+              isSavingDraft ||
+              (Object.keys(draftPrices).length === 0 &&
+                Object.keys(draftMoqs).length === 0 &&
+                Object.keys(cfDrafts).length === 0)
+            }
+            className="border-emerald-300 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-900"
+            title="Salva as edições manuais de preço e condições sem finalizar a cotação"
+          >
+            {isSavingDraft ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4 mr-2" />
+            )}
+            Salvar Cotação
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handleAcceptSelected}
             disabled={isFrozen}
             className="border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 hover:text-blue-800"
@@ -980,17 +1092,25 @@ export default function QuotationMatrix() {
                   </span>
                 </TableHead>
                 {cotacoesF.map((cf) => (
-                  <TableHead key={cf.id} className="min-w-[160px] bg-muted/30 border-r py-2">
+                  <TableHead
+                    key={cf.id}
+                    className="min-w-[160px] bg-muted/30 border-r py-2 cursor-pointer select-none"
+                    onDoubleClick={() => !isFrozen && handleSelectAllFor(cf.id)}
+                    title="Duplo clique para selecionar todos os itens deste fabricante"
+                  >
                     <div className="flex flex-col items-center relative group">
                       <div className="flex items-center gap-1 w-full justify-center">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <span className="font-bold text-foreground truncate max-w-[120px] text-xs cursor-help">
+                            <span className="font-bold text-foreground truncate max-w-[120px] text-xs cursor-pointer">
                               {cf.expand?.fornecedor_id?.nome}
                             </span>
                           </TooltipTrigger>
                           <TooltipContent side="top">
-                            <p>{cf.expand?.fornecedor_id?.nome}</p>
+                            <p className="font-semibold">{cf.expand?.fornecedor_id?.nome}</p>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              Dê duplo clique para selecionar todos os itens
+                            </p>
                           </TooltipContent>
                         </Tooltip>
 
@@ -1008,6 +1128,8 @@ export default function QuotationMatrix() {
                               variant="ghost"
                               size="icon"
                               className="h-5 w-5 opacity-0 group-hover:opacity-100"
+                              onClick={(e) => e.stopPropagation()}
+                              onDoubleClick={(e) => e.stopPropagation()}
                             >
                               <Settings2 className="w-3 h-3" />
                             </Button>
