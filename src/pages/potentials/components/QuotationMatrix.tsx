@@ -68,6 +68,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
   const [cotacoesI, setCotacoesI] = useState<any[]>([])
   const [fornecedores, setFornecedores] = useState<any[]>([])
   const [latestHistorico, setLatestHistorico] = useState<Record<string, any>>({})
+  const [potencial, setPotencial] = useState<any>(null)
 
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isCounterOpen, setIsCounterOpen] = useState(false)
@@ -156,8 +157,9 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
       allNotas.items.forEach((n) => histSet.add(n.fornecedor_id))
       setSuppliersWithHistory(histSet)
 
-      const potencial = await pb.collection('potenciais').getOne(potencialId)
-      const potencialDate = potencial.created
+      const potencialRecord = await pb.collection('potenciais').getOne(potencialId)
+      setPotencial(potencialRecord)
+      const potencialDate = potencialRecord.created
 
       const itemIds = Array.from(new Set(pItens.map((i) => i.item_id)))
       const latestHist: Record<string, any> = {}
@@ -354,42 +356,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
       })
       setIsAddOpen(false)
       toast({ title: 'Fabricante adicionado' })
-    } catch (err: any) {
-      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
-    }
-  }
-
-  const handleBlur = async (
-    cotacaoFId: string,
-    itemId: string,
-    price: number,
-    moq: number,
-    cotacaoIId?: string,
-  ) => {
-    try {
-      if (cotacaoIId) {
-        await pb
-          .collection('cotacoes_itens')
-          .update(cotacaoIId, { preco_ofertado: price, quantidade_minima: moq })
-      } else {
-        await pb.collection('cotacoes_itens').create({
-          cotacao_fornecedor_id: cotacaoFId,
-          item_id: itemId,
-          preco_ofertado: price,
-          quantidade_minima: moq,
-          vencedor: false,
-        })
-      }
-      setDraftPrices((prev) => {
-        const next = { ...prev }
-        delete next[`${cotacaoFId}_${itemId}`]
-        return next
-      })
-      setDraftMoqs((prev) => {
-        const next = { ...prev }
-        delete next[`${cotacaoFId}_${itemId}`]
-        return next
-      })
     } catch (err: any) {
       toast({ title: 'Erro', description: err.message, variant: 'destructive' })
     }
@@ -750,20 +716,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
     URL.revokeObjectURL(url)
   }
 
-  const handleSaveCfField = async (
-    cfId: string,
-    field: 'incoterm' | 'tempo_fabricacao' | 'condicao_pagamento',
-  ) => {
-    try {
-      const draftVal = cfDrafts[cfId]?.[field]
-      if (draftVal === undefined) return
-      await pb.collection('cotacoes_fornecedor').update(cfId, { [field]: draftVal })
-      toast({ title: 'Campo atualizado' })
-    } catch (err: any) {
-      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
-    }
-  }
-
   const handleExportForSupplier = (cf: any) => {
     let csv = 'SKU;Description;Size;Finish;Quantity;Unit;MOQ;Offered Price;Target Price\n'
     potencialItens.forEach((pi) => {
@@ -889,6 +841,12 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
         <div>
           <div className="flex items-center gap-3">
             <h2 className="text-2xl font-bold tracking-tight">Cotação de Fabricantes</h2>
+            <Badge
+              variant="outline"
+              className="bg-blue-50 text-blue-700 border border-blue-200 font-mono text-xs px-2.5 py-0.5"
+            >
+              Cotação #{potencial?.numero_potencial || potencialId}
+            </Badge>
             {isFrozen && (
               <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
                 <Lock className="w-3 h-3 mr-1" /> Bloqueada
@@ -1161,7 +1119,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                       },
                                     }))
                                   }
-                                  onBlur={() => handleSaveCfField(cf.id, 'incoterm')}
                                   title="Editar para esta cotação (não altera o cadastro do fabricante)"
                                 />
                               </div>
@@ -1189,7 +1146,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                       },
                                     }))
                                   }
-                                  onBlur={() => handleSaveCfField(cf.id, 'tempo_fabricacao')}
                                   title="Editar para esta cotação (não altera o cadastro do fabricante)"
                                 />
                               </div>
@@ -1217,7 +1173,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                       },
                                     }))
                                   }
-                                  onBlur={() => handleSaveCfField(cf.id, 'condicao_pagamento')}
                                   title="Editar para esta cotação (não altera o cadastro do fabricante)"
                                 />
                               </div>
@@ -1275,10 +1230,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                       </div>
 
                       {(() => {
-                        const hasPrices = cotacoesI.some(
-                          (c) => c.cotacao_fornecedor_id === cf.id && c.preco_ofertado > 0,
-                        )
-                        const isFinalizada = cf.status === 'finalizada' || hasPrices
+                        const isFinalizada = cf.status === 'finalizada'
                         return isFinalizada ? (
                           <Badge
                             variant="secondary"
@@ -1493,7 +1445,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                               onDraftMoqChange={(cfId: string, itemId: string, val: number) =>
                                 setDraftMoqs((p) => ({ ...p, [`${cfId}_${itemId}`]: val }))
                               }
-                              onBlur={handleBlur}
                               onToggleWinner={handleToggleWinner}
                             />
                           </TableCell>

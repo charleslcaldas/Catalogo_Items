@@ -37,10 +37,11 @@ export function PriceCell({
           <PriceInput
             value={currentPrice || undefined}
             onChange={(val) => onDraftChange(cotacaoF.id, item.item_id, val || 0)}
-            onBlur={() =>
-              (draftPrice !== undefined || draftMoq !== undefined) &&
-              onBlur(cotacaoF.id, item.item_id, currentPrice, currentMoq, cotacaoI?.id)
-            }
+            onBlur={() => {
+              if (onBlur && (draftPrice !== undefined || draftMoq !== undefined)) {
+                onBlur(cotacaoF.id, item.item_id, currentPrice, currentMoq, cotacaoI?.id)
+              }
+            }}
             className={cn(
               'h-7 text-xs text-right font-mono w-full',
               cotacaoI?.vencedor
@@ -82,10 +83,11 @@ export function PriceCell({
               const val = e.target.value.replace(/[^0-9]/g, '')
               onDraftMoqChange(cotacaoF.id, item.item_id, val ? parseInt(val, 10) : 0)
             }}
-            onBlur={() =>
-              (draftPrice !== undefined || draftMoq !== undefined) &&
-              onBlur(cotacaoF.id, item.item_id, currentPrice, currentMoq, cotacaoI?.id)
-            }
+            onBlur={() => {
+              if (onBlur && (draftPrice !== undefined || draftMoq !== undefined)) {
+                onBlur(cotacaoF.id, item.item_id, currentPrice, currentMoq, cotacaoI?.id)
+              }
+            }}
             onClick={(e) => e.stopPropagation()}
             className={cn(
               'h-6 text-[10px] text-right font-mono flex-1 min-w-0',

@@ -93,8 +93,6 @@ export function CounterProposalModal({
         let np = item.newPrice
         if (action === 'discount') {
           np = item.currentPrice * (1 - d / 100)
-        } else if (action === 'fixed_target') {
-          np = Math.max(0, d)
         } else if (action === 'match_best') {
           np = item.bestPrice
         } else if (action === 'discount_best') {
@@ -282,7 +280,6 @@ export function CounterProposalModal({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="discount">Desconto (%) s/ o preço atual</SelectItem>
-                  <SelectItem value="fixed_target">Preço Alvo Global (Fixo)</SelectItem>
                   <SelectItem value="match_best">Igualar ao Menor Preço Geral</SelectItem>
                   <SelectItem value="discount_best">Desconto (%) s/ o Menor Preço Geral</SelectItem>
                   <SelectItem value="manual">Definição Manual</SelectItem>
@@ -291,7 +288,7 @@ export function CounterProposalModal({
             </div>
             {action !== 'match_best' && action !== 'manual' && (
               <div className="flex flex-col gap-1.5 w-32">
-                <Label>{action === 'fixed_target' ? 'Preço Alvo ($)' : 'Desconto (%)'}</Label>
+                <Label>Desconto (%)</Label>
                 <Input
                   type="text"
                   inputMode="decimal"
