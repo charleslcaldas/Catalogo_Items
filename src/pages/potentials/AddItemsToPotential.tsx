@@ -485,22 +485,51 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
     ref,
     () => ({
       reloadItemsPrices: async () => {
-        if (!currentPotential?.id) return
+        const targetPotencialId =
+          currentPotential?.id ||
+          searchParams.get('id') ||
+          searchParams.get('potencialId') ||
+          searchParams.get('potencial_id')
+        if (!targetPotencialId) return
         try {
           const updatedItems = await pb.collection('potencial_itens').getFullList({
-            filter: `potencial_id="${currentPotential.id}"`,
+            filter: `potencial_id="${targetPotencialId}"`,
             expand: 'item_id,item_id.linha_id,item_id.acabamento_id',
+            sort: 'ordem',
           })
-          const itemMap = new Map<string, any>()
+          const itemMapById = new Map<string, any>()
+          const itemMapByItemId = new Map<string, any>()
           updatedItems.forEach((it) => {
-            itemMap.set(it.id, it)
+            itemMapById.set(it.id, it)
+            if (it.item_id) {
+              itemMapByItemId.set(it.item_id, it)
+            }
           })
-          setSelectedItems((prev) =>
-            prev.map((si) => {
-              if (si.recordId && itemMap.has(si.recordId)) {
-                const it = itemMap.get(si.recordId)!
+          setSelectedItems((prev) => {
+            if (prev.length === 0 && updatedItems.length > 0) {
+              return updatedItems.map((pi) => ({
+                id: pi.item_id,
+                recordId: pi.id,
+                data: {
+                  item: pi.expand?.item_id || ({ id: pi.item_id } as any),
+                  quantidade: pi.quantidade,
+                  unidade_medida: pi.unidade_medida || 'Pcs',
+                  preco_unitario: pi.preco_unitario !== undefined ? pi.preco_unitario : '',
+                  observacoes: pi.observacoes || '',
+                  ordem: pi.ordem || 0,
+                  referencia_preco: pi.referencia_preco,
+                  referencia_fornecedor: pi.referencia_fornecedor,
+                  referencia_data: pi.referencia_data,
+                },
+              }))
+            }
+
+            return prev.map((si) => {
+              const it = (si.recordId && itemMapById.get(si.recordId)) || itemMapByItemId.get(si.id)
+              if (it) {
                 return {
                   ...si,
+                  recordId: it.id,
                   data: {
                     ...si.data,
                     quantidade: it.quantidade !== undefined ? it.quantidade : si.data.quantidade,
@@ -515,14 +544,14 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
                 }
               }
               return si
-            }),
-          )
+            })
+          })
         } catch (err) {
           console.error('Failed to reload items prices', err)
         }
       },
     }),
-    [currentPotential?.id],
+    [currentPotential?.id, searchParams],
   )
 
   // Unsaved changes detection for beforeunload and navigation

@@ -602,9 +602,26 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
       }
 
       await Promise.all(promises)
+
+      // Limpar os drafts dos itens aceitos
+      setDraftPrices((prev) => {
+        const next = { ...prev }
+        for (const w of winners) {
+          delete next[`${w.cotacao_fornecedor_id}_${w.item_id}`]
+        }
+        return next
+      })
+      setDraftMoqs((prev) => {
+        const next = { ...prev }
+        for (const w of winners) {
+          delete next[`${w.cotacao_fornecedor_id}_${w.item_id}`]
+        }
+        return next
+      })
+
       toast({
         title: 'Sucesso',
-        description: `${updatedCount} preços de compra aceitos e histórico salvo.`,
+        description: `${updatedCount} preços de compra aceitos e propagados para os itens do potencial.`,
       })
       if (onAccepted) {
         await onAccepted()
