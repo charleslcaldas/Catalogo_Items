@@ -139,7 +139,6 @@ export default function ItemsPage() {
       tamanho: 100,
       acabamento_id: 120,
       ncm_id: 100,
-      descricao_base_id: 150,
       preco_compra: 130,
       preco_venda: 100,
       status: 150,
@@ -738,12 +737,6 @@ export default function ItemsPage() {
                   style={{ width: colWidths.acabamento_id, minWidth: colWidths.acabamento_id }}
                 />
                 <col style={{ width: colWidths.ncm_id, minWidth: colWidths.ncm_id }} />
-                <col
-                  style={{
-                    width: colWidths.descricao_base_id,
-                    minWidth: colWidths.descricao_base_id,
-                  }}
-                />
                 {!selectedItemId && (
                   <>
                     <col
@@ -861,20 +854,6 @@ export default function ItemsPage() {
                       onSort={handleSortClick}
                     />
                   </ResizableHeader>
-                  <ResizableHeader
-                    width={colWidths.descricao_base_id}
-                    onResize={(w) => handleResize('descricao_base_id', w)}
-                    onResizeEnd={(w) => handleResizeEnd('descricao_base_id', w)}
-                    className="px-2"
-                  >
-                    <SortableHeader
-                      column="descricao_base_id"
-                      title="Desc. Base"
-                      sortColumn={sortColumn}
-                      sortDirection={sortDirection}
-                      onSort={handleSortClick}
-                    />
-                  </ResizableHeader>
                   {!selectedItemId && (
                     <>
                       <ResizableHeader
@@ -911,7 +890,7 @@ export default function ItemsPage() {
                 {error ? (
                   <TableRow>
                     <TableCell
-                      colSpan={selectedItemId ? 9 : 12}
+                      colSpan={selectedItemId ? 8 : 11}
                       className="text-center py-16 text-destructive"
                     >
                       <div className="flex flex-col items-center justify-center gap-3">
@@ -930,7 +909,7 @@ export default function ItemsPage() {
                 ) : isLoading && apiItens.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={selectedItemId ? 9 : 12}
+                      colSpan={selectedItemId ? 8 : 11}
                       className="text-center py-16 text-muted-foreground"
                     >
                       <div className="flex flex-col items-center justify-center gap-3">
@@ -942,7 +921,7 @@ export default function ItemsPage() {
                 ) : apiItens.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={selectedItemId ? 9 : 12}
+                      colSpan={selectedItemId ? 8 : 11}
                       className="text-center py-16 text-muted-foreground"
                     >
                       <PackageOpen className="w-12 h-12 mx-auto opacity-20 mb-4" />
@@ -1062,11 +1041,6 @@ export default function ItemsPage() {
                         </TableCell>
                         <TableCell className="py-1.5 px-2 text-sm overflow-hidden text-ellipsis whitespace-nowrap align-middle">
                           {item.expand?.ncm_id?.codigo || '-'}
-                        </TableCell>
-                        <TableCell className="py-1.5 px-2 text-sm overflow-hidden text-ellipsis whitespace-nowrap align-middle">
-                          {item.expand?.descricao_base_id?.codigo ||
-                            item.expand?.descricao_base_id?.nome_pt ||
-                            '-'}
                         </TableCell>
                         {!selectedItemId && (
                           <>
