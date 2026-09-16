@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-12T19:20:23.905Z",
+  "generatedAt": "2026-09-16T11:52:55.115Z",
   "collections": [
     {
       "name": "users",
@@ -1473,6 +1473,156 @@
           "type": "text",
           "required": false,
           "system": false
+        },
+        {
+          "name": "supplier_type",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "own_manufacturing_products",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "qualification_status",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "risk_level",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "criticality",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "val_online_verification",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "val_legal_documents",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "val_bank_verification",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "val_factory_visit",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "val_audit",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "val_sample_product",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "last_assessment_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "next_review_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "responsible_c2_user",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "active_alerts_count",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "critical_alert",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "main_alert_obs",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "last_factory_visit_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "last_audit_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "last_online_verification_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ai_suggested_status",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ai_suggested_risk",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ai_analysis_summary",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "requires_human_approval",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "business_license",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": []
@@ -1705,6 +1855,530 @@
       "indexes": [
         "CREATE INDEX idx_contatos_fabricante ON contatos_fornecedor (fabricante_id)",
         "CREATE INDEX idx_contatos_nome ON contatos_fornecedor (nome)"
+      ]
+    },
+    {
+      "name": "supplier_assessments",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "supplier_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "fornecedores"
+        },
+        {
+          "name": "assessment_type",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "assessment_date",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "c2_responsible",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "external_auditor_inspector",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "assessment_status",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "risk_level",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "result",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "number_of_alerts",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "critical_alert",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "summary",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "findings",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "recommendations",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "corrective_actions_required",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "corrective_actions_completed",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "source_of_information",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "next_review_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "approved_by",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "approval_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "internal_notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "attachments",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "photos",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "visit_factory_exists",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "visit_own_production_confirmed",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "visit_address_confirmed",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "visit_score_production_org",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "visit_score_quality_control",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "visit_score_production_capacity",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "visit_score_equipment_condition",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "visit_score_technical_team",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "visit_score_warehouse_condition",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "visit_score_safety_conditions",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "visit_score_overall_impression",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "visit_conclusion",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "visit_video_url",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "audit_auditor_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "audit_company",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "audit_score",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "audit_major_non_conformities",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "audit_minor_non_conformities",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "audit_corrective_action_required",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "audit_corrective_action_deadline",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "audit_corrective_action_completed",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "audit_final_result",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dd_legal_company_name_confirmed",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dd_chinese_company_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dd_uscc",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dd_registration_status",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dd_registered_capital",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dd_paid_in_capital",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dd_foundation_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dd_legal_representative",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dd_registered_address",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dd_business_scope",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dd_manufacturer_status_confirmed",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dd_export_capability",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dd_litigation_found",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dd_court_cases",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dd_admin_penalties",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dd_abnormal_operation_records",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dd_enforcement_records",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dd_pledged_shares_equity_issues",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dd_intellectual_property",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dd_certifications",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dd_other_risk_alerts",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dd_source_platform",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_assessments_supplier ON supplier_assessments (supplier_id)",
+        "CREATE INDEX idx_assessments_type ON supplier_assessments (assessment_type)",
+        "CREATE INDEX idx_assessments_date ON supplier_assessments (assessment_date)",
+        "CREATE INDEX idx_assessments_status ON supplier_assessments (assessment_status)"
+      ]
+    },
+    {
+      "name": "supplier_red_flags",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "supplier_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "fornecedores"
+        },
+        {
+          "name": "assessment_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "supplier_assessments"
+        },
+        {
+          "name": "category",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "severity",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "action_required",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "resolved",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "resolved_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "resolved_by",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "resolution_notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_redflags_supplier ON supplier_red_flags (supplier_id)",
+        "CREATE INDEX idx_redflags_severity ON supplier_red_flags (severity)",
+        "CREATE INDEX idx_redflags_resolved ON supplier_red_flags (resolved)"
       ]
     }
   ]

@@ -110,6 +110,7 @@ export default function Fornecedores() {
     const matchContato = (f.contato || '').toLowerCase().includes(term)
     const matchEmail = (f.email || '').toLowerCase().includes(term)
     const matchCnpj = (f.cnpj || '').toLowerCase().includes(term)
+    const matchBusinessLicense = (f.business_license || '').toLowerCase().includes(term)
     const matchCidade = (f.cidade || '').toLowerCase().includes(term)
     const matchEstado = (f.estado || '').toLowerCase().includes(term)
     const matchPais = (f.pais || '').toLowerCase().includes(term)
@@ -129,6 +130,7 @@ export default function Fornecedores() {
       matchContato ||
       matchEmail ||
       matchCnpj ||
+      matchBusinessLicense ||
       matchCidade ||
       matchEstado ||
       matchPais ||
@@ -182,11 +184,11 @@ export default function Fornecedores() {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por nome, CNPJ, cidade, contato, linha..."
+            placeholder="Buscar por nome, CNPJ, Business License, cidade, contato..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-8"
-          />
+          />{' '}
         </div>
 
         <div className="w-full sm:w-60">
@@ -297,13 +299,21 @@ export default function Fornecedores() {
                               <Building2 className="w-4 h-4 text-primary shrink-0 opacity-70 group-hover:opacity-100" />
                               <span className="text-sm font-semibold">{f.nome}</span>
                             </div>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground font-normal mt-0.5">
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground font-normal mt-0.5 flex-wrap">
                               {f.cnpj && <span className="font-mono text-[11px]">{f.cnpj}</span>}
+                              {f.business_license && (
+                                <span
+                                  className="font-mono text-[11px] bg-muted/60 px-1 py-0.2 rounded"
+                                  title="Business License"
+                                >
+                                  BL: {f.business_license}
+                                </span>
+                              )}
                               {f.contato && <span>• Rep: {f.contato}</span>}
-                              {f.email && !f.contato && (
+                              {f.email && !f.contato && !f.business_license && (
                                 <span className="truncate max-w-[150px]">{f.email}</span>
                               )}
-                            </div>
+                            </div>{' '}
                           </div>
                         </TableCell>
 

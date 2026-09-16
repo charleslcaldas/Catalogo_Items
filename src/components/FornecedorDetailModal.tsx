@@ -129,11 +129,12 @@ export function FornecedorDetailModal({
                       </Badge>
                     )}
                   </div>
-                  {fornecedor.cnpj && (
-                    <p className="text-xs text-muted-foreground mt-0.5 font-mono">
-                      CNPJ: {fornecedor.cnpj}
-                    </p>
-                  )}
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5 font-mono flex-wrap">
+                    {fornecedor.cnpj && <span>CNPJ: {fornecedor.cnpj}</span>}
+                    {fornecedor.business_license && (
+                      <span>Business License: {fornecedor.business_license}</span>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -159,10 +160,21 @@ export function FornecedorDetailModal({
               <Card className="shadow-none border-muted">
                 <CardHeader className="py-3 px-4 bg-muted/20 border-b">
                   <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                    <Mail className="w-3.5 h-3.5 text-primary" /> Contato Principal
+                    <Mail className="w-3.5 h-3.5 text-primary" /> Contato Principal & Registro
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-4 space-y-2.5 text-xs">
+                  {fornecedor.business_license ? (
+                    <div>
+                      <span className="text-muted-foreground block text-[11px]">
+                        Business License:
+                      </span>
+                      <span className="font-mono font-medium text-foreground">
+                        {fornecedor.business_license}
+                      </span>
+                    </div>
+                  ) : null}
+
                   {fornecedor.contato ? (
                     <div>
                       <span className="text-muted-foreground block text-[11px]">
@@ -223,9 +235,10 @@ export function FornecedorDetailModal({
                   {!fornecedor.contato &&
                     !fornecedor.email &&
                     !fornecedor.telefone &&
-                    !fornecedor.website && (
+                    !fornecedor.website &&
+                    !fornecedor.business_license && (
                       <span className="text-muted-foreground italic">
-                        Nenhum contato direto cadastrado.
+                        Nenhum contato ou registro direto cadastrado.
                       </span>
                     )}
                 </CardContent>

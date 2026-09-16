@@ -11,10 +11,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useData } from '@/contexts/data-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, Pencil, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { Plus, Pencil, Search, ArrowUpDown, ArrowUp, ArrowDown, FilterX } from 'lucide-react'
 import { CategoryModal } from '@/components/MetadataModals'
 import { getContrastColor } from '@/lib/utils'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Categoria } from '@/types'
 
 import { Badge } from '@/components/ui/badge'
@@ -29,6 +29,9 @@ export default function Categories() {
   const [sortField, setSortField] = useState<SortField | null>('nome_pt')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const filterCategoriaId = searchParams.get('categoria_id') || searchParams.get('id')
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -54,6 +57,7 @@ export default function Categories() {
   }
 
   const filteredCategories = categorias.filter((c) => {
+    if (filterCategoriaId && c.id !== filterCategoriaId) return false
     const term = searchTerm.toLowerCase().trim()
     if (!term) return true
     return (
@@ -97,18 +101,50 @@ export default function Categories() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Categorias</h1>
-            <p className="text-muted-foreground">Gerencie as categorias principais de produtos.</p>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold tracking-tight">Categorias</h1>
+              {filterCategoriaId && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setSearchParams({})}
+                  className="h-8"
+                >
+                  <FilterX className="h-4 w-4 mr-1.5" />
+                  Limpar Filtro
+                </Button>
+              )}
+            </div>
+            <p className="text-muted-foreground">
+              {filterCategoriaId
+                ? `Mostrando categoria selecionada: ${categorias.find((c) => c.id === filterCategoriaId)?.nome_pt || 'Desconhecida'}`
+                : 'Gerencie as categorias principais de produtos.'}
+            </p>
           </div>
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Buscar categoria..."
-              className="pl-9 w-full"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          <div className="flex items-center gap-2">
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Buscar categoria..."
+                className="pl-9 w-full"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            {(searchTerm || filterCategoriaId) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSearchTerm('')
+                  setSearchParams({})
+                }}
+                className="h-10 text-muted-foreground"
+              >
+                <FilterX className="h-4 w-4 mr-1.5" /> Limpar
+              </Button>
+            )}
           </div>
         </div>
         <Button
@@ -163,7 +199,14 @@ export default function Categories() {
                 const linhasCount = linhas.filter((l) => l.categoria_id === cat.id).length
 
                 return (
-                  <TableRow key={cat.id} className="hover:bg-muted/50 transition-colors group">
+                  <TableRow
+                    key={cat.id}
+                    className={`hover:bg-muted/50 transition-colors group ${
+                      filterCategoriaId === cat.id
+                        ? 'bg-primary/5 font-medium ring-1 ring-primary/20'
+                        : ''
+                    }`}
+                  >
                     <TableCell className="font-medium">
                       <button
                         type="button"

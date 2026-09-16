@@ -39,6 +39,7 @@ export function FornecedorFormModal({
   const [formData, setFormData] = useState({
     nome: '',
     cnpj: '',
+    business_license: '',
     contato: '',
     email: '',
     telefone: '',
@@ -63,6 +64,7 @@ export function FornecedorFormModal({
         setFormData({
           nome: initialData.nome || '',
           cnpj: initialData.cnpj || '',
+          business_license: initialData.business_license || '',
           contato: initialData.contato || '',
           email: initialData.email || '',
           telefone: initialData.telefone || '',
@@ -88,6 +90,7 @@ export function FornecedorFormModal({
         setFormData({
           nome: '',
           cnpj: '',
+          business_license: '',
           contato: '',
           email: '',
           telefone: '',
@@ -154,6 +157,7 @@ export function FornecedorFormModal({
     const payload = {
       nome: formData.nome.trim(),
       cnpj: formData.cnpj.trim(),
+      business_license: formData.business_license.trim(),
       contato: formData.contato.trim(),
       email: formData.email.trim(),
       telefone: formData.telefone.trim(),
@@ -232,6 +236,16 @@ export function FornecedorFormModal({
                   placeholder="00.000.000/0000-00"
                   value={formData.cnpj}
                   onChange={(e) => setFormData({ ...formData, cnpj: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="business_license">Business License (Licença de Negócio)</Label>
+                <Input
+                  id="business_license"
+                  placeholder="Ex: 91330200MA2..."
+                  value={formData.business_license}
+                  onChange={(e) => setFormData({ ...formData, business_license: e.target.value })}
                 />
               </div>
 

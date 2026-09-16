@@ -67,14 +67,18 @@ export default function Dashboard() {
   }, [itens])
 
   const categoryDistribution = useMemo(() => {
-    const counts: Record<string, number> = {}
+    const dataMap: Record<string, { id?: string; name: string; value: number }> = {}
     itens.forEach((item) => {
-      const catName = item.expand?.linha_id?.expand?.categoria_id?.nome_pt || 'Sem Categoria'
-      counts[catName] = (counts[catName] || 0) + 1
+      const catObj = item.expand?.linha_id?.expand?.categoria_id
+      const catId = catObj?.id
+      const catName = catObj?.nome_pt || 'Sem Categoria'
+      const key = catId || catName
+      if (!dataMap[key]) {
+        dataMap[key] = { id: catId, name: catName, value: 0 }
+      }
+      dataMap[key].value += 1
     })
-    return Object.entries(counts)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
+    return Object.values(dataMap).sort((a, b) => b.value - a.value)
   }, [itens])
 
   const potentialsByStage = useMemo(() => {
@@ -191,7 +195,9 @@ export default function Dashboard() {
         <Card>
           <CardHeader>
             <CardTitle>Itens por Categoria</CardTitle>
-            <CardDescription>Distribuição do catálogo</CardDescription>
+            <CardDescription>
+              Distribuição do catálogo — clique no setor para filtrar a categoria
+            </CardDescription>
           </CardHeader>
           <CardContent className="flex justify-center h-[300px]">
             {categoryDistribution.length > 0 ? (
@@ -207,12 +213,25 @@ export default function Dashboard() {
                       paddingAngle={2}
                       dataKey="value"
                       nameKey="name"
+                      className="cursor-pointer focus:outline-none"
+                      onClick={(data: any) => {
+                        const targetId = data?.id || data?.payload?.id
+                        if (targetId) {
+                          navigate(`/categorias?categoria_id=${targetId}`)
+                        } else {
+                          navigate('/categorias')
+                        }
+                      }}
                       label={({ name, percent }) =>
                         percent > 0.05 ? `${name} (${(percent * 100).toFixed(0)}%)` : null
                       }
                     >
                       {categoryDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={`hsl(var(--chart-${(index % 5) + 1}))`} />
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={`hsl(var(--chart-${(index % 5) + 1}))`}
+                          className="cursor-pointer transition-opacity hover:opacity-80"
+                        />
                       ))}
                     </Pie>
                     <ChartTooltip content={(props: any) => <ChartTooltipContent {...props} />} />

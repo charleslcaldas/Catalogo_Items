@@ -138,6 +138,7 @@ export type Fornecedor = {
   contato?: string
   email?: string
   cnpj?: string
+  business_license?: string
   telefone?: string
   website?: string
   endereco?: string
