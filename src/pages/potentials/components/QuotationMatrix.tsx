@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   Plus,
@@ -94,6 +94,8 @@ export default function QuotationMatrix() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterByLine, setFilterByLine] = useState(false)
 
+  const userUnlockedRef = useRef(false)
+
   const loadData = async () => {
     if (!potencialId) return
     try {
@@ -120,7 +122,9 @@ export default function QuotationMatrix() {
       setFornecedores(forn)
 
       const anyFinalizada = cF.some((c) => c.status === 'finalizada')
-      if (anyFinalizada && !isFrozen) setIsFrozen(true)
+      if (anyFinalizada && !userUnlockedRef.current) {
+        setIsFrozen(true)
+      }
 
       const linhaIds = Array.from(
         new Set(pItens.map((i) => i.expand?.item_id?.linha_id).filter(Boolean)),
@@ -533,6 +537,7 @@ export default function QuotationMatrix() {
         title: 'Sucesso',
         description: `${updatedCount} preços de compra aceitos e histórico salvo.`,
       })
+      userUnlockedRef.current = false
       setIsFrozen(true)
     } catch (err: any) {
       toast({ title: 'Erro', description: err.message, variant: 'destructive' })
@@ -837,7 +842,10 @@ export default function QuotationMatrix() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setIsFrozen(false)}
+              onClick={() => {
+                userUnlockedRef.current = true
+                setIsFrozen(false)
+              }}
               className="border-red-200 text-red-700 bg-red-50 hover:bg-red-100 hover:text-red-800"
             >
               <Unlock className="w-4 h-4 mr-2" /> Editar Cotação

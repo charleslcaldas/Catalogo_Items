@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import AddItemsToPotential from './AddItemsToPotential'
+import AddItemsToPotential, { AddItemsToPotentialRef } from './AddItemsToPotential'
 import QuotationMatrix from './components/QuotationMatrix'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
@@ -13,7 +13,7 @@ import { useRealtime } from '@/hooks/use-realtime'
 
 export default function PotentialDetailsWrapper() {
   const [tab, setTab] = useState('items')
-  const [itemsKey, setItemsKey] = useState(Date.now())
+  const addItemsRef = useRef<AddItemsToPotentialRef>(null)
   const [globalMargin, setGlobalMargin] = useState('7.5')
   const [realMargin, setRealMargin] = useState<number | null>(null)
   const [isApplying, setIsApplying] = useState(false)
@@ -24,7 +24,6 @@ export default function PotentialDetailsWrapper() {
 
   const handleTabChange = (v: string) => {
     setTab(v)
-    if (v === 'items') setItemsKey(Date.now())
   }
 
   const loadTotals = async () => {
@@ -56,7 +55,7 @@ export default function PotentialDetailsWrapper() {
 
   useEffect(() => {
     loadTotals()
-  }, [potencialId, itemsKey])
+  }, [potencialId])
 
   useRealtime('potencial_itens', loadTotals)
   useRealtime('itens', loadTotals)
@@ -80,7 +79,9 @@ export default function PotentialDetailsWrapper() {
         return pb.collection('potencial_itens').update(item.id, { preco_unitario: salePrice })
       })
       await Promise.all(promises)
-      setItemsKey(Date.now())
+      if (addItemsRef.current) {
+        await addItemsRef.current.reloadItemsPrices()
+      }
       loadTotals()
       toast({ title: `Margem de ${margin}% aplicada a ${items.length} itens.` })
     } catch (err: any) {
@@ -157,7 +158,7 @@ export default function PotentialDetailsWrapper() {
       </div>
       <div className="flex-1 overflow-hidden relative">
         <div className={cn('absolute inset-0 overflow-auto', tab === 'items' ? 'block' : 'hidden')}>
-          <AddItemsToPotential key={itemsKey} />
+          <AddItemsToPotential ref={addItemsRef} />
         </div>
         <div
           className={cn(

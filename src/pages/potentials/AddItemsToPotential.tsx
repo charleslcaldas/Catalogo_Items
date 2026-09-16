@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useImperativeHandle, forwardRef, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
@@ -58,7 +58,11 @@ export type SelectedItemRecord = {
   data: SelectedItemData
 }
 
-export default function AddItemsToPotential() {
+export type AddItemsToPotentialRef = {
+  reloadItemsPrices: () => Promise<void>
+}
+
+export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_props, ref) => {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [currentPotential, setCurrentPotential] = useState<Potencial | null>(null)
@@ -75,6 +79,10 @@ export default function AddItemsToPotential() {
 
   const [selectedItems, setSelectedItems] = useState<any[]>([])
   const [lastOfferedPrices, setLastOfferedPrices] = useState<Record<string, number>>({})
+
+  // Track initial state to detect unsaved changes
+  const initialSnapshotRef = useRef<string>('')
+  const isSavedRef = useRef<boolean>(false)
 
   const [isSelecting, setIsSelecting] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -369,6 +377,13 @@ export default function AddItemsToPotential() {
       setCurrentPotential(saved)
       setFormData((prev) => ({ ...prev, status: statusToSave }))
 
+      // Update snapshot of saved state
+      isSavedRef.current = true
+      initialSnapshotRef.current = JSON.stringify({
+        formData: { ...formData, status: statusToSave },
+        items: itemsData,
+      })
+
       toast.success(`Cotação ${saved.numero_potencial} salva com sucesso!`, {
         className: 'bg-green-500 text-white border-none',
       })
@@ -438,11 +453,121 @@ export default function AddItemsToPotential() {
 
       formattedItems.sort((a, b) => (a.data.ordem || 0) - (b.data.ordem || 0))
       setSelectedItems(formattedItems)
+
+      // Set clean initial snapshot when loaded from search or URL
+      initialSnapshotRef.current = JSON.stringify({
+        formData: {
+          numero_potencial: quote.numero_potencial || '',
+          cliente: quote.cliente || '',
+          nome_potencial: quote.nome_potencial || '',
+          proprietario: quote.proprietario || '',
+          estagio: quote.estagio || '',
+          observacoes: quote.observacoes || '',
+          status: quote.status || 'Sem Itens',
+        },
+        items: formattedItems.map((fi) => ({
+          item_id: fi.id,
+          quantidade: Number(fi.data.quantidade) || 0,
+          unidade_medida: fi.data.unidade_medida,
+          preco_unitario: Number(fi.data.preco_unitario) || 0,
+          observacoes: fi.data.observacoes,
+        })),
+      })
+      isSavedRef.current = false
+
       toast.success('Cotação carregada com sucesso!')
     } catch (error) {
       toast.error('Erro ao carregar itens da cotação.')
     }
   }
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      reloadItemsPrices: async () => {
+        if (!currentPotential?.id) return
+        try {
+          const updatedItems = await pb.collection('potencial_itens').getFullList({
+            filter: `potencial_id="${currentPotential.id}"`,
+          })
+          const priceMap = new Map<string, number>()
+          updatedItems.forEach((it) => {
+            if (typeof it.preco_unitario === 'number') {
+              priceMap.set(it.id, it.preco_unitario)
+            }
+          })
+          setSelectedItems((prev) =>
+            prev.map((si) => {
+              if (si.recordId && priceMap.has(si.recordId)) {
+                return {
+                  ...si,
+                  data: {
+                    ...si.data,
+                    preco_unitario: priceMap.get(si.recordId)!,
+                  },
+                }
+              }
+              return si
+            }),
+          )
+        } catch (err) {
+          console.error('Failed to reload items prices', err)
+        }
+      },
+    }),
+    [currentPotential?.id],
+  )
+
+  // Unsaved changes detection for beforeunload and navigation
+  const isDirty = () => {
+    // If empty new quote with nothing filled, not dirty
+    const isEmptyNew =
+      !currentPotential &&
+      !formData.numero_potencial &&
+      !formData.cliente &&
+      !formData.nome_potencial &&
+      !formData.proprietario &&
+      !formData.estagio &&
+      !formData.observacoes &&
+      selectedItems.length === 0
+
+    if (isEmptyNew) return false
+
+    // Compare with snapshot
+    const currentSimplified = JSON.stringify({
+      formData: {
+        numero_potencial: formData.numero_potencial || '',
+        cliente: formData.cliente || '',
+        nome_potencial: formData.nome_potencial || '',
+        proprietario: formData.proprietario || '',
+        estagio: formData.estagio || '',
+        observacoes: formData.observacoes || '',
+        status: formData.status || 'Sem Itens',
+      },
+      items: selectedItems.map((si) => ({
+        item_id: si.id,
+        quantidade: Number(si.data.quantidade) || 0,
+        unidade_medida: si.data.unidade_medida,
+        preco_unitario: Number(si.data.preco_unitario) || 0,
+        observacoes: si.data.observacoes,
+      })),
+    })
+
+    return currentSimplified !== initialSnapshotRef.current
+  }
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty()) {
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  })
 
   const handleItemSaved = (newItem: Item) => {
     setSelectedItems((prev) => {
@@ -600,7 +725,18 @@ export default function AddItemsToPotential() {
             variant="outline"
             size="sm"
             className="h-8 text-xs"
-            onClick={() => navigate('/potenciais')}
+            onClick={() => {
+              if (isDirty()) {
+                if (
+                  !window.confirm(
+                    'Você tem alterações não salvas. Deseja realmente sair e descartar as alterações?',
+                  )
+                ) {
+                  return
+                }
+              }
+              navigate('/potenciais')
+            }}
           >
             Cancelar
           </Button>
@@ -805,4 +941,6 @@ export default function AddItemsToPotential() {
       />
     </div>
   )
-}
+})
+
+export default AddItemsToPotential
