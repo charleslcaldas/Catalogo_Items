@@ -201,6 +201,12 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
       } else {
         const unidadeObj = unidades.find((u) => u.id === item.unidade_id)
         const unidadeNome = unidadeObj ? unidadeObj.nome : item.unidade || 'Pcs'
+        const initialCost =
+          typeof item.preco_compra === 'number' && item.preco_compra > 0
+            ? item.preco_compra
+            : undefined
+        const initialSupplier = item.fornecedor_ultima_atualizacao || undefined
+
         return [
           ...prev,
           {
@@ -212,6 +218,9 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
               preco_unitario: item.preco_venda !== undefined ? item.preco_venda : '',
               observacoes: '',
               ordem: prev.length + 1,
+              referencia_preco: initialCost,
+              referencia_fornecedor: initialSupplier,
+              referencia_data: initialCost ? new Date().toISOString() : undefined,
             },
           },
         ]
@@ -245,6 +254,13 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
         toast.success(`Quantidade do item ${item.sku} atualizada.`)
       }
     } else {
+      // Obter snapshot inicial do item se disponível (ex: preco_compra do catálogo)
+      const initialCost =
+        typeof item.preco_compra === 'number' && item.preco_compra > 0
+          ? item.preco_compra
+          : undefined
+      const initialSupplier = item.fornecedor_ultima_atualizacao || undefined
+
       const newItemData: SelectedItemData = {
         item,
         quantidade: 1,
@@ -252,11 +268,14 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
         preco_unitario: item.preco_venda !== undefined ? item.preco_venda : '',
         observacoes: '',
         ordem: selectedItems.length + 1,
+        referencia_preco: initialCost,
+        referencia_fornecedor: initialSupplier,
+        referencia_data: initialCost ? new Date().toISOString() : undefined,
       }
 
       if (currentPotential) {
         try {
-          const created = await pb.collection('potencial_itens').create({
+          const createPayload: Record<string, any> = {
             potencial_id: currentPotential.id,
             item_id: item.id,
             quantidade: 1,
@@ -264,7 +283,12 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
             preco_unitario: Number(item.preco_venda) || 0,
             observacoes: '',
             ordem: selectedItems.length + 1,
-          })
+          }
+          if (initialCost !== undefined) createPayload.referencia_preco = initialCost
+          if (initialSupplier !== undefined) createPayload.referencia_fornecedor = initialSupplier
+          if (initialCost !== undefined) createPayload.referencia_data = new Date().toISOString()
+
+          const created = await pb.collection('potencial_itens').create(createPayload)
           setSelectedItems((prev) => [
             ...prev,
             {
@@ -366,6 +390,9 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
           preco_unitario: Number(si.data.preco_unitario) || 0,
           observacoes: si.data.observacoes,
           ordem: index + 1,
+          referencia_preco: si.data.referencia_preco,
+          referencia_fornecedor: si.data.referencia_fornecedor,
+          referencia_data: si.data.referencia_data,
         }))
 
       const saved = await savePotencialFull(
@@ -609,6 +636,12 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
     setSelectedItems((prev) => {
       const unidadeObj = unidades.find((u) => u.id === newItem.unidade_id)
       const unidadeNome = unidadeObj ? unidadeObj.nome : newItem.unidade || 'Pcs'
+      const initialCost =
+        typeof newItem.preco_compra === 'number' && newItem.preco_compra > 0
+          ? newItem.preco_compra
+          : undefined
+      const initialSupplier = newItem.fornecedor_ultima_atualizacao || undefined
+
       return [
         ...prev,
         {
@@ -620,6 +653,9 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
             preco_unitario: newItem.preco_venda !== undefined ? newItem.preco_venda : '',
             observacoes: '',
             ordem: prev.length + 1,
+            referencia_preco: initialCost,
+            referencia_fornecedor: initialSupplier,
+            referencia_data: initialCost ? new Date().toISOString() : undefined,
           },
         },
       ]

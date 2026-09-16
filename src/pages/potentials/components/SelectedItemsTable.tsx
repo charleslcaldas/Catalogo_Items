@@ -54,7 +54,7 @@ export function SelectedItemsTable({
     const num = Number(value)
     return isNaN(num)
       ? '-'
-      : `$ ${num.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`
+      : `$ ${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}`
   }
 
   const handleQuantityBlur = async (recordId: string | undefined, quantidade: string | number) => {

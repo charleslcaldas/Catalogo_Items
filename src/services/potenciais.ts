@@ -51,12 +51,18 @@ export const savePotencialFull = async (
   }
 
   await Promise.all(
-    itemsData.map((item) =>
-      pb.collection('potencial_itens').create({
+    itemsData.map((item) => {
+      const payload: Record<string, any> = {
         ...item,
         potencial_id: savedPotencial.id,
-      }),
-    ),
+      }
+      if (item.referencia_preco !== undefined) payload.referencia_preco = item.referencia_preco
+      if (item.referencia_fornecedor !== undefined)
+        payload.referencia_fornecedor = item.referencia_fornecedor
+      if (item.referencia_data !== undefined) payload.referencia_data = item.referencia_data
+
+      return pb.collection('potencial_itens').create(payload)
+    }),
   )
 
   return savedPotencial
@@ -83,11 +89,16 @@ export const duplicatePotencial = async (potencialId: string) => {
 
   await Promise.all(
     items.map((item) => {
-      const duplicatedItem = { ...item, potencial_id: newPotencial.id }
-      delete (duplicatedItem as any).id
-      delete (duplicatedItem as any).created
-      delete (duplicatedItem as any).updated
-      delete (duplicatedItem as any).expand
+      const duplicatedItem: Record<string, any> = { ...item, potencial_id: newPotencial.id }
+      delete duplicatedItem.id
+      delete duplicatedItem.created
+      delete duplicatedItem.updated
+      delete duplicatedItem.expand
+      if (item.referencia_preco !== undefined)
+        duplicatedItem.referencia_preco = item.referencia_preco
+      if (item.referencia_fornecedor !== undefined)
+        duplicatedItem.referencia_fornecedor = item.referencia_fornecedor
+      if (item.referencia_data !== undefined) duplicatedItem.referencia_data = item.referencia_data
       return pb.collection('potencial_itens').create(duplicatedItem)
     }),
   )
