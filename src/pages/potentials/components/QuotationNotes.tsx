@@ -134,16 +134,23 @@ export function QuotationNotes({
             </SelectContent>
           </Select>
         </div>
-        <div className="flex gap-2 items-start">
+        <div className="flex flex-col gap-2">
           <Textarea
             placeholder="Registre detalhes da negociação..."
-            className="min-h-[60px] text-xs resize-y flex-1"
+            className="min-h-[60px] text-xs resize-y w-full"
             value={newNote}
             onChange={(e) => setNewNote(e.target.value)}
           />
-          <Button onClick={handleAddNote} disabled={!newNote.trim()} className="h-full">
-            <Send className="w-4 h-4 mr-2" /> Salvar
-          </Button>
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              onClick={handleAddNote}
+              disabled={!newNote.trim()}
+              className="h-8 text-xs shrink-0"
+            >
+              <Send className="w-3.5 h-3.5 mr-1.5" /> Salvar Nota
+            </Button>
+          </div>
         </div>
       </div>
 

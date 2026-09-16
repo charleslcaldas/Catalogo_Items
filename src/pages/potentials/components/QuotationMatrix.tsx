@@ -1015,7 +1015,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                   <TableHead
                     key={cf.id}
                     className="min-w-[160px] bg-muted/30 border-r py-2 cursor-pointer select-none"
-                    onDoubleClick={() => cf.status !== 'finalizada' && handleSelectAllFor(cf.id)}
+                    onDoubleClick={() => handleSelectAllFor(cf.id)}
                     title="Duplo clique para selecionar todos os itens deste fabricante"
                   >
                     <div className="flex flex-col items-center relative group">
@@ -1071,7 +1071,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                       ? cfDrafts[cf.id].incoterm!
                                       : cf.incoterm || ''
                                   }
-                                  disabled={cf.status === 'finalizada'}
                                   onChange={(e) =>
                                     setCfDrafts((prev) => ({
                                       ...prev,
@@ -1098,7 +1097,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                       ? cfDrafts[cf.id].tempo_fabricacao!
                                       : cf.tempo_fabricacao || ''
                                   }
-                                  disabled={cf.status === 'finalizada'}
                                   onChange={(e) =>
                                     setCfDrafts((prev) => ({
                                       ...prev,
@@ -1125,7 +1123,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                       ? cfDrafts[cf.id].condicao_pagamento!
                                       : cf.condicao_pagamento || ''
                                   }
-                                  disabled={cf.status === 'finalizada'}
                                   onChange={(e) =>
                                     setCfDrafts((prev) => ({
                                       ...prev,
@@ -1160,7 +1157,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                   size="sm"
                                   className="w-full justify-start text-xs h-7"
                                   onClick={() => handleSelectAllFor(cf.id)}
-                                  disabled={cf.status === 'finalizada'}
                                 >
                                   <CheckSquare className="w-3 h-3 mr-2" /> Selecionar Todos
                                 </Button>
@@ -1168,8 +1164,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                   <Input
                                     type="file"
                                     accept=".csv,.xlsx,.xls"
-                                    className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed"
-                                    disabled={cf.status === 'finalizada'}
+                                    className="absolute inset-0 opacity-0 cursor-pointer"
                                     onChange={(e) =>
                                       e.target.files?.[0] &&
                                       handleFileSelect(cf.id, e.target.files[0])
@@ -1179,7 +1174,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                     variant="outline"
                                     size="sm"
                                     className="w-full justify-start text-xs h-7 pointer-events-none"
-                                    disabled={cf.status === 'finalizada'}
                                   >
                                     <FileUp className="w-3 h-3 mr-2" /> Importar Preços
                                   </Button>
@@ -1390,7 +1384,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                               isWinnerCell
                                 ? 'bg-blue-100/40 border-l-2 border-r-2 border-y-2 border-blue-400 shadow-[inset_0_0_0_1px_rgba(96,165,250,0.5)] z-10'
                                 : 'bg-background/50 hover:bg-muted/20',
-                              cf.status === 'finalizada' && 'pointer-events-none opacity-80',
                             )}
                           >
                             <PriceCell
