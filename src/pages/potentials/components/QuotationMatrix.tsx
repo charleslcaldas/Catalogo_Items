@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   Plus,
@@ -11,8 +11,6 @@ import {
   History,
   Maximize2,
   Minimize2,
-  Lock,
-  Unlock,
   Search,
   Save,
   Loader2,
@@ -73,7 +71,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isCounterOpen, setIsCounterOpen] = useState(false)
   const [isCompact, setIsCompact] = useState(false)
-  const [isFrozen, setIsFrozen] = useState(false)
   const [comboboxSearch, setComboboxSearch] = useState('')
 
   const [draftPrices, setDraftPrices] = useState<Record<string, number>>({})
@@ -102,8 +99,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterByLine, setFilterByLine] = useState(false)
 
-  const userUnlockedRef = useRef(false)
-
   const loadData = async () => {
     if (!potencialId) return
     try {
@@ -128,11 +123,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
       setCotacoesF(cF)
       setCotacoesI(cI)
       setFornecedores(forn)
-
-      const anyFinalizada = cF.some((c) => c.status === 'finalizada')
-      if (anyFinalizada && !userUnlockedRef.current) {
-        setIsFrozen(true)
-      }
 
       const linhaIds = Array.from(
         new Set(pItens.map((i) => i.expand?.item_id?.linha_id).filter(Boolean)),
@@ -590,8 +580,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
         title: 'Sucesso',
         description: `${updatedCount} preços de compra aceitos e histórico salvo.`,
       })
-      userUnlockedRef.current = false
-      setIsFrozen(true)
       if (onAccepted) {
         onAccepted()
       }
@@ -847,11 +835,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
             >
               Cotação #{potencial?.numero_potencial || potencialId}
             </Badge>
-            {isFrozen && (
-              <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
-                <Lock className="w-3 h-3 mr-1" /> Bloqueada
-              </Badge>
-            )}
           </div>
           <div className="flex flex-wrap gap-x-8 gap-y-2 mt-3 text-sm">
             <div className="flex flex-col">
@@ -886,113 +869,94 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
             {isCompact ? <Maximize2 className="w-4 h-4" /> : <Minimize2 className="w-4 h-4" />}
           </Button>
 
-          {isFrozen ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                userUnlockedRef.current = true
-                setIsFrozen(false)
-              }}
-              className="border-red-200 text-red-700 bg-red-50 hover:bg-red-100 hover:text-red-800"
-            >
-              <Unlock className="w-4 h-4 mr-2" /> Editar Cotação
-            </Button>
-          ) : (
-            <Popover open={isAddOpen} onOpenChange={setIsAddOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Plus className="w-4 h-4 mr-2" /> Fabricante
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[340px] p-0" align="start">
-                <div className="p-2 border-b flex items-center justify-between bg-muted/10">
-                  <Label
-                    className="text-xs text-muted-foreground cursor-pointer"
-                    htmlFor="line-filter"
-                  >
-                    Apenas fornecedores da linha
-                  </Label>
-                  <Switch
-                    id="line-filter"
-                    checked={filterByLine}
-                    onCheckedChange={setFilterByLine}
-                  />
-                </div>
-                <Command
-                  filter={(value, search) => {
-                    const normalizedValue = value.toLowerCase()
-                    const normalizedSearch = search.toLowerCase()
-                    const tokens = normalizedSearch.split(/\s+/)
-                    return tokens.every((token) => normalizedValue.includes(token)) ? 1 : 0
-                  }}
+          <Popover open={isAddOpen} onOpenChange={setIsAddOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Plus className="w-4 h-4 mr-2" /> Fabricante
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[340px] p-0" align="start">
+              <div className="p-2 border-b flex items-center justify-between bg-muted/10">
+                <Label
+                  className="text-xs text-muted-foreground cursor-pointer"
+                  htmlFor="line-filter"
                 >
-                  <CommandInput
-                    placeholder="Buscar fabricante..."
-                    value={comboboxSearch}
-                    onValueChange={setComboboxSearch}
-                  />
-                  <CommandList>
-                    <CommandEmpty>Nenhum fabricante encontrado.</CommandEmpty>
-                    <CommandGroup>
-                      {sortedFornecedores.map((f) => (
-                        <CommandItem
-                          key={f.id}
-                          value={f.nome}
-                          onSelect={() => {
-                            handleAddFornecedor(f.id)
-                            setComboboxSearch('')
-                          }}
-                        >
-                          <div className="flex items-center justify-between w-full">
-                            <span className="truncate" title={f.nome}>
-                              {f.nome}
-                            </span>
-                            <div className="flex items-center gap-1 shrink-0 ml-2">
-                              {prioritizedSuppliers.has(f.nome) && (
-                                <Badge
-                                  variant="secondary"
-                                  className="text-[9px] px-1 h-4 font-normal bg-emerald-50 text-emerald-700 border-emerald-200"
-                                >
-                                  Recomendado
-                                </Badge>
-                              )}
-                              {f.auditado && (
-                                <span title="Auditado">
-                                  <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
-                                </span>
-                              )}
-                              {(suppliersWithHistory.has(f.id) ||
-                                suppliersWithHistory.has(f.nome)) && (
-                                <span title="Possui Histórico">
-                                  <History className="w-3.5 h-3.5 text-muted-foreground" />
-                                </span>
-                              )}
-                            </div>
+                  Apenas fornecedores da linha
+                </Label>
+                <Switch id="line-filter" checked={filterByLine} onCheckedChange={setFilterByLine} />
+              </div>
+              <Command
+                filter={(value, search) => {
+                  const normalizedValue = value.toLowerCase()
+                  const normalizedSearch = search.toLowerCase()
+                  const tokens = normalizedSearch.split(/\s+/)
+                  return tokens.every((token) => normalizedValue.includes(token)) ? 1 : 0
+                }}
+              >
+                <CommandInput
+                  placeholder="Buscar fabricante..."
+                  value={comboboxSearch}
+                  onValueChange={setComboboxSearch}
+                />
+                <CommandList>
+                  <CommandEmpty>Nenhum fabricante encontrado.</CommandEmpty>
+                  <CommandGroup>
+                    {sortedFornecedores.map((f) => (
+                      <CommandItem
+                        key={f.id}
+                        value={f.nome}
+                        onSelect={() => {
+                          handleAddFornecedor(f.id)
+                          setComboboxSearch('')
+                        }}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span className="truncate" title={f.nome}>
+                            {f.nome}
+                          </span>
+                          <div className="flex items-center gap-1 shrink-0 ml-2">
+                            {prioritizedSuppliers.has(f.nome) && (
+                              <Badge
+                                variant="secondary"
+                                className="text-[9px] px-1 h-4 font-normal bg-emerald-50 text-emerald-700 border-emerald-200"
+                              >
+                                Recomendado
+                              </Badge>
+                            )}
+                            {f.auditado && (
+                              <span title="Auditado">
+                                <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                              </span>
+                            )}
+                            {(suppliersWithHistory.has(f.id) ||
+                              suppliersWithHistory.has(f.nome)) && (
+                              <span title="Possui Histórico">
+                                <History className="w-3.5 h-3.5 text-muted-foreground" />
+                              </span>
+                            )}
                           </div>
-                        </CommandItem>
-                      ))}
-                      {sortedFornecedores.length === 0 && (
-                        <CommandItem disabled>Nenhum fabricante disponível</CommandItem>
-                      )}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          )}
+                        </div>
+                      </CommandItem>
+                    ))}
+                    {sortedFornecedores.length === 0 && (
+                      <CommandItem disabled>Nenhum fabricante disponível</CommandItem>
+                    )}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
 
           <Button
             variant="outline"
             size="sm"
             onClick={() => setIsCounterOpen(true)}
-            disabled={isFrozen}
             className="border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 hover:text-amber-800"
           >
             <TrendingDown className="w-4 h-4 mr-2" /> Contraproposta
           </Button>
 
-          <Button variant="outline" size="sm" onClick={handleExportExcel} disabled={isFrozen}>
+          <Button variant="outline" size="sm" onClick={handleExportExcel}>
             <Download className="w-4 h-4 mr-2" /> Exportar Planilha (.csv)
           </Button>
 
@@ -1001,7 +965,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
             size="sm"
             onClick={handleSaveDraftPrices}
             disabled={
-              isFrozen ||
               isSavingDraft ||
               (Object.keys(draftPrices).length === 0 &&
                 Object.keys(draftMoqs).length === 0 &&
@@ -1022,7 +985,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
             variant="outline"
             size="sm"
             onClick={handleAcceptSelected}
-            disabled={isFrozen}
             className="border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 hover:text-blue-800"
           >
             <CheckSquare className="w-4 h-4 mr-2" /> Aceitar Selecionados
@@ -1053,7 +1015,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                   <TableHead
                     key={cf.id}
                     className="min-w-[160px] bg-muted/30 border-r py-2 cursor-pointer select-none"
-                    onDoubleClick={() => !isFrozen && handleSelectAllFor(cf.id)}
+                    onDoubleClick={() => cf.status !== 'finalizada' && handleSelectAllFor(cf.id)}
                     title="Duplo clique para selecionar todos os itens deste fabricante"
                   >
                     <div className="flex flex-col items-center relative group">
@@ -1109,7 +1071,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                       ? cfDrafts[cf.id].incoterm!
                                       : cf.incoterm || ''
                                   }
-                                  disabled={isFrozen}
+                                  disabled={cf.status === 'finalizada'}
                                   onChange={(e) =>
                                     setCfDrafts((prev) => ({
                                       ...prev,
@@ -1136,7 +1098,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                       ? cfDrafts[cf.id].tempo_fabricacao!
                                       : cf.tempo_fabricacao || ''
                                   }
-                                  disabled={isFrozen}
+                                  disabled={cf.status === 'finalizada'}
                                   onChange={(e) =>
                                     setCfDrafts((prev) => ({
                                       ...prev,
@@ -1163,7 +1125,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                       ? cfDrafts[cf.id].condicao_pagamento!
                                       : cf.condicao_pagamento || ''
                                   }
-                                  disabled={isFrozen}
+                                  disabled={cf.status === 'finalizada'}
                                   onChange={(e) =>
                                     setCfDrafts((prev) => ({
                                       ...prev,
@@ -1190,7 +1152,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                   size="sm"
                                   className="w-full justify-start text-xs h-7"
                                   onClick={() => handleExportCounterProposal(cf)}
-                                  disabled={isFrozen}
                                 >
                                   <Download className="w-3 h-3 mr-2" /> Exportar Contra-proposta
                                 </Button>
@@ -1199,7 +1160,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                   size="sm"
                                   className="w-full justify-start text-xs h-7"
                                   onClick={() => handleSelectAllFor(cf.id)}
-                                  disabled={isFrozen}
+                                  disabled={cf.status === 'finalizada'}
                                 >
                                   <CheckSquare className="w-3 h-3 mr-2" /> Selecionar Todos
                                 </Button>
@@ -1208,7 +1169,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                     type="file"
                                     accept=".csv,.xlsx,.xls"
                                     className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed"
-                                    disabled={isFrozen}
+                                    disabled={cf.status === 'finalizada'}
                                     onChange={(e) =>
                                       e.target.files?.[0] &&
                                       handleFileSelect(cf.id, e.target.files[0])
@@ -1218,7 +1179,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                     variant="outline"
                                     size="sm"
                                     className="w-full justify-start text-xs h-7 pointer-events-none"
-                                    disabled={isFrozen}
+                                    disabled={cf.status === 'finalizada'}
                                   >
                                     <FileUp className="w-3 h-3 mr-2" /> Importar Preços
                                   </Button>
@@ -1429,7 +1390,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                               isWinnerCell
                                 ? 'bg-blue-100/40 border-l-2 border-r-2 border-y-2 border-blue-400 shadow-[inset_0_0_0_1px_rgba(96,165,250,0.5)] z-10'
                                 : 'bg-background/50 hover:bg-muted/20',
-                              isFrozen && 'pointer-events-none opacity-80',
+                              cf.status === 'finalizada' && 'pointer-events-none opacity-80',
                             )}
                           >
                             <PriceCell
