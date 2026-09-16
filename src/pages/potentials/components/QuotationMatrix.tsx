@@ -473,8 +473,16 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
     }
   }
 
+  const getWinnerPrice = (ci: any) => {
+    const draftKey = `${ci.cotacao_fornecedor_id}_${ci.item_id}`
+    const draft = draftPrices[draftKey]
+    if (draft !== undefined && draft > 0) return draft
+    if (ci.preco_contraproposta > 0) return ci.preco_contraproposta
+    return ci.preco_ofertado || 0
+  }
+
   const handleAcceptSelected = async () => {
-    const winners = cotacoesI.filter((c) => c.vencedor && c.preco_ofertado > 0)
+    const winners = cotacoesI.filter((c) => c.vencedor && getWinnerPrice(c) > 0)
     if (winners.length === 0) {
       toast({ title: 'Nenhum item selecionado como vencedor' })
       return
@@ -499,8 +507,8 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
 
   const executeAcceptSelected = async (adjustMoq: boolean) => {
     try {
-      const winners = cotacoesI.filter((c) => c.vencedor && c.preco_ofertado > 0)
-      const promises = []
+      const winners = cotacoesI.filter((c) => c.vencedor && getWinnerPrice(c) > 0)
+      const promises: Promise<any>[] = []
       let updatedCount = 0
       const fornecedoresNomes = new Set<string>()
 
@@ -508,11 +516,29 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
         const pi = potencialItens.find((p) => p.item_id === w.item_id)
         if (!pi) continue
 
-        let priceToUse =
-          draftPrices[`${w.cotacao_fornecedor_id}_${w.item_id}`] ??
-          (w.preco_contraproposta > 0 ? w.preco_contraproposta : w.preco_ofertado)
+        const draftKey = `${w.cotacao_fornecedor_id}_${w.item_id}`
+        const draft = draftPrices[draftKey]
+        const priceToUse =
+          draft !== undefined && draft > 0
+            ? draft
+            : w.preco_contraproposta > 0
+              ? w.preco_contraproposta
+              : w.preco_ofertado
 
-        const moqToUse = draftMoqs[`${w.cotacao_fornecedor_id}_${w.item_id}`] ?? w.quantidade_minima
+        // Se houver draft > 0 para uma cotação aceita, persista também esse valor em cotacoes_itens
+        if (draft !== undefined && draft > 0) {
+          const draftMoq = draftMoqs[draftKey]
+          const moqVal = draftMoq !== undefined ? draftMoq : w.quantidade_minima || 0
+          promises.push(
+            pb.collection('cotacoes_itens').update(w.id, {
+              preco_ofertado: draft,
+              quantidade_minima: moqVal,
+              vencedor: true,
+            }),
+          )
+        }
+
+        const moqToUse = draftMoqs[draftKey] ?? w.quantidade_minima
 
         promises.push(pb.collection('itens').update(w.item_id, { preco_compra: priceToUse }))
 
@@ -581,8 +607,9 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
         description: `${updatedCount} preços de compra aceitos e histórico salvo.`,
       })
       if (onAccepted) {
-        onAccepted()
+        await onAccepted()
       }
+      await loadData()
     } catch (err: any) {
       toast({ title: 'Erro', description: err.message, variant: 'destructive' })
     } finally {
@@ -750,41 +777,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
     })
     return {
       custoTotal,
-    }
-  }, [potencialItens, cotacoesI, draftPrices])
-
-  const costSummary = useMemo(() => {
-    let custoUltimoPreco = 0
-    let custoSelecionado = 0
-    let totalVenda = 0
-
-    potencialItens.forEach((pi) => {
-      const qty = pi.quantidade || 0
-
-      const refPrice = typeof pi.referencia_preco === 'number' ? pi.referencia_preco : 0
-      custoUltimoPreco += qty * refPrice
-
-      const winner = cotacoesI.find((c) => c.item_id === pi.item_id && c.vencedor)
-      let selectedPrice = 0
-      if (winner) {
-        const draftP = draftPrices[`${winner.cotacao_fornecedor_id}_${pi.item_id}`]
-        selectedPrice = draftP !== undefined ? draftP : (winner.preco_ofertado ?? 0)
-      }
-      custoSelecionado += qty * selectedPrice
-
-      const salePrice = pi.preco_unitario || 0
-      totalVenda += qty * salePrice
-    })
-
-    const rentabilidadeAbsoluta = totalVenda - custoSelecionado
-    const rentabilidadePercentual = totalVenda > 0 ? (rentabilidadeAbsoluta / totalVenda) * 100 : 0
-
-    return {
-      custoUltimoPreco,
-      custoSelecionado,
-      totalVenda,
-      rentabilidadeAbsoluta,
-      rentabilidadePercentual,
     }
   }, [potencialItens, cotacoesI, draftPrices])
 
@@ -1468,41 +1460,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
         </div>
         <div className="shrink-0 flex flex-col gap-4 mb-4">
           <QuotationNotes potencialId={potencialId} cotacoesF={cotacoesF} />
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-2">
-            <div className="border rounded-xl p-4 bg-card shadow-sm flex flex-col justify-center">
-              <span className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">
-                Custo Referência
-              </span>
-              <span className="text-lg font-mono font-bold text-amber-600 mt-1">
-                $ {formatCurrency(costSummary.custoUltimoPreco)}
-              </span>
-            </div>
-            <div className="border rounded-xl p-4 bg-card shadow-sm flex flex-col justify-center">
-              <span className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">
-                Custo Selecionado
-              </span>
-              <span className="text-lg font-mono font-bold text-green-700 mt-1">
-                $ {formatCurrency(costSummary.custoSelecionado)}
-              </span>
-            </div>
-            <div className="border rounded-xl p-4 bg-card shadow-sm flex flex-col justify-center md:col-span-2">
-              <span className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">
-                Rentabilidade (vs Venda)
-              </span>
-              <div className="flex items-baseline gap-4 mt-1">
-                <span className="text-lg font-mono font-bold text-blue-700">
-                  $ {formatCurrency(costSummary.rentabilidadeAbsoluta)}
-                </span>
-                <span className="text-sm font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
-                  {costSummary.rentabilidadePercentual.toFixed(3)}%
-                </span>
-                <span className="text-xs text-muted-foreground ml-auto">
-                  Venda Total: $ {formatCurrency(costSummary.totalVenda)}
-                </span>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
