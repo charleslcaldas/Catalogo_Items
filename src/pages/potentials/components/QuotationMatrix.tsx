@@ -14,6 +14,10 @@ import {
   Search,
   Save,
   Loader2,
+  Truck,
+  Clock,
+  CreditCard,
+  Check,
 } from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
 import { Switch } from '@/components/ui/switch'
@@ -78,6 +82,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
   const [cfDrafts, setCfDrafts] = useState<
     Record<string, { incoterm?: string; tempo_fabricacao?: string; condicao_pagamento?: string }>
   >({})
+  const [savingCfIds, setSavingCfIds] = useState<Record<string, boolean>>({})
   const [isSavingDraft, setIsSavingDraft] = useState(false)
 
   const [suppliersWithHistory, setSuppliersWithHistory] = useState<Set<string>>(new Set())
@@ -329,6 +334,59 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
     setImportState(null)
   }
 
+  const handleSaveSupplierOptions = async (cfId: string) => {
+    const draft = cfDrafts[cfId]
+    if (!draft || Object.keys(draft).length === 0) {
+      toast({
+        title: 'Nenhuma alteração',
+        description: 'Não há alterações pendentes nas opções deste fabricante.',
+      })
+      return
+    }
+
+    try {
+      setSavingCfIds((prev) => ({ ...prev, [cfId]: true }))
+      const updatePayload: Record<string, any> = {}
+      if (draft.incoterm !== undefined) updatePayload.incoterm = draft.incoterm
+      if (draft.tempo_fabricacao !== undefined)
+        updatePayload.tempo_fabricacao = draft.tempo_fabricacao
+      if (draft.condicao_pagamento !== undefined)
+        updatePayload.condicao_pagamento = draft.condicao_pagamento
+
+      await pb.collection('cotacoes_fornecedor').update(cfId, updatePayload)
+
+      // Atualiza o estado local imediatamente
+      setCotacoesF((prev) =>
+        prev.map((item) => (item.id === cfId ? { ...item, ...updatePayload } : item)),
+      )
+
+      // Limpa os rascunhos salvos deste fornecedor
+      setCfDrafts((prev) => {
+        const next = { ...prev }
+        delete next[cfId]
+        return next
+      })
+
+      // Se houver callback onAccepted ou recarregamento de condições da cotação
+      if (onAccepted) {
+        await onAccepted()
+      }
+
+      toast({
+        title: 'Opções salvas com sucesso',
+        description: 'Condições comerciais do fabricante atualizadas.',
+      })
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao salvar opções',
+        description: err.message,
+        variant: 'destructive',
+      })
+    } finally {
+      setSavingCfIds((prev) => ({ ...prev, [cfId]: false }))
+    }
+  }
+
   const handleAddFornecedor = async (id: string) => {
     if (!potencialId || !id) return
     try {
@@ -415,6 +473,9 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
       setCfDrafts({})
 
       await loadData()
+      if (onAccepted) {
+        await onAccepted()
+      }
 
       toast({
         title: 'Edições salvas',
@@ -1056,25 +1117,41 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-5 w-5 opacity-0 group-hover:opacity-100"
+                              className="h-5 w-5 opacity-70 hover:opacity-100 group-hover:opacity-100"
                               onClick={(e) => e.stopPropagation()}
                               onDoubleClick={(e) => e.stopPropagation()}
+                              title="Opções do Fabricante"
                             >
                               <Settings2 className="w-3 h-3" />
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-72 p-3" align="center">
+                          <PopoverContent
+                            className="w-80 p-3"
+                            align="center"
+                            onClick={(e) => e.stopPropagation()}
+                            onDoubleClick={(e) => e.stopPropagation()}
+                          >
                             <div className="space-y-3">
-                              <h4 className="font-medium text-sm">Opções do Fabricante</h4>
+                              <div className="flex items-center justify-between pb-1 border-b">
+                                <h4 className="font-semibold text-xs text-foreground">
+                                  Opções do Fabricante
+                                </h4>
+                                <span className="text-[10px] text-muted-foreground truncate max-w-[140px]">
+                                  {cf.expand?.fornecedor_id?.nome}
+                                </span>
+                              </div>
+
                               <div className="space-y-1">
                                 <Label className="text-xs flex items-center gap-1">
+                                  <Truck className="w-3 h-3 text-muted-foreground" />
                                   Incoterm
                                   <span className="text-[9px] font-normal text-muted-foreground">
                                     (desta cotação)
                                   </span>
                                 </Label>
                                 <Input
-                                  className="h-7 text-xs"
+                                  className="h-7 text-xs bg-white"
+                                  placeholder="Ex: CIF, FOB, EXW..."
                                   value={
                                     cfDrafts[cf.id]?.incoterm !== undefined
                                       ? cfDrafts[cf.id].incoterm!
@@ -1092,15 +1169,18 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                   title="Editar para esta cotação (não altera o cadastro do fabricante)"
                                 />
                               </div>
+
                               <div className="space-y-1">
                                 <Label className="text-xs flex items-center gap-1">
+                                  <Clock className="w-3 h-3 text-muted-foreground" />
                                   Tempo de Fabricação
                                   <span className="text-[9px] font-normal text-muted-foreground">
                                     (desta cotação)
                                   </span>
                                 </Label>
                                 <Input
-                                  className="h-7 text-xs"
+                                  className="h-7 text-xs bg-white"
+                                  placeholder="Ex: 30 a 45 dias..."
                                   value={
                                     cfDrafts[cf.id]?.tempo_fabricacao !== undefined
                                       ? cfDrafts[cf.id].tempo_fabricacao!
@@ -1118,15 +1198,18 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                   title="Editar para esta cotação (não altera o cadastro do fabricante)"
                                 />
                               </div>
+
                               <div className="space-y-1">
                                 <Label className="text-xs flex items-center gap-1">
+                                  <CreditCard className="w-3 h-3 text-muted-foreground" />
                                   Condição de Pagamento
                                   <span className="text-[9px] font-normal text-muted-foreground">
                                     (desta cotação)
                                   </span>
                                 </Label>
                                 <Input
-                                  className="h-7 text-xs"
+                                  className="h-7 text-xs bg-white"
+                                  placeholder="Ex: 30% sinal + 70% embarque..."
                                   value={
                                     cfDrafts[cf.id]?.condicao_pagamento !== undefined
                                       ? cfDrafts[cf.id].condicao_pagamento!
@@ -1144,7 +1227,34 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                   title="Editar para esta cotação (não altera o cadastro do fabricante)"
                                 />
                               </div>
-                              <div className="pt-2 border-t flex flex-col gap-2">
+
+                              {/* Botão de salvar no painel */}
+                              {(() => {
+                                const hasDraftChanges =
+                                  cfDrafts[cf.id] !== undefined &&
+                                  (cfDrafts[cf.id]?.incoterm !== undefined ||
+                                    cfDrafts[cf.id]?.tempo_fabricacao !== undefined ||
+                                    cfDrafts[cf.id]?.condicao_pagamento !== undefined)
+                                const isSavingThisCf = !!savingCfIds[cf.id]
+
+                                return (
+                                  <Button
+                                    size="sm"
+                                    className="w-full text-xs h-7 bg-emerald-600 hover:bg-emerald-700 text-white font-medium gap-1.5 shadow-xs"
+                                    disabled={isSavingThisCf || !hasDraftChanges}
+                                    onClick={() => handleSaveSupplierOptions(cf.id)}
+                                  >
+                                    {isSavingThisCf ? (
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                      <Save className="w-3.5 h-3.5" />
+                                    )}
+                                    {isSavingThisCf ? 'Salvando...' : 'Salvar Condições'}
+                                  </Button>
+                                )
+                              })()}
+
+                              <div className="pt-2 border-t flex flex-col gap-1.5">
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -1212,18 +1322,103 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                         )
                       })()}
 
-                      <div className="flex gap-1 mt-1 text-[9px] text-muted-foreground">
-                        {cf.expand?.fornecedor_id?.incoterm && (
-                          <span className="bg-muted px-1 rounded truncate max-w-[60px]">
-                            {cf.expand.fornecedor_id.incoterm}
-                          </span>
-                        )}
-                        {cf.expand?.fornecedor_id?.tempo_fabricacao && (
-                          <span className="bg-muted px-1 rounded truncate max-w-[60px]">
-                            {cf.expand.fornecedor_id.tempo_fabricacao}
-                          </span>
-                        )}
-                      </div>
+                      {/* Informações comerciais desta cotação (Incoterm, Fabricação, Pagamento) */}
+                      {(() => {
+                        const effectiveIncoterm =
+                          cfDrafts[cf.id]?.incoterm !== undefined
+                            ? cfDrafts[cf.id].incoterm
+                            : cf.incoterm || cf.expand?.fornecedor_id?.incoterm || ''
+                        const effectiveTempo =
+                          cfDrafts[cf.id]?.tempo_fabricacao !== undefined
+                            ? cfDrafts[cf.id].tempo_fabricacao
+                            : cf.tempo_fabricacao ||
+                              cf.expand?.fornecedor_id?.tempo_fabricacao ||
+                              ''
+                        const effectivePagamento =
+                          cfDrafts[cf.id]?.condicao_pagamento !== undefined
+                            ? cfDrafts[cf.id].condicao_pagamento
+                            : cf.condicao_pagamento ||
+                              cf.expand?.fornecedor_id?.condicao_pagamento ||
+                              ''
+
+                        const hasAnyCondition =
+                          !!effectiveIncoterm || !!effectiveTempo || !!effectivePagamento
+
+                        if (!hasAnyCondition) {
+                          return (
+                            <span className="text-[9px] text-muted-foreground/60 italic mt-1">
+                              Sem condições cadastradas
+                            </span>
+                          )
+                        }
+
+                        return (
+                          <div className="w-full flex flex-col gap-0.5 mt-1 pt-1 border-t border-border/50 text-[10px] text-left">
+                            {effectiveIncoterm && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="flex items-center gap-1 text-muted-foreground hover:text-foreground cursor-default">
+                                    <Truck className="w-2.5 h-2.5 shrink-0 text-blue-600" />
+                                    <span className="font-medium text-foreground shrink-0 text-[9px]">
+                                      Incoterm:
+                                    </span>
+                                    <span className="truncate font-semibold text-[9px] text-blue-700 bg-blue-50/70 px-1 py-0.2 rounded border border-blue-200/60 max-w-[100px]">
+                                      {effectiveIncoterm}
+                                    </span>
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="text-xs">
+                                  <p>
+                                    <strong>Incoterm:</strong> {effectiveIncoterm}
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+
+                            {effectiveTempo && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="flex items-center gap-1 text-muted-foreground hover:text-foreground cursor-default">
+                                    <Clock className="w-2.5 h-2.5 shrink-0 text-blue-600" />
+                                    <span className="font-medium text-foreground shrink-0 text-[9px]">
+                                      Fabricação:
+                                    </span>
+                                    <span className="truncate text-[9px] text-muted-foreground max-w-[100px]">
+                                      {effectiveTempo}
+                                    </span>
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="text-xs">
+                                  <p>
+                                    <strong>Tempo de Fabricação:</strong> {effectiveTempo}
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+
+                            {effectivePagamento && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="flex items-center gap-1 text-muted-foreground hover:text-foreground cursor-default">
+                                    <CreditCard className="w-2.5 h-2.5 shrink-0 text-blue-600" />
+                                    <span className="font-medium text-foreground shrink-0 text-[9px]">
+                                      Pagamento:
+                                    </span>
+                                    <span className="truncate text-[9px] text-muted-foreground max-w-[100px]">
+                                      {effectivePagamento}
+                                    </span>
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="text-xs">
+                                  <p>
+                                    <strong>Condição de Pagamento:</strong> {effectivePagamento}
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                          </div>
+                        )
+                      })()}
                     </div>
                   </TableHead>
                 ))}
