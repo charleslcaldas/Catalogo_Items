@@ -1702,7 +1702,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                               'align-top px-1 border-r transition-colors relative',
                               isCompact ? 'py-0.5' : 'py-1',
                               isWinnerCell
-                                ? 'bg-blue-50/70 border-l-2 border-r-2 border-y-2 border-blue-300 shadow-[inset_0_0_0_1px_rgba(147,197,253,0.35)] z-10'
+                                ? 'bg-blue-100/70'
                                 : 'bg-background/50 hover:bg-muted/20',
                             )}
                           >

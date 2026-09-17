@@ -26,7 +26,7 @@ export function PriceCell({
       className={cn(
         'p-1.5 rounded-md flex flex-col gap-1.5 relative group min-h-[44px] cursor-pointer transition-all',
         cotacaoI?.vencedor
-          ? 'bg-blue-50/90 ring-2 ring-blue-400 border border-blue-300 shadow-xs'
+          ? 'bg-blue-100 hover:bg-blue-100/90'
           : isLowest
             ? 'bg-emerald-100/70 ring-1.5 ring-emerald-500/80 hover:bg-emerald-100'
             : 'hover:bg-muted/50',
@@ -45,7 +45,7 @@ export function PriceCell({
             className={cn(
               'h-7 text-xs text-right font-mono w-full font-semibold transition-colors',
               cotacaoI?.vencedor
-                ? 'bg-white text-blue-900 border-blue-300 font-bold focus-visible:ring-blue-400 shadow-2xs'
+                ? 'bg-white text-blue-900 border-border font-bold focus-visible:ring-blue-400 shadow-2xs'
                 : isLowest
                   ? 'bg-white/90 text-emerald-800 font-bold border-emerald-400 focus-visible:ring-emerald-400 shadow-2xs'
                   : 'bg-background text-foreground',
@@ -92,7 +92,7 @@ export function PriceCell({
             className={cn(
               'h-6 text-[10px] text-right font-mono flex-1 min-w-0',
               cotacaoI?.vencedor
-                ? 'bg-white text-blue-900 border-blue-300 focus-visible:ring-blue-400'
+                ? 'bg-white text-blue-900 border-border focus-visible:ring-blue-400'
                 : isLowest
                   ? 'bg-white/90 border-emerald-300 text-emerald-900 focus-visible:ring-emerald-400'
                   : '',
