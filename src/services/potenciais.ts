@@ -85,6 +85,7 @@ export const duplicatePotencial = async (potencialId: string) => {
   delete (duplicatedData as any).anexos
   delete (duplicatedData as any).expand
 
+  // incoterm_cliente, condicao_pagamento_cliente, tempo_fabricacao_cliente são mantidos automaticamente no duplicatedData
   const newPotencial = await pb.collection('potenciais').create(duplicatedData)
 
   await Promise.all(

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-16T14:29:40.896Z",
+  "generatedAt": "2026-09-17T10:31:00.673Z",
   "collections": [
     {
       "name": "users",
@@ -701,6 +701,24 @@
           "required": false,
           "system": false,
           "collectionRef": "estagios_potencial"
+        },
+        {
+          "name": "incoterm_cliente",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "condicao_pagamento_cliente",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tempo_fabricacao_cliente",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [

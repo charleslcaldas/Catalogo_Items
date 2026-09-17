@@ -170,6 +170,9 @@ export default function PotentialDetailsWrapper() {
             onAccepted={async () => {
               if (addItemsRef.current) {
                 await addItemsRef.current.reloadItemsPrices()
+                if (addItemsRef.current.reloadQuotationConditions) {
+                  await addItemsRef.current.reloadQuotationConditions()
+                }
               }
               loadTotals()
             }}

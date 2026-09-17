@@ -209,6 +209,9 @@ export type Potencial = {
   nome_comprador?: string
   notas?: string
   anexos?: string[]
+  incoterm_cliente?: string
+  condicao_pagamento_cliente?: string
+  tempo_fabricacao_cliente?: string
   created: string
   updated: string
   expand?: {

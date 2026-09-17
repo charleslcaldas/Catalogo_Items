@@ -1,4 +1,12 @@
-import { useState, useEffect, useImperativeHandle, forwardRef, useRef } from 'react'
+import {
+  useState,
+  useEffect,
+  useImperativeHandle,
+  forwardRef,
+  useRef,
+  useMemo,
+  useCallback,
+} from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
@@ -13,10 +21,14 @@ import {
   Truck,
   CreditCard,
   Clock,
+  RotateCcw,
+  Info,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Command,
@@ -60,6 +72,7 @@ export type SelectedItemRecord = {
 
 export type AddItemsToPotentialRef = {
   reloadItemsPrices: () => Promise<void>
+  reloadQuotationConditions?: () => Promise<void>
 }
 
 export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_props, ref) => {
@@ -75,6 +88,14 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
     estagio: '',
     observacoes: '',
     status: 'Sem Itens',
+    incoterm_cliente: '',
+    condicao_pagamento_cliente: '',
+    tempo_fabricacao_cliente: '',
+  })
+  const [condicoesManuais, setCondicoesManuais] = useState({
+    incoterm: false,
+    condicao_pagamento: false,
+    tempo_fabricacao: false,
   })
 
   const [selectedItems, setSelectedItems] = useState<any[]>([])
@@ -93,6 +114,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
   const [unidades, setUnidades] = useState<UnidadeMedida[]>([])
   const [statuses, setStatuses] = useState<StatusPotencial[]>([])
   const [fornecedorCotacoes, setFornecedorCotacoes] = useState<any[]>([])
+  const [cotacoesItens, setCotacoesItens] = useState<any[]>([])
 
   // Quick Search state
   const [quickSearchOpen, setQuickSearchOpen] = useState(false)
@@ -114,20 +136,38 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
     loadStatuses()
   }, [])
 
+  const loadQuotationConditionsData = useCallback(
+    async (potId?: string) => {
+      const targetId = potId || currentPotential?.id
+      if (!targetId) {
+        setFornecedorCotacoes([])
+        setCotacoesItens([])
+        return
+      }
+      try {
+        const [cfs, cis] = await Promise.all([
+          pb.collection('cotacoes_fornecedor').getFullList({
+            filter: `potencial_id="${targetId}"`,
+            expand: 'fornecedor_id',
+            sort: 'created',
+          }),
+          pb.collection('cotacoes_itens').getFullList({
+            filter: `cotacao_fornecedor_id.potencial_id="${targetId}"`,
+            expand: 'cotacao_fornecedor_id,item_id',
+          }),
+        ])
+        setFornecedorCotacoes(cfs)
+        setCotacoesItens(cis)
+      } catch (err) {
+        console.error('Erro ao carregar cotações para condições comerciais:', err)
+      }
+    },
+    [currentPotential?.id],
+  )
+
   useEffect(() => {
-    if (!currentPotential?.id) {
-      setFornecedorCotacoes([])
-      return
-    }
-    pb.collection('cotacoes_fornecedor')
-      .getFullList({
-        filter: `potencial_id="${currentPotential.id}"`,
-        expand: 'fornecedor_id',
-        sort: 'created',
-      })
-      .then(setFornecedorCotacoes)
-      .catch(console.error)
-  }, [currentPotential?.id])
+    loadQuotationConditionsData()
+  }, [loadQuotationConditionsData])
 
   useEffect(() => {
     const delay = setTimeout(() => {
@@ -407,7 +447,18 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
       // Update snapshot of saved state
       isSavedRef.current = true
       initialSnapshotRef.current = JSON.stringify({
-        formData: { ...formData, status: statusToSave },
+        formData: {
+          numero_potencial: formData.numero_potencial || '',
+          cliente: formData.cliente || '',
+          nome_potencial: formData.nome_potencial || '',
+          proprietario: formData.proprietario || '',
+          estagio: formData.estagio || '',
+          observacoes: formData.observacoes || '',
+          status: statusToSave,
+          incoterm_cliente: formData.incoterm_cliente || '',
+          condicao_pagamento_cliente: formData.condicao_pagamento_cliente || '',
+          tempo_fabricacao_cliente: formData.tempo_fabricacao_cliente || '',
+        },
         items: itemsData,
       })
 
@@ -457,6 +508,14 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
       estagio: quote.estagio || '',
       observacoes: quote.observacoes || '',
       status: quote.status || 'Sem Itens',
+      incoterm_cliente: quote.incoterm_cliente || '',
+      condicao_pagamento_cliente: quote.condicao_pagamento_cliente || '',
+      tempo_fabricacao_cliente: quote.tempo_fabricacao_cliente || '',
+    })
+    setCondicoesManuais({
+      incoterm: !!quote.incoterm_cliente,
+      condicao_pagamento: !!quote.condicao_pagamento_cliente,
+      tempo_fabricacao: !!quote.tempo_fabricacao_cliente,
     })
     setIsSearchQuoteOpen(false)
 
@@ -491,6 +550,9 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
           estagio: quote.estagio || '',
           observacoes: quote.observacoes || '',
           status: quote.status || 'Sem Itens',
+          incoterm_cliente: quote.incoterm_cliente || '',
+          condicao_pagamento_cliente: quote.condicao_pagamento_cliente || '',
+          tempo_fabricacao_cliente: quote.tempo_fabricacao_cliente || '',
         },
         items: formattedItems.map((fi) => ({
           item_id: fi.id,
@@ -511,6 +573,16 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
   useImperativeHandle(
     ref,
     () => ({
+      reloadQuotationConditions: async () => {
+        const targetPotencialId =
+          currentPotential?.id ||
+          searchParams.get('id') ||
+          searchParams.get('potencialId') ||
+          searchParams.get('potencial_id')
+        if (targetPotencialId) {
+          await loadQuotationConditionsData(targetPotencialId)
+        }
+      },
       reloadItemsPrices: async () => {
         const targetPotencialId =
           currentPotential?.id ||
@@ -606,6 +678,9 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
         estagio: formData.estagio || '',
         observacoes: formData.observacoes || '',
         status: formData.status || 'Sem Itens',
+        incoterm_cliente: formData.incoterm_cliente || '',
+        condicao_pagamento_cliente: formData.condicao_pagamento_cliente || '',
+        tempo_fabricacao_cliente: formData.tempo_fabricacao_cliente || '',
       },
       items: selectedItems.map((si) => ({
         item_id: si.id,
@@ -713,6 +788,152 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
   }
 
   const { totalSKUs, totalQty, totalValue } = calculateTotals()
+
+  // Fornecedores efetivamente aceitos na Cotação de Fabricantes (status === 'finalizada' ou itens vencedores)
+  const fornecedoresAceitosComValor = useMemo(() => {
+    // Identificar fornecedores que têm itens vencedores ou cotação finalizada
+    const supplierWinningTotals = new Map<
+      string,
+      { cf: any; valorTotal: number; numItens: number }
+    >()
+
+    // Criar mapa de itens de potencial por item_id para pegar quantidades
+    const itemQtyMap = new Map<string, number>()
+    selectedItems.forEach((si) => {
+      itemQtyMap.set(si.id, Number(si.data.quantidade) || 0)
+    })
+
+    // Analisar cotacoesItens
+    cotacoesItens.forEach((ci) => {
+      if (ci.vencedor) {
+        const cfId = ci.cotacao_fornecedor_id
+        const cf = fornecedorCotacoes.find((f) => f.id === cfId)
+        if (cf) {
+          const qty = itemQtyMap.get(ci.item_id) || 0
+          const preco = Number(ci.preco) || 0
+          const subtotal = qty * preco
+
+          const current = supplierWinningTotals.get(cf.id) || { cf, valorTotal: 0, numItens: 0 }
+          current.valorTotal += subtotal
+          current.numItens += 1
+          supplierWinningTotals.set(cf.id, current)
+        }
+      }
+    })
+
+    // Também incluir fornecedores marcados como 'finalizada', mesmo se ainda sem itens marcados vencedores
+    fornecedorCotacoes.forEach((cf) => {
+      if (cf.status === 'finalizada' && !supplierWinningTotals.has(cf.id)) {
+        supplierWinningTotals.set(cf.id, { cf, valorTotal: 0, numItens: 0 })
+      }
+    })
+
+    return Array.from(supplierWinningTotals.values())
+  }, [fornecedorCotacoes, cotacoesItens, selectedItems])
+
+  // Cálculo automático das condições comerciais para o cliente
+  const condicoesSugeridas = useMemo(() => {
+    if (fornecedoresAceitosComValor.length === 0) {
+      return {
+        incoterm: '',
+        condicao_pagamento: '',
+        tempo_fabricacao: '',
+      }
+    }
+
+    if (fornecedoresAceitosComValor.length === 1) {
+      const unico = fornecedoresAceitosComValor[0].cf
+      return {
+        incoterm: unico.incoterm || '',
+        condicao_pagamento: unico.condicao_pagamento || '',
+        tempo_fabricacao: unico.tempo_fabricacao || '',
+      }
+    }
+
+    // 2 ou mais fornecedores aceitos:
+    // 1. Incoterm do fornecedor com MAIOR pedido (maior valor total aceito)
+    const sortedByValor = [...fornecedoresAceitosComValor].sort(
+      (a, b) => b.valorTotal - a.valorTotal,
+    )
+    const fornecedorMaiorPedido = sortedByValor[0]?.cf
+    const incotermCalculado = fornecedorMaiorPedido?.incoterm || ''
+
+    // 2. Tempo de fabricação = MAIOR prazo entre os aceitos
+    // Extrai números de prazo (ex: "30 dias" -> 30) se possível, senão pega a string mais longa ou maior número
+    let maiorPrazoTexto = ''
+    let maiorPrazoNumero = -1
+    fornecedoresAceitosComValor.forEach(({ cf }) => {
+      const tf = (cf.tempo_fabricacao || '').trim()
+      if (!tf) return
+      const matches = tf.match(/\d+/)
+      const num = matches ? parseInt(matches[0], 10) : 0
+      if (num > maiorPrazoNumero) {
+        maiorPrazoNumero = num
+        maiorPrazoTexto = tf
+      } else if (maiorPrazoNumero <= 0 && tf.length > maiorPrazoTexto.length) {
+        maiorPrazoTexto = tf
+      }
+    })
+
+    return {
+      incoterm: incotermCalculado,
+      condicao_pagamento: '', // Condição própria para o cliente quando 2+ fornecedores
+      tempo_fabricacao: maiorPrazoTexto,
+    }
+  }, [fornecedoresAceitosComValor])
+
+  // Auto-preenchimento apenas dos campos ainda não editados manualmente pelo usuário
+  useEffect(() => {
+    if (fornecedoresAceitosComValor.length === 0) return
+
+    setFormData((prev) => {
+      let changed = false
+      const updated = { ...prev }
+
+      // Se incoterm não foi editado manualmente e campo está vazio ou igual a sugestão anterior
+      if (!condicoesManuais.incoterm && condicoesSugeridas.incoterm && !prev.incoterm_cliente) {
+        updated.incoterm_cliente = condicoesSugeridas.incoterm
+        changed = true
+      }
+      if (
+        !condicoesManuais.condicao_pagamento &&
+        condicoesSugeridas.condicao_pagamento &&
+        !prev.condicao_pagamento_cliente
+      ) {
+        updated.condicao_pagamento_cliente = condicoesSugeridas.condicao_pagamento
+        changed = true
+      }
+      if (
+        !condicoesManuais.tempo_fabricacao &&
+        condicoesSugeridas.tempo_fabricacao &&
+        !prev.tempo_fabricacao_cliente
+      ) {
+        updated.tempo_fabricacao_cliente = condicoesSugeridas.tempo_fabricacao
+        changed = true
+      }
+
+      return changed ? updated : prev
+    })
+  }, [condicoesSugeridas, fornecedoresAceitosComValor, condicoesManuais])
+
+  const handleRecalcularCondicoes = () => {
+    setFormData((prev) => ({
+      ...prev,
+      incoterm_cliente: condicoesSugeridas.incoterm || prev.incoterm_cliente,
+      condicao_pagamento_cliente:
+        fornecedoresAceitosComValor.length === 1
+          ? condicoesSugeridas.condicao_pagamento || prev.condicao_pagamento_cliente
+          : prev.condicao_pagamento_cliente,
+      tempo_fabricacao_cliente:
+        condicoesSugeridas.tempo_fabricacao || prev.tempo_fabricacao_cliente,
+    }))
+    setCondicoesManuais({
+      incoterm: false,
+      condicao_pagamento: false,
+      tempo_fabricacao: false,
+    })
+    toast.success('Condições comerciais recalculadas a partir dos fornecedores aceitos!')
+  }
 
   if (isSelecting) {
     return (
@@ -945,48 +1166,71 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
         </div>
       </div>
 
-      {fornecedorCotacoes.length > 0 && (
-        <Card className="p-4 shadow-sm">
-          <div className="flex flex-col gap-1 mb-3">
-            <h3 className="text-sm font-semibold">Condições Comerciais dos Fabricantes</h3>
-            <p className="text-[11px] text-muted-foreground">
-              Incoterm, condição de pagamento e tempo de fabricação informados na cotação.
-            </p>
+      {/* 1. Condições Comerciais dos Fabricantes Selecionados */}
+      {fornecedoresAceitosComValor.length > 0 && (
+        <Card className="p-4 shadow-sm border-blue-200/80 bg-blue-50/20">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-foreground">
+                  Condições Comerciais dos Fabricantes
+                </h3>
+                <Badge
+                  variant="outline"
+                  className="text-[10px] bg-blue-50 text-blue-700 border-blue-300"
+                >
+                  {fornecedoresAceitosComValor.length} selecionado
+                  {fornecedoresAceitosComValor.length > 1 ? 's' : ''}
+                </Badge>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Exibindo apenas os fabricantes selecionados/aceitos para formar o preço na cotação.
+              </p>
+            </div>
           </div>
           <div className="flex flex-wrap gap-3">
-            {fornecedorCotacoes.map((cf) => {
+            {fornecedoresAceitosComValor.map(({ cf, valorTotal, numItens }) => {
               const nome = cf.expand?.fornecedor_id?.nome || 'Fabricante'
               return (
                 <div
                   key={cf.id}
-                  className="flex flex-col gap-2 border rounded-lg p-3 min-w-[200px] bg-slate-50/60"
+                  className="flex flex-col gap-2 border border-blue-200 rounded-lg p-3 min-w-[240px] bg-white shadow-xs"
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-between gap-2">
                     <span className="font-semibold text-xs text-foreground truncate">{nome}</span>
                     <Badge
                       variant="outline"
-                      className={`text-[9px] h-4 px-1 ${
-                        cf.status === 'finalizada'
-                          ? 'bg-muted-foreground/10 text-muted-foreground'
-                          : 'border-amber-300 text-amber-700 bg-amber-50'
-                      }`}
+                      className="text-[9px] h-4 px-1.5 bg-blue-50 text-blue-700 border-blue-300 font-medium"
                     >
-                      {cf.status === 'finalizada' ? 'Finalizada' : 'Pendente'}
+                      Selecionado
                     </Badge>
                   </div>
-                  <div className="grid grid-cols-1 gap-1 text-[11px]">
+                  {valorTotal > 0 && (
+                    <div className="text-[10px] text-muted-foreground bg-slate-50 px-2 py-1 rounded border border-slate-100 flex justify-between items-center">
+                      <span>Total aceito:</span>
+                      <span className="font-semibold text-foreground">
+                        ${' '}
+                        {valorTotal.toLocaleString('en-US', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}{' '}
+                        ({numItens} {numItens === 1 ? 'item' : 'itens'})
+                      </span>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 gap-1.5 text-[11px] pt-1">
                     <div className="flex items-center gap-1.5 text-muted-foreground">
-                      <Truck className="w-3 h-3 shrink-0" />
+                      <Truck className="w-3 h-3 shrink-0 text-blue-600" />
                       <span className="font-medium text-foreground">Incoterm:</span>
                       <span className="truncate">{cf.incoterm || '—'}</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-muted-foreground">
-                      <CreditCard className="w-3 h-3 shrink-0" />
+                      <CreditCard className="w-3 h-3 shrink-0 text-blue-600" />
                       <span className="font-medium text-foreground">Pagamento:</span>
                       <span className="truncate">{cf.condicao_pagamento || '—'}</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-muted-foreground">
-                      <Clock className="w-3 h-3 shrink-0" />
+                      <Clock className="w-3 h-3 shrink-0 text-blue-600" />
                       <span className="font-medium text-foreground">Fabricação:</span>
                       <span className="truncate">{cf.tempo_fabricacao || '—'}</span>
                     </div>
@@ -997,6 +1241,141 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
           </div>
         </Card>
       )}
+
+      {/* 2. Nova seção: Condições Comerciais para o Cliente */}
+      <Card className="p-4 shadow-sm border-slate-200">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3 pb-3 border-b border-slate-100">
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-foreground">
+                Condições Comerciais para o Cliente
+              </h3>
+              <Badge
+                variant="outline"
+                className="text-[10px] bg-slate-50 text-slate-700 border-slate-200"
+              >
+                Proposta ao Cliente
+              </Badge>
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Condições comerciais que serão enviadas na proposta para o cliente. Preenchidas
+              automaticamente a partir dos fabricantes aceitos ou personalizadas.
+            </p>
+          </div>
+          {fornecedoresAceitosComValor.length > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleRecalcularCondicoes}
+              className="h-7 text-xs px-2.5 self-start sm:self-auto gap-1.5 text-muted-foreground hover:text-foreground"
+              title="Recalcula as condições comerciais a partir dos fornecedores aceitos"
+            >
+              <RotateCcw className="w-3 h-3" />
+              Recalcular automático
+            </Button>
+          )}
+        </div>
+
+        {fornecedoresAceitosComValor.length > 0 && (
+          <div className="mb-3 px-3 py-2 bg-blue-50/60 border border-blue-100 rounded-md text-[11px] text-blue-800 flex items-start gap-2">
+            <Info className="w-4 h-4 shrink-0 mt-0.5 text-blue-600" />
+            <div className="flex-1 leading-relaxed">
+              {fornecedoresAceitosComValor.length === 1 ? (
+                <span>
+                  <strong>1 fornecedor aceito:</strong> Incoterm, condição de pagamento e prazo
+                  herdados automaticamente do fabricante selecionado.
+                </span>
+              ) : (
+                <span>
+                  <strong>{fornecedoresAceitosComValor.length} fornecedores aceitos:</strong>{' '}
+                  Incoterm obtido do fabricante com maior volume de pedido (
+                  {condicoesSugeridas.incoterm || '—'}), prazo definido como o maior entre os
+                  aceitos ({condicoesSugeridas.tempo_fabricacao || '—'}) e condição de pagamento
+                  definida especialmente para o cliente.
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="incoterm_cliente"
+              className="text-xs font-medium flex items-center gap-1.5"
+            >
+              <Truck className="w-3.5 h-3.5 text-muted-foreground" />
+              Incoterm
+              {condicoesManuais.incoterm && (
+                <span className="text-[10px] text-amber-600 font-normal">
+                  (editado manualmente)
+                </span>
+              )}
+            </Label>
+            <Input
+              id="incoterm_cliente"
+              placeholder="Ex: FOB, CIF, EXW..."
+              value={formData.incoterm_cliente || ''}
+              onChange={(e) => {
+                setFormData((prev) => ({ ...prev, incoterm_cliente: e.target.value }))
+                setCondicoesManuais((prev) => ({ ...prev, incoterm: true }))
+              }}
+              className="h-8 text-xs bg-white"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="condicao_pagamento_cliente"
+              className="text-xs font-medium flex items-center gap-1.5"
+            >
+              <CreditCard className="w-3.5 h-3.5 text-muted-foreground" />
+              Condição de Pagamento
+              {condicoesManuais.condicao_pagamento && (
+                <span className="text-[10px] text-amber-600 font-normal">
+                  (editado manualmente)
+                </span>
+              )}
+            </Label>
+            <Input
+              id="condicao_pagamento_cliente"
+              placeholder="Ex: 30% sinal + 70% embarque..."
+              value={formData.condicao_pagamento_cliente || ''}
+              onChange={(e) => {
+                setFormData((prev) => ({ ...prev, condicao_pagamento_cliente: e.target.value }))
+                setCondicoesManuais((prev) => ({ ...prev, condicao_pagamento: true }))
+              }}
+              className="h-8 text-xs bg-white"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="tempo_fabricacao_cliente"
+              className="text-xs font-medium flex items-center gap-1.5"
+            >
+              <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+              Tempo de Fabricação
+              {condicoesManuais.tempo_fabricacao && (
+                <span className="text-[10px] text-amber-600 font-normal">
+                  (editado manualmente)
+                </span>
+              )}
+            </Label>
+            <Input
+              id="tempo_fabricacao_cliente"
+              placeholder="Ex: 30 a 45 dias..."
+              value={formData.tempo_fabricacao_cliente || ''}
+              onChange={(e) => {
+                setFormData((prev) => ({ ...prev, tempo_fabricacao_cliente: e.target.value }))
+                setCondicoesManuais((prev) => ({ ...prev, tempo_fabricacao: true }))
+              }}
+              className="h-8 text-xs bg-white"
+            />
+          </div>
+        </div>
+      </Card>
 
       <PotentialNotes potencialId={currentPotential?.id || ''} />
       <PotentialAttachments potencial={currentPotential} onUpdate={setCurrentPotential} />
