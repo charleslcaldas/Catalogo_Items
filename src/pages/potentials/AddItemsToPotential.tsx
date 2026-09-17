@@ -801,7 +801,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
       return acc + (refPrice > 0 ? qty * refPrice : 0)
     }, 0)
     const profitValue = totalValue - totalCostRef
-    const profitPercent = totalCostRef > 0 ? (profitValue / totalCostRef) * 100 : null
+    const profitPercent = totalValue > 0 ? (profitValue / totalValue) * 100 : null
 
     return { totalSKUs, totalQty, totalValue, totalCostRef, profitValue, profitPercent }
   }
