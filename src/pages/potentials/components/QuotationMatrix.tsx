@@ -1016,30 +1016,30 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
 
   return (
     <div className="flex flex-col h-full space-y-6">
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center bg-card p-4 border rounded-xl shadow-sm gap-4 shrink-0">
-        <div>
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-card p-4 border rounded-xl shadow-sm gap-4 shrink-0">
+        <div className="flex flex-col gap-2 shrink-0">
           <div className="flex items-center gap-3">
-            <h2 className="text-2xl font-bold tracking-tight">Cotação de Fabricantes</h2>
+            <h2 className="text-2xl font-bold tracking-tight whitespace-nowrap">
+              Cotação de Fabricantes
+            </h2>
             <Badge
               variant="outline"
-              className="bg-blue-50 text-blue-700 border border-blue-200 font-mono text-xs px-2.5 py-0.5"
+              className="bg-blue-50 text-blue-700 border border-blue-200 font-mono text-xs px-2.5 py-0.5 whitespace-nowrap"
             >
               Cotação #{potencial?.numero_potencial || potencialId}
             </Badge>
           </div>
-          <div className="flex flex-wrap gap-x-8 gap-y-2 mt-3 text-sm">
-            <div className="flex flex-col">
-              <span className="text-muted-foreground font-medium text-[10px] uppercase tracking-wider">
-                Custo Selecionado
-              </span>
-              <span className="font-mono font-bold text-lg text-green-700">
-                $ {formatCurrency(totals.custoTotal)}
-              </span>
-            </div>
+          <div className="flex flex-col">
+            <span className="text-muted-foreground font-medium text-[10px] uppercase tracking-wider">
+              Custo Selecionado
+            </span>
+            <span className="font-mono font-bold text-lg text-green-700 leading-tight">
+              $ {formatCurrency(totals.custoTotal)}
+            </span>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 self-stretch xl:self-auto pt-2 xl:pt-0 border-t xl:border-0">
+        <div className="flex flex-wrap items-center justify-start lg:justify-end gap-2 w-full lg:w-auto pt-3 lg:pt-0 border-t lg:border-0">
           <div className="relative w-48 xl:w-64">
             <Search className="w-4 h-4 absolute left-2.5 top-2.5 text-muted-foreground" />
             <Input
@@ -1054,7 +1054,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
             variant="ghost"
             size="icon"
             onClick={() => setIsCompact(!isCompact)}
-            className="hidden xl:flex text-muted-foreground"
+            className="text-muted-foreground"
             title="Alternar Densidade"
           >
             {isCompact ? <Maximize2 className="w-4 h-4" /> : <Minimize2 className="w-4 h-4" />}
@@ -1062,7 +1062,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
 
           <Popover open={isAddOpen} onOpenChange={setIsAddOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="whitespace-nowrap">
                 <Plus className="w-4 h-4 mr-2" /> Fabricante
               </Button>
             </PopoverTrigger>
@@ -1142,12 +1142,17 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
             variant="outline"
             size="sm"
             onClick={() => setIsCounterOpen(true)}
-            className="border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 hover:text-amber-800"
+            className="border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 hover:text-amber-800 whitespace-nowrap"
           >
             <TrendingDown className="w-4 h-4 mr-2" /> Contraproposta
           </Button>
 
-          <Button variant="outline" size="sm" onClick={handleExportExcel}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportExcel}
+            className="whitespace-nowrap"
+          >
             <Download className="w-4 h-4 mr-2" /> Exportar Planilha (.csv)
           </Button>
 
@@ -1161,7 +1166,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                 Object.keys(draftMoqs).length === 0 &&
                 Object.keys(cfDrafts).length === 0)
             }
-            className="border-emerald-300 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-900"
+            className="border-emerald-300 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-900 whitespace-nowrap"
             title="Salva as edições manuais de preço e condições sem finalizar a cotação"
           >
             {isSavingDraft ? (
@@ -1176,7 +1181,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
             variant="outline"
             size="sm"
             onClick={handleAcceptSelected}
-            className="border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 hover:text-blue-800"
+            className="border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 hover:text-blue-800 whitespace-nowrap"
           >
             <CheckSquare className="w-4 h-4 mr-2" /> Aceitar Selecionados
           </Button>
