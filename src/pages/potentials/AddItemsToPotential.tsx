@@ -50,6 +50,7 @@ import { StatusManagementModal } from './components/StatusManagementModal'
 import { savePotencialFull, getPotencialItens, duplicatePotencial } from '@/services/potenciais'
 import { getContrastColor, cn } from '@/lib/utils'
 import pb from '@/lib/pocketbase/client'
+import { useRealtime } from '@/hooks/use-realtime'
 import type { Potencial, Item, UnidadeMedida, StatusPotencial } from '@/types'
 
 export type SelectedItemData = {
@@ -168,6 +169,13 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
   useEffect(() => {
     loadQuotationConditionsData()
   }, [loadQuotationConditionsData])
+
+  useRealtime('cotacoes_itens', () => {
+    loadQuotationConditionsData()
+  })
+  useRealtime('cotacoes_fornecedor', () => {
+    loadQuotationConditionsData()
+  })
 
   useEffect(() => {
     const delay = setTimeout(() => {
@@ -801,9 +809,9 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
   const { totalSKUs, totalQty, totalValue, totalCostRef, profitValue, profitPercent } =
     calculateTotals()
 
-  // Fornecedores efetivamente aceitos na Cotação de Fabricantes (status === 'finalizada' ou itens vencedores)
+  // Fornecedores efetivamente aceitos na Cotação de Fabricantes (somente com itens vencedores vigentes)
   const fornecedoresAceitosComValor = useMemo(() => {
-    // Identificar fornecedores que têm itens vencedores ou cotação finalizada
+    // Identificar fornecedores que têm itens vencedores vigentes para itens atualmente na cotação
     const supplierWinningTotals = new Map<
       string,
       { cf: any; valorTotal: number; numItens: number }
@@ -815,14 +823,15 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
       itemQtyMap.set(si.id, Number(si.data.quantidade) || 0)
     })
 
-    // Analisar cotacoesItens
+    // Analisar cotacoesItens apenas dos itens vencedores vigentes da cotação atual
     cotacoesItens.forEach((ci) => {
-      if (ci.vencedor) {
+      if (ci.vencedor && itemQtyMap.has(ci.item_id)) {
         const cfId = ci.cotacao_fornecedor_id
         const cf = fornecedorCotacoes.find((f) => f.id === cfId)
         if (cf) {
           const qty = itemQtyMap.get(ci.item_id) || 0
-          const preco = Number(ci.preco) || 0
+          const preco =
+            typeof ci.preco_ofertado === 'number' ? ci.preco_ofertado : Number(ci.preco) || 0
           const subtotal = qty * preco
 
           const current = supplierWinningTotals.get(cf.id) || { cf, valorTotal: 0, numItens: 0 }
@@ -830,13 +839,6 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
           current.numItens += 1
           supplierWinningTotals.set(cf.id, current)
         }
-      }
-    })
-
-    // Também incluir fornecedores marcados como 'finalizada', mesmo se ainda sem itens marcados vencedores
-    fornecedorCotacoes.forEach((cf) => {
-      if (cf.status === 'finalizada' && !supplierWinningTotals.has(cf.id)) {
-        supplierWinningTotals.set(cf.id, { cf, valorTotal: 0, numItens: 0 })
       }
     })
 
@@ -894,7 +896,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
     }
   }, [fornecedoresAceitosComValor])
 
-  // Auto-preenchimento apenas dos campos ainda não editados manualmente pelo usuário
+  // Auto-preenchimento ou atualização automática das condições para o cliente quando não editado manualmente
   useEffect(() => {
     if (fornecedoresAceitosComValor.length === 0) return
 
@@ -902,15 +904,19 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
       let changed = false
       const updated = { ...prev }
 
-      // Se incoterm não foi editado manualmente e campo está vazio ou igual a sugestão anterior
-      if (!condicoesManuais.incoterm && condicoesSugeridas.incoterm && !prev.incoterm_cliente) {
+      // Se incoterm não foi editado manualmente pelo usuário, atualizar para a sugestão atual
+      if (
+        !condicoesManuais.incoterm &&
+        condicoesSugeridas.incoterm &&
+        prev.incoterm_cliente !== condicoesSugeridas.incoterm
+      ) {
         updated.incoterm_cliente = condicoesSugeridas.incoterm
         changed = true
       }
       if (
         !condicoesManuais.condicao_pagamento &&
         condicoesSugeridas.condicao_pagamento &&
-        !prev.condicao_pagamento_cliente
+        prev.condicao_pagamento_cliente !== condicoesSugeridas.condicao_pagamento
       ) {
         updated.condicao_pagamento_cliente = condicoesSugeridas.condicao_pagamento
         changed = true
@@ -918,7 +924,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
       if (
         !condicoesManuais.tempo_fabricacao &&
         condicoesSugeridas.tempo_fabricacao &&
-        !prev.tempo_fabricacao_cliente
+        prev.tempo_fabricacao_cliente !== condicoesSugeridas.tempo_fabricacao
       ) {
         updated.tempo_fabricacao_cliente = condicoesSugeridas.tempo_fabricacao
         changed = true

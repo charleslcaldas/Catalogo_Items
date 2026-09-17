@@ -22,8 +22,11 @@ export default function PotentialDetailsWrapper() {
   const potencialId =
     searchParams.get('id') || searchParams.get('potencialId') || searchParams.get('potencial_id')
 
-  const handleTabChange = (v: string) => {
+  const handleTabChange = async (v: string) => {
     setTab(v)
+    if (v === 'items' && addItemsRef.current?.reloadQuotationConditions) {
+      await addItemsRef.current.reloadQuotationConditions()
+    }
   }
 
   const loadTotals = async () => {
