@@ -538,7 +538,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
     const draftKey = `${ci.cotacao_fornecedor_id}_${ci.item_id}`
     const draft = draftPrices[draftKey]
     if (draft !== undefined && draft > 0) return draft
-    if (ci.preco_contraproposta > 0) return ci.preco_contraproposta
     return ci.preco_ofertado || 0
   }
 
@@ -579,12 +578,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
 
         const draftKey = `${w.cotacao_fornecedor_id}_${w.item_id}`
         const draft = draftPrices[draftKey]
-        const priceToUse =
-          draft !== undefined && draft > 0
-            ? draft
-            : w.preco_contraproposta > 0
-              ? w.preco_contraproposta
-              : w.preco_ofertado
+        const priceToUse = draft !== undefined && draft > 0 ? draft : w.preco_ofertado
 
         // Se houver draft > 0 para uma cotação aceita, persista também esse valor em cotacoes_itens
         if (draft !== undefined && draft > 0) {
@@ -695,6 +689,135 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
     }
   }
 
+  const handleAcceptCounterProposalForSupplier = async (cfId: string) => {
+    const cf = cotacoesF.find((f) => f.id === cfId)
+    const supplierName = cf?.expand?.fornecedor_id?.nome || 'Fabricante'
+
+    // Buscar itens deste fornecedor que possuem contraproposta > 0
+    const itemsWithCounter = cotacoesI.filter(
+      (c) => c.cotacao_fornecedor_id === cfId && c.preco_contraproposta > 0,
+    )
+
+    if (itemsWithCounter.length === 0) {
+      toast({
+        title: 'Sem contraproposta',
+        description: `Não há itens com contraproposta definida para ${supplierName}.`,
+      })
+      return
+    }
+
+    try {
+      const promises: Promise<any>[] = []
+      let updatedCount = 0
+
+      for (const ci of itemsWithCounter) {
+        const finalPrice = ci.preco_contraproposta
+        const pi = potencialItens.find((p) => p.item_id === ci.item_id)
+        if (!pi) continue
+
+        // Atualizar cotacoes_itens: novo preco_ofertado = preco_contraproposta, zerar preco_contraproposta e marcar como vencedor
+        promises.push(
+          pb.collection('cotacoes_itens').update(ci.id, {
+            preco_ofertado: finalPrice,
+            preco_contraproposta: 0,
+            vencedor: true,
+          }),
+        )
+
+        // Desmarcar vencedor anterior se for de outro fornecedor
+        const otherWinners = cotacoesI.filter(
+          (c) => c.item_id === ci.item_id && c.vencedor && c.id !== ci.id,
+        )
+        for (const ow of otherWinners) {
+          promises.push(pb.collection('cotacoes_itens').update(ow.id, { vencedor: false }))
+        }
+
+        // Atualiza preco_compra no cadastro de itens
+        promises.push(pb.collection('itens').update(ci.item_id, { preco_compra: finalPrice }))
+
+        const oldRefPrice = typeof pi.referencia_preco === 'number' ? pi.referencia_preco : 0
+        const oldVendaPrice = typeof pi.preco_unitario === 'number' ? pi.preco_unitario : 0
+
+        let marginToUse = pi.expand?.item_id?.expand?.linha_id?.margem_padrao ?? 7.5
+        if (oldRefPrice > 0 && oldVendaPrice > 0) {
+          marginToUse = (1 - oldRefPrice / oldVendaPrice) * 100
+        }
+
+        let newSellingPrice = marginToUse < 100 ? finalPrice / (1 - marginToUse / 100) : finalPrice
+        newSellingPrice = Number(newSellingPrice.toFixed(3))
+
+        const moqToUse = ci.quantidade_minima || 0
+        let qtdeToUpdate = pi.quantidade
+        if (moqToUse > 0 && pi.quantidade < moqToUse) {
+          qtdeToUpdate = moqToUse
+        }
+
+        promises.push(
+          pb.collection('potencial_itens').update(pi.id, {
+            quantidade: qtdeToUpdate,
+            referencia_preco: finalPrice,
+            referencia_fornecedor: supplierName,
+            referencia_data: new Date().toISOString(),
+            preco_unitario: newSellingPrice,
+          }),
+        )
+
+        promises.push(
+          pb.collection('historico_precos').create({
+            item_id: ci.item_id,
+            preco: finalPrice,
+            fornecedor: supplierName,
+            data_cotacao: new Date().toISOString(),
+            tipo: 'compra',
+          }),
+        )
+
+        updatedCount++
+      }
+
+      // Marcar cotação deste fornecedor como finalizada
+      promises.push(pb.collection('cotacoes_fornecedor').update(cfId, { status: 'finalizada' }))
+
+      if (user?.id) {
+        promises.push(
+          pb.collection('potencial_notas').create({
+            potencial_id: potencialId,
+            user_id: user.id,
+            conteudo: `Contraproposta aceita para ${supplierName}. Itens atualizados: ${updatedCount}.`,
+            categoria: 'Cotação',
+          }),
+        )
+      }
+
+      await Promise.all(promises)
+
+      // Limpar eventuais drafts deste fornecedor
+      setDraftPrices((prev) => {
+        const next = { ...prev }
+        for (const ci of itemsWithCounter) {
+          delete next[`${ci.cotacao_fornecedor_id}_${ci.item_id}`]
+        }
+        return next
+      })
+
+      toast({
+        title: 'Contraproposta Aceita',
+        description: `${updatedCount} itens da contraproposta foram aceitos e propagados para os itens do potencial.`,
+      })
+
+      if (onAccepted) {
+        await onAccepted()
+      }
+      await loadData()
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao aceitar contraproposta',
+        description: err.message,
+        variant: 'destructive',
+      })
+    }
+  }
+
   const handleExportExcel = () => {
     let csv = 'SKU;Description;Size;Finish;Quantity;Unit;'
 
@@ -743,10 +866,8 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
       let targetPrice = 0
       const winners = cotacoesI.filter((c) => c.item_id === pi.item_id && c.vencedor)
       if (winners.length > 0) {
-        targetPrice =
-          winners[0].preco_contraproposta > 0
-            ? winners[0].preco_contraproposta
-            : winners[0].preco_ofertado
+        const draft = draftPrices[`${winners[0].cotacao_fornecedor_id}_${pi.item_id}`]
+        targetPrice = draft !== undefined && draft > 0 ? draft : winners[0].preco_ofertado || 0
       } else {
         targetPrice = offeredPrice
       }
@@ -1140,7 +1261,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                   {cf.expand?.fornecedor_id?.nome}
                                 </span>
                               </div>
-
                               <div className="space-y-1">
                                 <Label className="text-xs flex items-center gap-1">
                                   <Truck className="w-3 h-3 text-muted-foreground" />
@@ -1169,7 +1289,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                   title="Editar para esta cotação (não altera o cadastro do fabricante)"
                                 />
                               </div>
-
                               <div className="space-y-1">
                                 <Label className="text-xs flex items-center gap-1">
                                   <Clock className="w-3 h-3 text-muted-foreground" />
@@ -1198,7 +1317,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                   title="Editar para esta cotação (não altera o cadastro do fabricante)"
                                 />
                               </div>
-
                               <div className="space-y-1">
                                 <Label className="text-xs flex items-center gap-1">
                                   <CreditCard className="w-3 h-3 text-muted-foreground" />
@@ -1227,7 +1345,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                   title="Editar para esta cotação (não altera o cadastro do fabricante)"
                                 />
                               </div>
-
                               {/* Botão de salvar no painel */}
                               {(() => {
                                 const hasDraftChanges =
@@ -1253,8 +1370,32 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                   </Button>
                                 )
                               })()}
-
                               <div className="pt-2 border-t flex flex-col gap-1.5">
+                                {(() => {
+                                  const countWithCounter = cotacoesI.filter(
+                                    (c) =>
+                                      c.cotacao_fornecedor_id === cf.id &&
+                                      c.preco_contraproposta > 0,
+                                  ).length
+                                  return (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="w-full justify-start text-xs h-7 bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200 font-medium"
+                                      disabled={countWithCounter === 0}
+                                      title={
+                                        countWithCounter > 0
+                                          ? `Aceita a contraproposta para ${countWithCounter} item(ns) deste fabricante`
+                                          : 'Nenhum item com contraproposta definida'
+                                      }
+                                      onClick={() => handleAcceptCounterProposalForSupplier(cf.id)}
+                                    >
+                                      <TrendingDown className="w-3 h-3 mr-2 text-amber-600" />
+                                      Aceitar Contraproposta{' '}
+                                      {countWithCounter > 0 && `(${countWithCounter})`}
+                                    </Button>
+                                  )
+                                })()}
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -1297,7 +1438,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                     <FileUp className="w-3 h-3 mr-2" /> Importar Preços
                                   </Button>
                                 </div>
-                              </div>
+                              </div>{' '}
                             </div>
                           </PopoverContent>
                         </Popover>
@@ -1444,31 +1585,11 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                     )
                     const draft = draftPrices[`${cf.id}_${pi.item_id}`]
                     if (draft !== undefined) return draft
-                    if (ci)
-                      return ci.vencedor && ci.preco_contraproposta > 0
-                        ? ci.preco_contraproposta
-                        : ci.preco_ofertado
-                    return 0
+                    return ci?.preco_ofertado || 0
                   })
                   const validCurrentPrices = currentPrices.filter((p) => p > 0)
                   const lowestCurrentPrice =
                     validCurrentPrices.length > 0 ? Math.min(...validCurrentPrices) : undefined
-
-                  let lowestCurrentProviderName = ''
-                  let lowestCurrentDate = ''
-
-                  if (lowestCurrentPrice) {
-                    const ciFound = cotacoesI.find(
-                      (c) => c.item_id === pi.item_id && c.preco_ofertado === lowestCurrentPrice,
-                    )
-                    if (ciFound && ciFound.expand && ciFound.expand.cotacao_fornecedor_id) {
-                      lowestCurrentProviderName =
-                        ciFound.expand.cotacao_fornecedor_id.expand?.fornecedor_id?.nome || ''
-                      lowestCurrentDate = new Date(
-                        ciFound.expand.cotacao_fornecedor_id.created,
-                      ).toLocaleDateString()
-                    }
-                  }
 
                   return (
                     <TableRow key={pi.id} className="group hover:bg-transparent">
@@ -1553,12 +1674,12 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
 
                       <TableCell
                         className={cn(
-                          'align-middle px-2 text-right border-r bg-muted/5',
+                          'align-middle px-2 text-right border-r bg-emerald-50/40',
                           isCompact ? 'py-1' : 'py-1.5',
                         )}
                       >
                         {lowestCurrentPrice ? (
-                          <span className="font-mono text-xs text-green-700 font-bold">
+                          <span className="font-mono text-xs text-emerald-700 font-bold">
                             $ {formatCurrency(lowestCurrentPrice)}
                           </span>
                         ) : (
@@ -1571,22 +1692,17 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                           (c) => c.cotacao_fornecedor_id === cf.id && c.item_id === pi.item_id,
                         )
                         const draft = draftPrices[`${cf.id}_${pi.item_id}`]
-                        const currentPrice =
-                          draft !== undefined
-                            ? draft
-                            : (ci?.vencedor && ci?.preco_contraproposta > 0
-                                ? ci.preco_contraproposta
-                                : ci?.preco_ofertado) || 0
+                        const currentPrice = draft !== undefined ? draft : ci?.preco_ofertado || 0
                         const isWinnerCell = ci?.vencedor
 
                         return (
                           <TableCell
                             key={cf.id}
                             className={cn(
-                              'align-top px-1 border-r transition-colors relative text-green-700',
+                              'align-top px-1 border-r transition-colors relative',
                               isCompact ? 'py-0.5' : 'py-1',
                               isWinnerCell
-                                ? 'bg-blue-100/40 border-l-2 border-r-2 border-y-2 border-blue-400 shadow-[inset_0_0_0_1px_rgba(96,165,250,0.5)] z-10'
+                                ? 'bg-blue-50/70 border-l-2 border-r-2 border-y-2 border-blue-300 shadow-[inset_0_0_0_1px_rgba(147,197,253,0.35)] z-10'
                                 : 'bg-background/50 hover:bg-muted/20',
                             )}
                           >

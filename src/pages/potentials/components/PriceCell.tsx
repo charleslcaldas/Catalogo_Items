@@ -24,11 +24,11 @@ export function PriceCell({
     <div
       onClick={() => onToggleWinner(cotacaoF.id, item.item_id, cotacaoI?.id, cotacaoI?.vencedor)}
       className={cn(
-        'p-1.5 rounded flex flex-col gap-1.5 relative group min-h-[44px] cursor-pointer transition-colors',
+        'p-1.5 rounded-md flex flex-col gap-1.5 relative group min-h-[44px] cursor-pointer transition-all',
         cotacaoI?.vencedor
-          ? 'bg-blue-600 ring-2 ring-blue-700 shadow-md'
+          ? 'bg-blue-50/90 ring-2 ring-blue-400 border border-blue-300 shadow-xs'
           : isLowest
-            ? 'bg-green-50/50 ring-1 ring-green-400 hover:bg-green-100/50'
+            ? 'bg-emerald-100/70 ring-1.5 ring-emerald-500/80 hover:bg-emerald-100'
             : 'hover:bg-muted/50',
       )}
     >
@@ -43,12 +43,12 @@ export function PriceCell({
               }
             }}
             className={cn(
-              'h-7 text-xs text-right font-mono w-full',
+              'h-7 text-xs text-right font-mono w-full font-semibold transition-colors',
               cotacaoI?.vencedor
-                ? 'bg-blue-700 text-white border-blue-500 focus-visible:ring-blue-300 placeholder:text-blue-300'
+                ? 'bg-white text-blue-900 border-blue-300 font-bold focus-visible:ring-blue-400 shadow-2xs'
                 : isLowest
-                  ? 'text-green-700 font-bold'
-                  : 'bg-background',
+                  ? 'bg-white/90 text-emerald-800 font-bold border-emerald-400 focus-visible:ring-emerald-400 shadow-2xs'
+                  : 'bg-background text-foreground',
             )}
           />
         </div>
@@ -56,9 +56,9 @@ export function PriceCell({
           <span
             className={cn(
               'font-mono text-[10px] font-bold whitespace-nowrap pl-1',
-              cotacaoI?.vencedor ? 'text-amber-300' : 'text-amber-500',
+              cotacaoI?.vencedor ? 'text-amber-700' : 'text-amber-600',
             )}
-            title="Proposta"
+            title="Contraproposta"
           >
             $ {counterPrice.toFixed(3)}
           </span>
@@ -70,7 +70,7 @@ export function PriceCell({
           <span
             className={cn(
               'text-[9px] uppercase font-bold w-6 shrink-0',
-              cotacaoI?.vencedor ? 'text-blue-100' : 'text-muted-foreground',
+              cotacaoI?.vencedor ? 'text-blue-700' : 'text-muted-foreground',
             )}
           >
             MOQ
@@ -92,8 +92,10 @@ export function PriceCell({
             className={cn(
               'h-6 text-[10px] text-right font-mono flex-1 min-w-0',
               cotacaoI?.vencedor
-                ? 'bg-blue-700 text-white border-blue-500 focus-visible:ring-blue-300 placeholder:text-blue-300'
-                : '',
+                ? 'bg-white text-blue-900 border-blue-300 focus-visible:ring-blue-400'
+                : isLowest
+                  ? 'bg-white/90 border-emerald-300 text-emerald-900 focus-visible:ring-emerald-400'
+                  : '',
             )}
             placeholder="MOQ"
           />
@@ -104,7 +106,7 @@ export function PriceCell({
             className={cn(
               'text-[9px] underline pr-1',
               cotacaoI?.vencedor
-                ? 'text-blue-200 hover:text-white'
+                ? 'text-blue-600 hover:text-blue-800'
                 : 'text-muted-foreground hover:text-foreground',
             )}
             onClick={(e) => {
