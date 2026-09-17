@@ -48,7 +48,7 @@ import { PotentialNotes } from './components/PotentialNotes'
 import { PotentialAttachments } from './components/PotentialAttachments'
 import { StatusManagementModal } from './components/StatusManagementModal'
 import { savePotencialFull, getPotencialItens, duplicatePotencial } from '@/services/potenciais'
-import { getContrastColor } from '@/lib/utils'
+import { getContrastColor, cn } from '@/lib/utils'
 import pb from '@/lib/pocketbase/client'
 import type { Potencial, Item, UnidadeMedida, StatusPotencial } from '@/types'
 
@@ -784,10 +784,22 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
       (acc, si) => acc + (Number(si.data.quantidade) || 0) * (Number(si.data.preco_unitario) || 0),
       0,
     )
-    return { totalSKUs, totalQty, totalValue }
+    const totalCostRef = selectedItems.reduce((acc, si) => {
+      const qty = Number(si.data.quantidade) || 0
+      const refPrice =
+        typeof si.data.referencia_preco === 'number' && !isNaN(si.data.referencia_preco)
+          ? si.data.referencia_preco
+          : 0
+      return acc + (refPrice > 0 ? qty * refPrice : 0)
+    }, 0)
+    const profitValue = totalValue - totalCostRef
+    const profitPercent = totalCostRef > 0 ? (profitValue / totalCostRef) * 100 : null
+
+    return { totalSKUs, totalQty, totalValue, totalCostRef, profitValue, profitPercent }
   }
 
-  const { totalSKUs, totalQty, totalValue } = calculateTotals()
+  const { totalSKUs, totalQty, totalValue, totalCostRef, profitValue, profitPercent } =
+    calculateTotals()
 
   // Fornecedores efetivamente aceitos na Cotação de Fabricantes (status === 'finalizada' ou itens vencedores)
   const fornecedoresAceitosComValor = useMemo(() => {
@@ -1136,32 +1148,94 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
         />
 
         {/* Totals Summary Widget */}
-        <div className="p-4 border-t bg-slate-50 flex items-center justify-end gap-6 shrink-0 rounded-b-lg">
-          <div className="flex flex-col items-end">
-            <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
-              Total SKUs
-            </span>
-            <span className="text-sm font-semibold">{totalSKUs}</span>
+        <div className="p-4 border-t bg-slate-50 flex flex-wrap items-center justify-between gap-4 sm:gap-6 shrink-0 rounded-b-lg">
+          {/* Lado Esquerdo: Custo Ref. Total e Lucro Estimado */}
+          <div className="flex items-center gap-6">
+            <div className="flex flex-col items-start">
+              <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                Custo Ref. Total
+              </span>
+              <span className="text-sm font-semibold font-mono text-amber-700">
+                ${' '}
+                {totalCostRef.toLocaleString('en-US', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </span>
+            </div>
+            <div className="w-px h-8 bg-border"></div>
+            <div className="flex flex-col items-start">
+              <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                Lucro Estimado
+              </span>
+              <div className="flex items-baseline gap-1.5 font-mono">
+                <span
+                  className={cn(
+                    'text-sm font-semibold',
+                    profitValue > 0
+                      ? 'text-emerald-600'
+                      : profitValue < 0
+                        ? 'text-red-600'
+                        : 'text-foreground',
+                  )}
+                >
+                  {profitValue < 0 ? '-' : ''}$
+                  {Math.abs(profitValue).toLocaleString('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
+                <span
+                  className={cn(
+                    'text-xs font-medium',
+                    profitValue > 0
+                      ? 'text-emerald-600/90'
+                      : profitValue < 0
+                        ? 'text-red-600/90'
+                        : 'text-muted-foreground',
+                  )}
+                >
+                  (
+                  {profitPercent !== null
+                    ? `${profitPercent >= 0 ? '+' : ''}${profitPercent.toLocaleString('pt-BR', {
+                        minimumFractionDigits: 1,
+                        maximumFractionDigits: 1,
+                      })}%`
+                    : '—'}
+                  )
+                </span>
+              </div>
+            </div>
           </div>
-          <div className="w-px h-8 bg-border"></div>
-          <div className="flex flex-col items-end">
-            <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
-              Quantidade Total
-            </span>
-            <span className="text-sm font-semibold">{totalQty.toLocaleString('en-US')}</span>
-          </div>
-          <div className="w-px h-8 bg-border"></div>
-          <div className="flex flex-col items-end">
-            <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
-              Valor Total Estimado
-            </span>
-            <span className="text-lg font-bold text-primary">
-              ${' '}
-              {totalValue.toLocaleString('en-US', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </span>
+
+          {/* Lado Direito: Total SKUs, Quantidade Total e Valor Total Estimado */}
+          <div className="flex items-center gap-6 ml-auto">
+            <div className="flex flex-col items-end">
+              <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                Total SKUs
+              </span>
+              <span className="text-sm font-semibold">{totalSKUs}</span>
+            </div>
+            <div className="w-px h-8 bg-border"></div>
+            <div className="flex flex-col items-end">
+              <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                Quantidade Total
+              </span>
+              <span className="text-sm font-semibold">{totalQty.toLocaleString('en-US')}</span>
+            </div>
+            <div className="w-px h-8 bg-border"></div>
+            <div className="flex flex-col items-end">
+              <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                Valor Total Estimado
+              </span>
+              <span className="text-lg font-bold text-primary">
+                ${' '}
+                {totalValue.toLocaleString('en-US', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </span>
+            </div>
           </div>
         </div>
       </div>
