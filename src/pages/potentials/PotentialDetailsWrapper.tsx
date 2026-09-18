@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import AddItemsToPotential, { AddItemsToPotentialRef } from './AddItemsToPotential'
 import QuotationMatrix from './components/QuotationMatrix'
@@ -12,6 +13,7 @@ import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 
 export default function PotentialDetailsWrapper() {
+  const navigate = useNavigate()
   const [tab, setTab] = useState('items')
   const addItemsRef = useRef<AddItemsToPotentialRef>(null)
   const [globalMargin, setGlobalMargin] = useState('7.5')
@@ -97,22 +99,45 @@ export default function PotentialDetailsWrapper() {
   return (
     <div className="h-full flex flex-col bg-background relative z-0">
       <div className="px-6 pt-4 border-b flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <Tabs value={tab} onValueChange={handleTabChange} className="w-auto">
-          <TabsList className="mb-[-1px] bg-muted/40 p-1">
-            <TabsTrigger
-              value="items"
-              className="rounded-b-none px-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-            >
-              Itens do Potencial
-            </TabsTrigger>
-            <TabsTrigger
-              value="quotations"
-              className="rounded-b-none px-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-            >
-              Cotação de Fabricantes
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-3 text-xs gap-1.5 font-medium shadow-xs"
+            onClick={() => {
+              if (addItemsRef.current?.isDirty && addItemsRef.current.isDirty()) {
+                if (
+                  !window.confirm(
+                    'Você tem alterações não salvas. Deseja realmente sair e descartar as alterações?',
+                  )
+                ) {
+                  return
+                }
+              }
+              navigate('/potenciais')
+            }}
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Voltar
+          </Button>
+
+          <Tabs value={tab} onValueChange={handleTabChange} className="w-auto">
+            <TabsList className="mb-[-1px] bg-muted/40 p-1">
+              <TabsTrigger
+                value="items"
+                className="rounded-b-none px-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                Itens do Potencial
+              </TabsTrigger>
+              <TabsTrigger
+                value="quotations"
+                className="rounded-b-none px-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                Cotação de Fabricantes
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
 
         {tab === 'items' && (
           <div className="flex items-center gap-3 mb-2 bg-muted/20 p-1.5 px-3 rounded-md border shadow-sm">

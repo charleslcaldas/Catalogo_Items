@@ -16,8 +16,6 @@ import {
   Save,
   CheckCircle,
   Copy,
-  Check,
-  ChevronsUpDown,
   Truck,
   CreditCard,
   Clock,
@@ -29,16 +27,6 @@ import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command'
-
 import { ProductCatalog } from './components/ProductCatalog'
 import { QuickItemModal } from './components/QuickItemModal'
 import { SearchQuoteModal } from './components/SearchQuoteModal'
@@ -74,6 +62,7 @@ export type SelectedItemRecord = {
 export type AddItemsToPotentialRef = {
   reloadItemsPrices: () => Promise<void>
   reloadQuotationConditions?: () => Promise<void>
+  isDirty?: () => boolean
 }
 
 export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_props, ref) => {
@@ -116,11 +105,6 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
   const [statuses, setStatuses] = useState<StatusPotencial[]>([])
   const [fornecedorCotacoes, setFornecedorCotacoes] = useState<any[]>([])
   const [cotacoesItens, setCotacoesItens] = useState<any[]>([])
-
-  // Quick Search state
-  const [quickSearchOpen, setQuickSearchOpen] = useState(false)
-  const [quickSearchQuery, setQuickSearchQuery] = useState('')
-  const [quickSearchResults, setQuickSearchResults] = useState<Item[]>([])
 
   const loadStatuses = () => {
     pb.collection('status_potencial')
@@ -176,22 +160,6 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
   useRealtime('cotacoes_fornecedor', () => {
     loadQuotationConditionsData()
   })
-
-  useEffect(() => {
-    const delay = setTimeout(() => {
-      if (quickSearchQuery.length > 1) {
-        pb.collection('itens')
-          .getList<Item>(1, 15, {
-            filter: `sku ~ "${quickSearchQuery}" || descr_pt ~ "${quickSearchQuery}" || descricao_curta ~ "${quickSearchQuery}"`,
-            expand: 'acabamento_id,unidade_id',
-          })
-          .then((res) => setQuickSearchResults(res.items))
-      } else {
-        setQuickSearchResults([])
-      }
-    }, 300)
-    return () => clearTimeout(delay)
-  }, [quickSearchQuery])
 
   useEffect(() => {
     const id = searchParams.get('id')
@@ -274,91 +242,6 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
         ]
       }
     })
-  }
-
-  const handleQuickAdd = async (item: Item) => {
-    const existing = selectedItems.find((si) => si.id === item.id)
-    const unidadeObj = unidades.find((u) => u.id === item.unidade_id)
-    const unidadeNome = unidadeObj ? unidadeObj.nome : item.unidade || 'Pcs'
-
-    if (existing) {
-      const newQty = Number(existing.data.quantidade || 0) + 1
-
-      setSelectedItems((prev) => {
-        const next = [...prev]
-        const idx = next.findIndex((si) => si.id === item.id)
-        next[idx] = { ...next[idx], data: { ...next[idx].data, quantidade: newQty } }
-        return next
-      })
-
-      if (currentPotential && existing.recordId) {
-        try {
-          await pb.collection('potencial_itens').update(existing.recordId, { quantidade: newQty })
-          toast.success(`Quantidade do item ${item.sku} atualizada.`)
-        } catch (error: any) {
-          toast.error(`Erro ao atualizar quantidade no banco de dados.`)
-        }
-      } else {
-        toast.success(`Quantidade do item ${item.sku} atualizada.`)
-      }
-    } else {
-      // Obter snapshot inicial do item se disponível (ex: preco_compra do catálogo)
-      const initialCost =
-        typeof item.preco_compra === 'number' && item.preco_compra > 0
-          ? item.preco_compra
-          : undefined
-      const initialSupplier = item.fornecedor_ultima_atualizacao || undefined
-
-      const newItemData: SelectedItemData = {
-        item,
-        quantidade: 1,
-        unidade_medida: unidadeNome,
-        preco_unitario: item.preco_venda !== undefined ? item.preco_venda : '',
-        observacoes: '',
-        ordem: selectedItems.length + 1,
-        referencia_preco: initialCost,
-        referencia_fornecedor: initialSupplier,
-        referencia_data: initialCost ? new Date().toISOString() : undefined,
-      }
-
-      if (currentPotential) {
-        try {
-          const createPayload: Record<string, any> = {
-            potencial_id: currentPotential.id,
-            item_id: item.id,
-            quantidade: 1,
-            unidade_medida: unidadeNome,
-            preco_unitario: Number(item.preco_venda) || 0,
-            observacoes: '',
-            ordem: selectedItems.length + 1,
-          }
-          if (initialCost !== undefined) createPayload.referencia_preco = initialCost
-          if (initialSupplier !== undefined) createPayload.referencia_fornecedor = initialSupplier
-          if (initialCost !== undefined) createPayload.referencia_data = new Date().toISOString()
-
-          const created = await pb.collection('potencial_itens').create(createPayload)
-          setSelectedItems((prev) => [
-            ...prev,
-            {
-              id: item.id,
-              recordId: created.id,
-              data: {
-                ...newItemData,
-                referencia_preco: created.referencia_preco,
-                referencia_fornecedor: created.referencia_fornecedor,
-                referencia_data: created.referencia_data,
-              },
-            },
-          ])
-          toast.success(`Item ${item.sku} adicionado à cotação.`)
-        } catch (error: any) {
-          toast.error(`Erro ao salvar item no banco: ${error.message}`)
-        }
-      } else {
-        setSelectedItems((prev) => [...prev, { id: item.id, data: newItemData }])
-        toast.success(`Item ${item.sku} adicionado (rascunho).`)
-      }
-    }
   }
 
   const handleUpdateItem = (id: string, field: keyof SelectedItemData, value: string) => {
@@ -474,9 +357,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
         className: 'bg-green-500 text-white border-none',
       })
 
-      if (statusOverride === 'Completo') {
-        navigate('/potenciais')
-      } else if (!currentPotential) {
+      if (!currentPotential) {
         navigate(`/potenciais/adicionar?id=${saved.id}`, { replace: true })
         handleQuoteSelected(saved)
       } else {
@@ -581,6 +462,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
   useImperativeHandle(
     ref,
     () => ({
+      isDirty: () => isDirty(),
       reloadQuotationConditions: async () => {
         const targetPotencialId =
           currentPotential?.id ||
@@ -1005,7 +887,27 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
   return (
     <div className="flex flex-col p-4 md:p-6 max-w-[1600px] mx-auto w-full min-h-[calc(100vh-4rem)] space-y-4">
       <div className="flex items-center justify-between">
-        <div>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-3 text-xs gap-1.5 font-medium shadow-xs"
+            onClick={() => {
+              if (isDirty()) {
+                if (
+                  !window.confirm(
+                    'Você tem alterações não salvas. Deseja realmente sair e descartar as alterações?',
+                  )
+                ) {
+                  return
+                }
+              }
+              navigate('/potenciais')
+            }}
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Voltar
+          </Button>
           <h1 className="text-xl font-bold tracking-tight">
             {currentPotential
               ? `Cotação: ${currentPotential.cliente || 'Desconhecido'}`
@@ -1081,59 +983,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
       />
 
       <div className="bg-white rounded-lg border shadow-sm flex flex-col flex-1 min-h-0">
-        <div className="p-3 border-b flex items-center justify-between bg-slate-50/50 rounded-t-lg shrink-0">
-          <div className="flex items-center gap-4">
-            <h2 className="text-sm font-semibold">Itens da Cotação</h2>
-
-            <Popover open={quickSearchOpen} onOpenChange={setQuickSearchOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={quickSearchOpen}
-                  className="w-[300px] justify-between h-8 text-xs bg-white shadow-sm"
-                >
-                  Adição rápida de item...
-                  <Search className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[400px] p-0" align="start">
-                <Command>
-                  <CommandInput
-                    placeholder="Buscar por SKU ou descrição..."
-                    onValueChange={setQuickSearchQuery}
-                  />
-                  <CommandList>
-                    <CommandEmpty>Nenhum item encontrado.</CommandEmpty>
-                    <CommandGroup>
-                      {quickSearchResults.map((item) => (
-                        <CommandItem
-                          key={item.id}
-                          value={item.sku}
-                          onSelect={() => {
-                            handleQuickAdd(item)
-                            setTimeout(() => {
-                              setQuickSearchOpen(false)
-                              setQuickSearchQuery('')
-                            }, 0)
-                          }}
-                        >
-                          <Check className="mr-2 h-4 w-4 opacity-0" />
-                          <div className="flex flex-col gap-1">
-                            <span className="font-semibold text-xs">{item.sku}</span>
-                            <span className="text-[10px] text-muted-foreground">
-                              {item.descricao_curta || item.descr_pt}
-                            </span>
-                          </div>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          </div>
-
+        <div className="p-3 border-b flex items-center justify-end bg-slate-50/50 rounded-t-lg shrink-0">
           <Button
             size="sm"
             className="rounded-full h-8 px-4 text-xs font-medium shadow-sm"
