@@ -200,13 +200,14 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
 
   useEffect(() => {
     const id = searchParams.get('id')
-    if (id && !currentPotential) {
+    // Apenas carrega da URL se ainda não carregamos este mesmo id
+    if (id && currentPotential?.id !== id) {
       pb.collection('potenciais')
         .getOne(id)
         .then((quote) => handleQuoteSelected(quote as Potencial))
         .catch(() => toast.error('Erro ao carregar a cotação a partir da URL.'))
     }
-  }, [searchParams])
+  }, [searchParams, currentPotential?.id])
 
   useEffect(() => {
     const loadLastOfferedPrices = async () => {
@@ -344,9 +345,25 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
 
     setIsSaving(true)
     try {
+      // Prioridade absoluta: status escolhido pelo usuário no dropdown (formData.status).
+      // statusOverride ('Completo') só é aplicado se o usuário clicou expressamente em "Salvar e Concluir"
+      // e não escolheu outro status no dropdown (ou seja, se estava o default ou se selecionou Completo).
       let statusToSave = formData.status
-      if (statusOverride) {
-        statusToSave = selectedItems.length === 0 ? 'Sem Itens' : statusOverride
+      if (statusOverride === 'Completo') {
+        // Se o usuário não definiu explicitamente um status diferente de Sem Itens / Rascunho / Completo,
+        // ou se o status atual era o inicial 'Sem Itens', 'Salvar e Concluir' define como 'Completo'.
+        // Mas se o usuário escolheu outro status personalizado ou específico no dropdown, a escolha dele prevalece.
+        if (
+          !formData.status ||
+          formData.status === 'Sem Itens' ||
+          formData.status === 'Completo' ||
+          formData.status === 'Rascunho' ||
+          formData.status === 'Incompleto'
+        ) {
+          statusToSave = 'Completo'
+        }
+      } else if (!statusToSave) {
+        statusToSave = selectedItems.length === 0 ? 'Sem Itens' : 'Incompleto'
       }
 
       const itemsData = selectedItems
@@ -369,44 +386,44 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
         itemsData,
       )
 
+      // Garantir que o objeto retornado reflete exatamente o status salvo
+      saved.status = statusToSave
+
       setCurrentPotential(saved)
-      setFormData((prev) => ({ ...prev, status: statusToSave }))
+      setFormData((prev) => ({
+        ...prev,
+        numero_potencial: saved.numero_potencial || prev.numero_potencial,
+        cliente: saved.cliente || prev.cliente,
+        nome_potencial: saved.nome_potencial || prev.nome_potencial,
+        nome_comprador: saved.nome_comprador || prev.nome_comprador,
+        proprietario: saved.proprietario || prev.proprietario,
+        estagio_id: saved.estagio_id || prev.estagio_id,
+        observacoes: saved.observacoes || prev.observacoes,
+        status: statusToSave,
+        incoterm_cliente: saved.incoterm_cliente || prev.incoterm_cliente,
+        condicao_pagamento_cliente:
+          saved.condicao_pagamento_cliente || prev.condicao_pagamento_cliente,
+        tempo_fabricacao_cliente: saved.tempo_fabricacao_cliente || prev.tempo_fabricacao_cliente,
+      }))
 
       // Update snapshot of saved state immediately with the saved values
       isSavedRef.current = true
-      initialSnapshotRef.current = JSON.stringify({
-        formData: {
-          numero_potencial: saved.numero_potencial || '',
-          cliente: saved.cliente || '',
-          nome_potencial: saved.nome_potencial || '',
-          nome_comprador: saved.nome_comprador || '',
-          proprietario: saved.proprietario || '',
-          estagio_id: saved.estagio_id || '',
-          observacoes: saved.observacoes || '',
-          status: statusToSave,
-          incoterm_cliente: saved.incoterm_cliente || '',
-          condicao_pagamento_cliente: saved.condicao_pagamento_cliente || '',
-          tempo_fabricacao_cliente: saved.tempo_fabricacao_cliente || '',
-        },
-        items: itemsData.map((item) => ({
-          item_id: item.item_id,
-          quantidade: Number(item.quantidade) || 0,
-          unidade_medida: item.unidade_medida || 'Pcs',
-          preco_unitario: Number(item.preco_unitario) || 0,
-          observacoes: item.observacoes || '',
-        })),
-      })
+      initialSnapshotRef.current = buildSnapshot(
+        { ...formData, status: statusToSave },
+        selectedItems,
+      )
 
       toast.success(`Cotação ${saved.numero_potencial} salva com sucesso!`, {
         className: 'bg-green-500 text-white border-none',
       })
 
+      // Atualiza URL se for novo potencial
       if (!currentPotential) {
         navigate(`/potenciais/adicionar?id=${saved.id}`, { replace: true })
-        await handleQuoteSelected(saved)
-      } else {
-        await handleQuoteSelected(saved)
       }
+
+      // Recarrega itens persistidos mantendo o status salvo sem sobreposições
+      await handleQuoteSelected(saved, statusToSave)
     } catch (error) {
       toast.error('Erro ao salvar a cotação.')
     } finally {
@@ -431,9 +448,11 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
     }
   }
 
-  const handleQuoteSelected = async (quote: Potencial) => {
-    setCurrentPotential(quote)
-    setFormData({
+  const handleQuoteSelected = async (quote: Potencial, explicitStatus?: string) => {
+    const finalStatus = explicitStatus ?? (quote.status || 'Sem Itens')
+    const updatedQuote = { ...quote, status: finalStatus }
+    setCurrentPotential(updatedQuote)
+    const nextFormData = {
       numero_potencial: quote.numero_potencial || '',
       cliente: quote.cliente || '',
       nome_potencial: quote.nome_potencial || '',
@@ -441,11 +460,12 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
       proprietario: quote.proprietario || '',
       estagio_id: quote.estagio_id || '',
       observacoes: quote.observacoes || '',
-      status: quote.status || 'Sem Itens',
+      status: finalStatus,
       incoterm_cliente: quote.incoterm_cliente || '',
       condicao_pagamento_cliente: quote.condicao_pagamento_cliente || '',
       tempo_fabricacao_cliente: quote.tempo_fabricacao_cliente || '',
-    })
+    }
+    setFormData(nextFormData)
     setCondicoesManuais({
       incoterm: !!quote.incoterm_cliente,
       condicao_pagamento: !!quote.condicao_pagamento_cliente,
@@ -474,11 +494,13 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
       formattedItems.sort((a, b) => (a.data.ordem || 0) - (b.data.ordem || 0))
       setSelectedItems(formattedItems)
 
-      // Set clean initial snapshot when loaded from search or URL
-      initialSnapshotRef.current = buildSnapshot(quote as any, formattedItems)
+      // Set clean initial snapshot when loaded from search or URL or after save
+      initialSnapshotRef.current = buildSnapshot(nextFormData, formattedItems)
       isSavedRef.current = false
 
-      toast.success('Cotação carregada com sucesso!')
+      if (!explicitStatus) {
+        toast.success('Cotação carregada com sucesso!')
+      }
     } catch (error) {
       toast.error('Erro ao carregar itens da cotação.')
     }
@@ -634,17 +656,9 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
   }
 
   const getStatusBadge = () => {
-    if (selectedItems.length === 0) {
-      return (
-        <Badge
-          variant="secondary"
-          className="border-0 font-normal rounded-full px-2 h-5 text-[10px]"
-        >
-          Sem Itens
-        </Badge>
-      )
-    }
-    const dynamicStatus = statuses.find((s) => s.nome === formData.status)
+    const statusName = formData.status || 'Sem Itens'
+
+    const dynamicStatus = statuses.find((s) => s.nome.toLowerCase() === statusName.toLowerCase())
     if (dynamicStatus && dynamicStatus.cor_hex) {
       return (
         <Badge
@@ -654,21 +668,39 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
           }}
           className="border-0 font-normal rounded-full px-2 h-5 text-[10px] shadow-none whitespace-nowrap"
         >
-          {formData.status}
+          {statusName}
         </Badge>
       )
     }
-    const hasIncomplete = selectedItems.some((si) => !si.data.quantidade || !si.data.preco_unitario)
-    if (!hasIncomplete && formData.status === 'Completo') {
+
+    const lowered = statusName.toLowerCase()
+    if (lowered === 'completo') {
       return (
         <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-emerald-200 font-normal rounded-full px-2 h-5 text-[10px]">
           Completo
         </Badge>
       )
     }
+    if (lowered === 'sem itens') {
+      return (
+        <Badge
+          variant="secondary"
+          className="border-0 font-normal rounded-full px-2 h-5 text-[10px]"
+        >
+          Sem Itens
+        </Badge>
+      )
+    }
+    if (lowered === 'incompleto') {
+      return (
+        <Badge className="bg-amber-50 text-amber-700 hover:bg-amber-50 border-amber-200 font-normal rounded-full px-2 h-5 text-[10px]">
+          Incompleto
+        </Badge>
+      )
+    }
     return (
-      <Badge className="bg-amber-50 text-amber-700 hover:bg-amber-50 border-amber-200 font-normal rounded-full px-2 h-5 text-[10px]">
-        {formData.status}
+      <Badge variant="secondary" className="border-0 font-normal rounded-full px-2 h-5 text-[10px]">
+        {statusName}
       </Badge>
     )
   }
