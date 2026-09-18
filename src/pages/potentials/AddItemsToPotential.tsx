@@ -84,8 +84,9 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
     numero_potencial: '',
     cliente: '',
     nome_potencial: '',
+    nome_comprador: '',
     proprietario: '',
-    estagio: '',
+    estagio_id: '',
     observacoes: '',
     status: 'Sem Itens',
     incoterm_cliente: '',
@@ -111,8 +112,9 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
         numero_potencial: data.numero_potencial || '',
         cliente: data.cliente || '',
         nome_potencial: data.nome_potencial || '',
+        nome_comprador: data.nome_comprador || '',
         proprietario: data.proprietario || '',
-        estagio: data.estagio || '',
+        estagio_id: data.estagio_id || '',
         observacoes: data.observacoes || '',
         status: data.status || 'Sem Itens',
         incoterm_cliente: data.incoterm_cliente || '',
@@ -377,8 +379,9 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
           numero_potencial: saved.numero_potencial || '',
           cliente: saved.cliente || '',
           nome_potencial: saved.nome_potencial || '',
+          nome_comprador: saved.nome_comprador || '',
           proprietario: saved.proprietario || '',
-          estagio: saved.estagio || '',
+          estagio_id: saved.estagio_id || '',
           observacoes: saved.observacoes || '',
           status: statusToSave,
           incoterm_cliente: saved.incoterm_cliente || '',
@@ -434,8 +437,9 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
       numero_potencial: quote.numero_potencial || '',
       cliente: quote.cliente || '',
       nome_potencial: quote.nome_potencial || '',
+      nome_comprador: quote.nome_comprador || '',
       proprietario: quote.proprietario || '',
-      estagio: quote.estagio || '',
+      estagio_id: quote.estagio_id || '',
       observacoes: quote.observacoes || '',
       status: quote.status || 'Sem Itens',
       incoterm_cliente: quote.incoterm_cliente || '',
@@ -572,8 +576,9 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
       !formData.numero_potencial &&
       !formData.cliente &&
       !formData.nome_potencial &&
+      !formData.nome_comprador &&
       !formData.proprietario &&
-      !formData.estagio &&
+      !formData.estagio_id &&
       !formData.observacoes &&
       selectedItems.length === 0
 
