@@ -11,6 +11,16 @@ import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 export default function PotentialDetailsWrapper() {
   const navigate = useNavigate()
@@ -19,6 +29,7 @@ export default function PotentialDetailsWrapper() {
   const [globalMargin, setGlobalMargin] = useState('7.5')
   const [realMargin, setRealMargin] = useState<number | null>(null)
   const [isApplying, setIsApplying] = useState(false)
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
   const { toast } = useToast()
   const [searchParams] = useSearchParams()
   const potencialId =
@@ -106,13 +117,8 @@ export default function PotentialDetailsWrapper() {
             className="h-8 px-3 text-xs gap-1.5 font-medium shadow-xs"
             onClick={() => {
               if (addItemsRef.current?.isDirty && addItemsRef.current.isDirty()) {
-                if (
-                  !window.confirm(
-                    'Você tem alterações não salvas. Deseja realmente sair e descartar as alterações?',
-                  )
-                ) {
-                  return
-                }
+                setShowUnsavedDialog(true)
+                return
               }
               navigate('/potenciais')
             }}
@@ -207,6 +213,29 @@ export default function PotentialDetailsWrapper() {
           />
         </div>
       </div>
+      <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Você tem alterações não salvas</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja realmente sair e descartar as alterações feitas nesta cotação? Todas as
+              modificações não salvas serão perdidas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Continuar editando</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                setShowUnsavedDialog(false)
+                navigate('/potenciais')
+              }}
+            >
+              Descartar alterações
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

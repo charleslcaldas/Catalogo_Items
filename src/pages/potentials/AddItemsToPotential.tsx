@@ -27,6 +27,16 @@ import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { ProductCatalog } from './components/ProductCatalog'
 import { QuickItemModal } from './components/QuickItemModal'
 import { SearchQuoteModal } from './components/SearchQuoteModal'
@@ -95,11 +105,36 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
   const initialSnapshotRef = useRef<string>('')
   const isSavedRef = useRef<boolean>(false)
 
+  const buildSnapshot = (data: typeof formData, items: typeof selectedItems) => {
+    return JSON.stringify({
+      formData: {
+        numero_potencial: data.numero_potencial || '',
+        cliente: data.cliente || '',
+        nome_potencial: data.nome_potencial || '',
+        proprietario: data.proprietario || '',
+        estagio: data.estagio || '',
+        observacoes: data.observacoes || '',
+        status: data.status || 'Sem Itens',
+        incoterm_cliente: data.incoterm_cliente || '',
+        condicao_pagamento_cliente: data.condicao_pagamento_cliente || '',
+        tempo_fabricacao_cliente: data.tempo_fabricacao_cliente || '',
+      },
+      items: items.map((si) => ({
+        item_id: si.id,
+        quantidade: Number(si.data?.quantidade) || 0,
+        unidade_medida: si.data?.unidade_medida || 'Pcs',
+        preco_unitario: Number(si.data?.preco_unitario) || 0,
+        observacoes: si.data?.observacoes || '',
+      })),
+    })
+  }
+
   const [isSelecting, setIsSelecting] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isSearchQuoteOpen, setIsSearchQuoteOpen] = useState(false)
   const [isItemModalOpen, setIsItemModalOpen] = useState(false)
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
   const [itemToEdit, setItemToEdit] = useState<Partial<Item> | undefined>(undefined)
   const [unidades, setUnidades] = useState<UnidadeMedida[]>([])
   const [statuses, setStatuses] = useState<StatusPotencial[]>([])
@@ -335,22 +370,28 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
       setCurrentPotential(saved)
       setFormData((prev) => ({ ...prev, status: statusToSave }))
 
-      // Update snapshot of saved state
+      // Update snapshot of saved state immediately with the saved values
       isSavedRef.current = true
       initialSnapshotRef.current = JSON.stringify({
         formData: {
-          numero_potencial: formData.numero_potencial || '',
-          cliente: formData.cliente || '',
-          nome_potencial: formData.nome_potencial || '',
-          proprietario: formData.proprietario || '',
-          estagio: formData.estagio || '',
-          observacoes: formData.observacoes || '',
+          numero_potencial: saved.numero_potencial || '',
+          cliente: saved.cliente || '',
+          nome_potencial: saved.nome_potencial || '',
+          proprietario: saved.proprietario || '',
+          estagio: saved.estagio || '',
+          observacoes: saved.observacoes || '',
           status: statusToSave,
-          incoterm_cliente: formData.incoterm_cliente || '',
-          condicao_pagamento_cliente: formData.condicao_pagamento_cliente || '',
-          tempo_fabricacao_cliente: formData.tempo_fabricacao_cliente || '',
+          incoterm_cliente: saved.incoterm_cliente || '',
+          condicao_pagamento_cliente: saved.condicao_pagamento_cliente || '',
+          tempo_fabricacao_cliente: saved.tempo_fabricacao_cliente || '',
         },
-        items: itemsData,
+        items: itemsData.map((item) => ({
+          item_id: item.item_id,
+          quantidade: Number(item.quantidade) || 0,
+          unidade_medida: item.unidade_medida || 'Pcs',
+          preco_unitario: Number(item.preco_unitario) || 0,
+          observacoes: item.observacoes || '',
+        })),
       })
 
       toast.success(`Cotação ${saved.numero_potencial} salva com sucesso!`, {
@@ -359,9 +400,9 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
 
       if (!currentPotential) {
         navigate(`/potenciais/adicionar?id=${saved.id}`, { replace: true })
-        handleQuoteSelected(saved)
+        await handleQuoteSelected(saved)
       } else {
-        handleQuoteSelected(saved)
+        await handleQuoteSelected(saved)
       }
     } catch (error) {
       toast.error('Erro ao salvar a cotação.')
@@ -430,27 +471,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
       setSelectedItems(formattedItems)
 
       // Set clean initial snapshot when loaded from search or URL
-      initialSnapshotRef.current = JSON.stringify({
-        formData: {
-          numero_potencial: quote.numero_potencial || '',
-          cliente: quote.cliente || '',
-          nome_potencial: quote.nome_potencial || '',
-          proprietario: quote.proprietario || '',
-          estagio: quote.estagio || '',
-          observacoes: quote.observacoes || '',
-          status: quote.status || 'Sem Itens',
-          incoterm_cliente: quote.incoterm_cliente || '',
-          condicao_pagamento_cliente: quote.condicao_pagamento_cliente || '',
-          tempo_fabricacao_cliente: quote.tempo_fabricacao_cliente || '',
-        },
-        items: formattedItems.map((fi) => ({
-          item_id: fi.id,
-          quantidade: Number(fi.data.quantidade) || 0,
-          unidade_medida: fi.data.unidade_medida,
-          preco_unitario: Number(fi.data.preco_unitario) || 0,
-          observacoes: fi.data.observacoes,
-        })),
-      })
+      initialSnapshotRef.current = buildSnapshot(quote as any, formattedItems)
       isSavedRef.current = false
 
       toast.success('Cotação carregada com sucesso!')
@@ -558,28 +579,8 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
 
     if (isEmptyNew) return false
 
-    // Compare with snapshot
-    const currentSimplified = JSON.stringify({
-      formData: {
-        numero_potencial: formData.numero_potencial || '',
-        cliente: formData.cliente || '',
-        nome_potencial: formData.nome_potencial || '',
-        proprietario: formData.proprietario || '',
-        estagio: formData.estagio || '',
-        observacoes: formData.observacoes || '',
-        status: formData.status || 'Sem Itens',
-        incoterm_cliente: formData.incoterm_cliente || '',
-        condicao_pagamento_cliente: formData.condicao_pagamento_cliente || '',
-        tempo_fabricacao_cliente: formData.tempo_fabricacao_cliente || '',
-      },
-      items: selectedItems.map((si) => ({
-        item_id: si.id,
-        quantidade: Number(si.data.quantidade) || 0,
-        unidade_medida: si.data.unidade_medida,
-        preco_unitario: Number(si.data.preco_unitario) || 0,
-        observacoes: si.data.observacoes,
-      })),
-    })
+    // Compare with snapshot using consistent builder
+    const currentSimplified = buildSnapshot(formData, selectedItems)
 
     return currentSimplified !== initialSnapshotRef.current
   }
@@ -894,13 +895,8 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
             className="h-8 px-3 text-xs gap-1.5 font-medium shadow-xs"
             onClick={() => {
               if (isDirty()) {
-                if (
-                  !window.confirm(
-                    'Você tem alterações não salvas. Deseja realmente sair e descartar as alterações?',
-                  )
-                ) {
-                  return
-                }
+                setShowUnsavedDialog(true)
+                return
               }
               navigate('/potenciais')
             }}
@@ -940,13 +936,8 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
             className="h-8 text-xs"
             onClick={() => {
               if (isDirty()) {
-                if (
-                  !window.confirm(
-                    'Você tem alterações não salvas. Deseja realmente sair e descartar as alterações?',
-                  )
-                ) {
-                  return
-                }
+                setShowUnsavedDialog(true)
+                return
               }
               navigate('/potenciais')
             }}
@@ -1320,6 +1311,30 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
         onOpenChange={setIsStatusModalOpen}
         onSaved={loadStatuses}
       />
+
+      <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Você tem alterações não salvas</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja realmente sair e descartar as alterações feitas nesta cotação? Todas as
+              modificações não salvas serão perdidas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Continuar editando</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                setShowUnsavedDialog(false)
+                navigate('/potenciais')
+              }}
+            >
+              Descartar alterações
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 })
