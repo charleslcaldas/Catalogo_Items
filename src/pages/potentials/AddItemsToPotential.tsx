@@ -105,31 +105,40 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
   // Track initial state to detect unsaved changes
   const initialSnapshotRef = useRef<string>('')
   const isSavedRef = useRef<boolean>(false)
+  const isInitializedRef = useRef<boolean>(false)
 
   const buildSnapshot = (data: typeof formData, items: typeof selectedItems) => {
     return JSON.stringify({
       formData: {
-        numero_potencial: data.numero_potencial || '',
-        cliente: data.cliente || '',
-        nome_potencial: data.nome_potencial || '',
-        nome_comprador: data.nome_comprador || '',
-        proprietario: data.proprietario || '',
-        estagio_id: data.estagio_id || '',
-        observacoes: data.observacoes || '',
+        numero_potencial: (data.numero_potencial || '').trim(),
+        cliente: (data.cliente || '').trim(),
+        nome_potencial: (data.nome_potencial || '').trim(),
+        nome_comprador: (data.nome_comprador || '').trim(),
+        proprietario: (data.proprietario || '').trim(),
+        estagio_id: (data.estagio_id || '').trim(),
+        observacoes: (data.observacoes || '').trim(),
         status: data.status || 'Sem Itens',
-        incoterm_cliente: data.incoterm_cliente || '',
-        condicao_pagamento_cliente: data.condicao_pagamento_cliente || '',
-        tempo_fabricacao_cliente: data.tempo_fabricacao_cliente || '',
+        incoterm_cliente: (data.incoterm_cliente || '').trim(),
+        condicao_pagamento_cliente: (data.condicao_pagamento_cliente || '').trim(),
+        tempo_fabricacao_cliente: (data.tempo_fabricacao_cliente || '').trim(),
       },
-      items: items.map((si) => ({
+      items: (items || []).map((si) => ({
         item_id: si.id,
         quantidade: Number(si.data?.quantidade) || 0,
         unidade_medida: si.data?.unidade_medida || 'Pcs',
         preco_unitario: Number(si.data?.preco_unitario) || 0,
-        observacoes: si.data?.observacoes || '',
+        observacoes: (si.data?.observacoes || '').trim(),
       })),
     })
   }
+
+  // Set default initial snapshot for new quotes on mount
+  useEffect(() => {
+    if (!searchParams.get('id') && !isInitializedRef.current) {
+      initialSnapshotRef.current = buildSnapshot(formData, [])
+      isInitializedRef.current = true
+    }
+  }, [])
 
   const [isSelecting, setIsSelecting] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -595,16 +604,19 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
     // If empty new quote with nothing filled, not dirty
     const isEmptyNew =
       !currentPotential &&
-      !formData.numero_potencial &&
-      !formData.cliente &&
-      !formData.nome_potencial &&
-      !formData.nome_comprador &&
-      !formData.proprietario &&
-      !formData.estagio_id &&
-      !formData.observacoes &&
+      !formData.numero_potencial?.trim() &&
+      !formData.cliente?.trim() &&
+      !formData.nome_potencial?.trim() &&
+      !formData.nome_comprador?.trim() &&
+      !formData.proprietario?.trim() &&
+      !formData.estagio_id?.trim() &&
+      !formData.observacoes?.trim() &&
       selectedItems.length === 0
 
     if (isEmptyNew) return false
+
+    // If snapshot has not been initialized yet, it's not dirty
+    if (!initialSnapshotRef.current) return false
 
     // Compare with snapshot using consistent builder
     const currentSimplified = buildSnapshot(formData, selectedItems)
@@ -616,14 +628,16 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (isDirty()) {
         e.preventDefault()
+        // Standard spec for modern browsers to prompt user before closing the tab/window
         e.returnValue = ''
+        return ''
       }
     }
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload)
     }
-  })
+  }, [formData, selectedItems, currentPotential])
 
   const handleItemSaved = (newItem: Item) => {
     setSelectedItems((prev) => {
@@ -873,6 +887,44 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
     toast.success('Condições comerciais recalculadas a partir dos fornecedores aceitos!')
   }
 
+  // Se as condições mudarem automaticamente sem interação do usuário (ex: cálculo ao carregar),
+  // e o formulário ainda estiver com o snapshot original da cotação, sincronizar o snapshot
+  // para não marcar dirty falsamente logo ao carregar a página
+  useEffect(() => {
+    if (initialSnapshotRef.current && currentPotential) {
+      try {
+        const parsedInitial = JSON.parse(initialSnapshotRef.current)
+        const parsedCurrent = JSON.parse(buildSnapshot(formData, selectedItems))
+
+        // Se as únicas diferenças forem as condições sugeridas automáticas:
+        const diffKeys = Object.keys(parsedCurrent.formData).filter(
+          (k) => (parsedCurrent.formData as any)[k] !== (parsedInitial.formData as any)[k],
+        )
+        const conditionKeys = [
+          'incoterm_cliente',
+          'condicao_pagamento_cliente',
+          'tempo_fabricacao_cliente',
+        ]
+        const onlyConditionDiffs =
+          diffKeys.length > 0 && diffKeys.every((k) => conditionKeys.includes(k))
+
+        if (
+          onlyConditionDiffs &&
+          !condicoesManuais.incoterm &&
+          !condicoesManuais.condicao_pagamento &&
+          !condicoesManuais.tempo_fabricacao
+        ) {
+          initialSnapshotRef.current = buildSnapshot(formData, selectedItems)
+        }
+      } catch (e) {
+        // ignore json parse error
+      }
+    }
+  }, [
+    formData.incoterm_cliente,
+    formData.condicao_pagamento_cliente,
+    formData.tempo_fabricacao_cliente,
+  ])
   if (isSelecting) {
     return (
       <div className="h-[calc(100vh-4rem)] flex flex-col p-4 md:p-6 max-w-[1600px] mx-auto w-full bg-slate-50/50">
