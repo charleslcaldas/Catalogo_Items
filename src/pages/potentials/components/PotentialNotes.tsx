@@ -4,6 +4,16 @@ import { toast } from 'sonner'
 import { Send, Trash2, Edit2, X, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import pb from '@/lib/pocketbase/client'
 import { useAuth } from '@/hooks/use-auth'
 
@@ -15,6 +25,7 @@ export function PotentialNotes({ potencialId }: { potencialId: string }) {
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editContent, setEditContent] = useState('')
+  const [noteToDelete, setNoteToDelete] = useState<string | null>(null)
 
   const loadNotes = async () => {
     try {
@@ -55,15 +66,21 @@ export function PotentialNotes({ potencialId }: { potencialId: string }) {
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Excluir esta nota?')) return
+  const confirmDelete = async () => {
+    if (!noteToDelete) return
     try {
-      await pb.collection('potencial_notas').delete(id)
+      await pb.collection('potencial_notas').delete(noteToDelete)
       loadNotes()
       toast.success('Nota excluída.')
     } catch (err) {
       toast.error('Erro ao excluir nota.')
+    } finally {
+      setNoteToDelete(null)
     }
+  }
+
+  const handleDelete = (id: string) => {
+    setNoteToDelete(id)
   }
 
   const startEdit = (note: any) => {
@@ -177,6 +194,26 @@ export function PotentialNotes({ potencialId }: { potencialId: string }) {
           </p>
         )}
       </div>
+
+      <AlertDialog open={!!noteToDelete} onOpenChange={(open) => !open && setNoteToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Nota</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja realmente excluir esta nota? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmDelete}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

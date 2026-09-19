@@ -146,6 +146,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
   const [isItemModalOpen, setIsItemModalOpen] = useState(false)
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false)
   const [itemToEdit, setItemToEdit] = useState<Partial<Item> | undefined>(undefined)
   const [unidades, setUnidades] = useState<UnidadeMedida[]>([])
   const [statuses, setStatuses] = useState<StatusPotencial[]>([])
@@ -440,10 +441,8 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
     }
   }
 
-  const handleDuplicate = async () => {
+  const executeDuplicate = async () => {
     if (!currentPotential) return
-    if (!confirm('Deseja duplicar esta cotação? Isso criará uma cópia idêntica.')) return
-
     setIsSaving(true)
     try {
       const newPotencial = await duplicatePotencial(currentPotential.id)
@@ -455,6 +454,11 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
     } finally {
       setIsSaving(false)
     }
+  }
+
+  const handleDuplicate = () => {
+    if (!currentPotential) return
+    setShowDuplicateDialog(true)
   }
 
   const handleQuoteSelected = async (quote: Potencial, explicitStatus?: string) => {
@@ -601,6 +605,9 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
 
   // Unsaved changes detection for beforeunload and navigation
   const isDirty = () => {
+    // If snapshot has not been initialized yet, it is NEVER dirty
+    if (!initialSnapshotRef.current) return false
+
     // If empty new quote with nothing filled, not dirty
     const isEmptyNew =
       !currentPotential &&
@@ -615,20 +622,25 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
 
     if (isEmptyNew) return false
 
-    // If snapshot has not been initialized yet, it's not dirty
-    if (!initialSnapshotRef.current) return false
-
     // Compare with snapshot using consistent builder
     const currentSimplified = buildSnapshot(formData, selectedItems)
 
     return currentSimplified !== initialSnapshotRef.current
   }
 
+  // Ref to hold the latest isDirty status so beforeunload listener only triggers when genuinely dirty
+  const isDirtyRef = useRef(false)
   useEffect(() => {
+    isDirtyRef.current = isDirty()
+  }, [formData, selectedItems, currentPotential])
+
+  useEffect(() => {
+    // O evento 'beforeunload' é acionado APENAS pelo navegador ao fechar/recarregar a aba do navegador.
+    // Navegações internas por rotas do React Router não passam por beforeunload,
+    // garantindo que NUNCA haja alerta nativo do navegador ao navegar entre telas no app.
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isDirty()) {
+      if (isDirtyRef.current) {
         e.preventDefault()
-        // Standard spec for modern browsers to prompt user before closing the tab/window
         e.returnValue = ''
         return ''
       }
@@ -637,7 +649,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload)
     }
-  }, [formData, selectedItems, currentPotential])
+  }, [])
 
   const handleItemSaved = (newItem: Item) => {
     setSelectedItems((prev) => {
@@ -887,11 +899,11 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
     toast.success('Condições comerciais recalculadas a partir dos fornecedores aceitos!')
   }
 
-  // Se as condições mudarem automaticamente sem interação do usuário (ex: cálculo ao carregar),
-  // e o formulário ainda estiver com o snapshot original da cotação, sincronizar o snapshot
-  // para não marcar dirty falsamente logo ao carregar a página
+  // Se as condições mudarem automaticamente sem interação do usuário (ex: cálculo ao carregar tanto para cotação nova quanto existente),
+  // e o formulário ainda estiver com o snapshot original, sincronizar o snapshot inicial
+  // para NÃO marcar dirty falsamente logo ao carregar a página sem edição explícita do usuário
   useEffect(() => {
-    if (initialSnapshotRef.current && currentPotential) {
+    if (initialSnapshotRef.current) {
       try {
         const parsedInitial = JSON.parse(initialSnapshotRef.current)
         const parsedCurrent = JSON.parse(buildSnapshot(formData, selectedItems))
@@ -924,6 +936,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
     formData.incoterm_cliente,
     formData.condicao_pagamento_cliente,
     formData.tempo_fabricacao_cliente,
+    condicoesManuais,
   ])
   if (isSelecting) {
     return (
@@ -1400,6 +1413,28 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
         onOpenChange={setIsStatusModalOpen}
         onSaved={loadStatuses}
       />
+
+      <AlertDialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Duplicar Cotação</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja duplicar esta cotação? Uma cópia idêntica será criada no sistema.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowDuplicateDialog(false)
+                executeDuplicate()
+              }}
+            >
+              Duplicar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
         <AlertDialogContent>

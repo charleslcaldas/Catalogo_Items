@@ -27,6 +27,16 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -58,6 +68,7 @@ export default function FotosCatalogo() {
   const { acabamentos } = useData()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingFoto, setEditingFoto] = useState<any>(null)
+  const [fotoToDelete, setFotoToDelete] = useState<string | null>(null)
 
   const [selectedFotoIds, setSelectedFotoIds] = useState<Set<string>>(new Set())
   const [isMergeModalOpen, setIsMergeModalOpen] = useState(false)
@@ -189,14 +200,20 @@ export default function FotosCatalogo() {
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta foto?')) return
+  const confirmDelete = async () => {
+    if (!fotoToDelete) return
     try {
-      await pb.collection('foto_catalogo').delete(id)
+      await pb.collection('foto_catalogo').delete(fotoToDelete)
       toast.success('Foto excluída com sucesso')
     } catch (e) {
       toast.error('Erro ao excluir foto')
+    } finally {
+      setFotoToDelete(null)
     }
+  }
+
+  const handleDelete = (id: string) => {
+    setFotoToDelete(id)
   }
 
   const openEdit = (f: any) => {
@@ -945,6 +962,26 @@ export default function FotosCatalogo() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!fotoToDelete} onOpenChange={(open) => !open && setFotoToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Foto</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta foto? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmDelete}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -3,6 +3,16 @@ import { Send, Trash2, Edit2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -28,6 +38,7 @@ export function QuotationNotes({
   const [filterFornecedor, setFilterFornecedor] = useState<string>('all')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editContent, setEditContent] = useState('')
+  const [noteToDelete, setNoteToDelete] = useState<string | null>(null)
 
   const loadNotes = async () => {
     try {
@@ -64,15 +75,21 @@ export function QuotationNotes({
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Deseja excluir esta nota?')) return
+  const confirmDelete = async () => {
+    if (!noteToDelete) return
     try {
-      await pb.collection('potencial_notas').delete(id)
+      await pb.collection('potencial_notas').delete(noteToDelete)
       loadNotes()
       toast({ title: 'Nota excluída' })
     } catch (err: any) {
       toast({ title: 'Erro', description: err.message, variant: 'destructive' })
+    } finally {
+      setNoteToDelete(null)
     }
+  }
+
+  const handleDelete = (id: string) => {
+    setNoteToDelete(id)
   }
 
   const handleSaveEdit = async (id: string) => {
@@ -221,6 +238,26 @@ export function QuotationNotes({
           ))
         )}
       </div>
+
+      <AlertDialog open={!!noteToDelete} onOpenChange={(open) => !open && setNoteToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Nota</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja excluir esta nota? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmDelete}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
