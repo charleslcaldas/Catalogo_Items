@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Search, Image as ImageIcon } from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
 import { toast } from 'sonner'
+import { textMatchesAll } from '@/lib/utils'
 
 export function PhotoPickerModal({
   open,
@@ -31,8 +32,9 @@ export function PhotoPickerModal({
   const filtered = fotos
     .filter((f) => f.id !== excludeId)
     .filter((f) => {
-      const text = `${f.descricao || ''} ${f.tipo || ''} ${f.subtipo || ''}`.toLowerCase()
-      return text.includes(search.toLowerCase())
+      if (!search.trim()) return true
+      const text = `${f.descricao || ''} ${f.tipo || ''} ${f.subtipo || ''}`
+      return textMatchesAll(text, search)
     })
 
   const getThumb = (f: any) => {

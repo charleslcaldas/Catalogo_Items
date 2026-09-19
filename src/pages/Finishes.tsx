@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useData } from '@/contexts/data-context'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { getContrastColor, cn } from '@/lib/utils'
+import { getContrastColor, cn, textMatchesAll } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Plus, Pencil, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { FinishModal } from '@/components/MetadataModals'
@@ -52,13 +52,9 @@ export default function Finishes() {
   }
 
   const filteredAcabamentos = acabamentos.filter((a) => {
-    const term = searchTerm.toLowerCase().trim()
-    if (!term) return true
-    return (
-      a.nome_pt.toLowerCase().includes(term) ||
-      (a.nome_en && a.nome_en.toLowerCase().includes(term)) ||
-      a.codigo.toLowerCase().includes(term)
-    )
+    if (!searchTerm.trim()) return true
+    const haystack = [a.codigo, a.nome_pt, a.nome_en].filter(Boolean).join(' ')
+    return textMatchesAll(haystack, searchTerm)
   })
 
   const sortedAcabamentos = [...filteredAcabamentos].sort((a, b) => {

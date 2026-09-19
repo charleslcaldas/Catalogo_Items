@@ -14,6 +14,7 @@ import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Building2, MapPin, Globe, Layers, FileText, X, Plus, Check, Search } from 'lucide-react'
+import { textMatchesAll } from '@/lib/utils'
 import { useData } from '@/contexts/data-context'
 import { Fornecedor } from '@/types'
 import { toast } from 'sonner'
@@ -139,11 +140,8 @@ export function FornecedorFormModal({
 
   const filteredLinhas = linhas.filter((l) => {
     if (!linhaSearch.trim()) return true
-    const term = linhaSearch.toLowerCase()
-    return (
-      (l.nome_pt && l.nome_pt.toLowerCase().includes(term)) ||
-      (l.nome_en && l.nome_en.toLowerCase().includes(term))
-    )
+    const haystack = [l.nome_pt, l.nome_en].filter(Boolean).join(' ')
+    return textMatchesAll(haystack, linhaSearch)
   })
 
   const handleSubmit = async (e: React.FormEvent) => {

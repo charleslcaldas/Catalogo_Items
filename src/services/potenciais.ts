@@ -11,6 +11,10 @@ export const getPotenciais = () => {
 export const searchPotenciais = (term: string) => {
   let filter = ''
   if (term) {
+    const tokens = term
+      .split(/\s+/)
+      .map((t) => t.trim().replace(/"/g, ''))
+      .filter(Boolean)
     const fields = [
       'numero_potencial',
       'cliente',
@@ -18,8 +22,14 @@ export const searchPotenciais = (term: string) => {
       'proprietario',
       'nome_comprador',
     ]
-    const clauses = fields.map((f) => buildFieldAccentCondition(f, term))
-    filter = clauses.join(' || ')
+    if (tokens.length > 0) {
+      filter = tokens
+        .map((token) => {
+          const clauses = fields.map((f) => buildFieldAccentCondition(f, token))
+          return `(${clauses.join(' || ')})`
+        })
+        .join(' && ')
+    }
   }
   return pb.collection<Potencial>('potenciais').getList(1, 50, {
     filter,

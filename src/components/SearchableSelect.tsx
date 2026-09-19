@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Check, ChevronsUpDown, Plus } from 'lucide-react'
+import { textMatchesAll } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
@@ -68,7 +69,7 @@ export function SearchableSelect({
               {options.map((opt) => (
                 <CommandItem
                   key={opt.value}
-                  value={opt.label}
+                  value={`${opt.label} ${opt.value}`}
                   onSelect={() => {
                     onChange(opt.value)
                     setOpen(false)

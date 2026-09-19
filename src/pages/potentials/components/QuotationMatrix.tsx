@@ -1079,10 +1079,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
               </div>
               <Command
                 filter={(value, search) => {
-                  const normalizedValue = value.toLowerCase()
-                  const normalizedSearch = search.toLowerCase()
-                  const tokens = normalizedSearch.split(/\s+/)
-                  return tokens.every((token) => normalizedValue.includes(token)) ? 1 : 0
+                  return textMatchesAll(value, search) ? 1 : 0
                 }}
               >
                 <CommandInput

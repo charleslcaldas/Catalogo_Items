@@ -29,6 +29,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { useData, DescricaoBase } from '@/contexts/data-context'
 import { Plus, Copy, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { textMatchesAll } from '@/lib/utils'
 import { toast } from 'sonner'
 import pb from '@/lib/pocketbase/client'
 import { extractFieldErrors, getErrorMessage } from '@/lib/pocketbase/errors'
@@ -45,11 +46,14 @@ export default function DescricoesBasePage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null)
 
   const filteredDesc = descricoesBase.filter((d) => {
-    const term = searchTerm.toLowerCase()
-    return (
-      d.nome_pt.toLowerCase().includes(term) ||
-      (d.nome_en && d.nome_en.toLowerCase().includes(term))
-    )
+    if (!searchTerm.trim()) return true
+    const catName = categorias.find((c) => c.id === d.categoria_id)?.nome_pt || ''
+    const linhaName = linhas.find((l) => l.id === d.linha_id)?.nome_pt || ''
+    const ncmCode = ncms.find((n) => n.id === d.ncm_id)?.codigo || ''
+    const haystack = [d.nome_pt, d.nome_en, catName, linhaName, ncmCode, d.codigo]
+      .filter(Boolean)
+      .join(' ')
+    return textMatchesAll(haystack, searchTerm)
   })
 
   const handleOpenNew = () => {

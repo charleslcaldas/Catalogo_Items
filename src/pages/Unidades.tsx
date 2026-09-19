@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Edit2, ArrowRight } from 'lucide-react'
+import { Plus, Trash2, Edit2, ArrowRight, Search } from 'lucide-react'
+import { textMatchesAll } from '@/lib/utils'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,6 +29,7 @@ export default function Unidades() {
   const navigate = useNavigate()
   const { itens, reloadMetadata } = useData()
   const [unidades, setUnidades] = useState<any[]>([])
+  const [searchTerm, setSearchTerm] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingUnidade, setEditingUnidade] = useState<any>(null)
   const [nome, setNome] = useState('')
@@ -98,14 +100,31 @@ export default function Unidades() {
     setIsModalOpen(true)
   }
 
+  const filteredUnidades = unidades.filter((u) => {
+    if (!searchTerm.trim()) return true
+    return textMatchesAll(u.nome, searchTerm)
+  })
+
   return (
     <div className="p-6 max-w-4xl mx-auto animate-fade-in">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Unidades de Medida</h1>
-          <p className="text-muted-foreground text-sm">
-            Gerencie as unidades utilizadas nos itens do catálogo.
-          </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Unidades de Medida</h1>
+            <p className="text-muted-foreground text-sm">
+              Gerencie as unidades utilizadas nos itens do catálogo.
+            </p>
+          </div>
+          <div className="relative w-full sm:w-60">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Buscar unidade..."
+              className="pl-9 w-full"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         </div>
         <Button onClick={openNew}>
           <Plus className="w-4 h-4 mr-2" /> Nova Unidade
@@ -122,14 +141,16 @@ export default function Unidades() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {unidades.length === 0 ? (
+            {filteredUnidades.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
-                  Nenhuma unidade cadastrada.
+                  {unidades.length === 0
+                    ? 'Nenhuma unidade cadastrada.'
+                    : 'Nenhuma unidade encontrada.'}
                 </TableCell>
               </TableRow>
             ) : (
-              unidades.map((u) => {
+              filteredUnidades.map((u) => {
                 const itensCount = itens.filter((i) => i.unidade_id === u.id).length
 
                 return (

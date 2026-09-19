@@ -49,6 +49,7 @@ import { useData } from '@/contexts/data-context'
 import { ImagePreviewModal } from '@/components/ImagePreviewModal'
 import { MergeFotosModal } from '@/components/MergeFotosModal'
 import { useAuth } from '@/hooks/use-auth'
+import { normalizeText, textMatchesAll } from '@/lib/utils'
 import { ResizableHeader } from '@/components/ui/resizable-header'
 import { useNavigate } from 'react-router-dom'
 
@@ -243,9 +244,13 @@ export default function FotosCatalogo() {
   }, [fotos])
 
   const filteredAndSortedFotos = useMemo(() => {
-    const terms = searchTerm.split(' ').filter(Boolean)
-    const includes = terms.filter((t) => !t.startsWith('-')).map((t) => t.toLowerCase())
-    const excludes = terms.filter((t) => t.startsWith('-')).map((t) => t.substring(1).toLowerCase())
+    const rawTerms = searchTerm.split(/\s+/).filter(Boolean)
+    const includesTerms = rawTerms.filter((t) => !t.startsWith('-'))
+    const excludesTerms = rawTerms
+      .filter((t) => t.startsWith('-'))
+      .map((t) => t.substring(1))
+      .filter(Boolean)
+      .map((t) => normalizeText(t))
 
     const filtered = fotos.filter((f) => {
       // Filtro de Tipo
@@ -264,11 +269,14 @@ export default function FotosCatalogo() {
         }
       }
 
-      const searchableText = `${f.descricao || ''} ${f.tipo || ''} ${f.subtipo || ''}`.toLowerCase()
+      const searchableText = `${f.descricao || ''} ${f.tipo || ''} ${f.subtipo || ''}`
 
-      const hasAllIncludes = includes.every((inc) => searchableText.includes(inc))
+      const hasAllIncludes =
+        includesTerms.length === 0 || textMatchesAll(searchableText, includesTerms.join(' '))
+
+      const normSearchable = normalizeText(searchableText)
       const hasNoExcludes =
-        excludes.length === 0 || excludes.every((exc) => exc && !searchableText.includes(exc))
+        excludesTerms.length === 0 || excludesTerms.every((exc) => !normSearchable.includes(exc))
 
       return hasAllIncludes && hasNoExcludes
     })

@@ -46,6 +46,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useData } from '@/contexts/data-context'
 import { ContatoFornecedor } from '@/types'
 import { ContatoModal } from '@/components/MetadataModals'
+import { textMatchesAll } from '@/lib/utils'
 import pb from '@/lib/pocketbase/client'
 
 export default function ContactsPage() {
@@ -79,28 +80,25 @@ export default function ContactsPage() {
     }
     // Busca textual
     if (!search.trim()) return true
-    const term = search.toLowerCase()
-    const fullName = `${c.nome || ''} ${c.sobrenome || ''}`.toLowerCase()
-    const email = (c.email || '').toLowerCase()
-    const phone = (c.telefone || '').toLowerCase()
-    const whats = (c.whatsapp || '').toLowerCase()
-    const wechat = (c.wechat || '').toLowerCase()
-    const cargo = (c.cargo || '').toLowerCase()
-    const fabName = (
+    const fullName = `${c.nome || ''} ${c.sobrenome || ''}`
+    const fabName =
       c.expand?.fabricante_id?.nome ||
       fornecedores.find((f) => f.id === c.fabricante_id)?.nome ||
       ''
-    ).toLowerCase()
+    const haystack = [
+      fullName,
+      c.email,
+      c.telefone,
+      c.whatsapp,
+      c.wechat,
+      c.cargo,
+      fabName,
+      c.observacoes,
+    ]
+      .filter(Boolean)
+      .join(' ')
 
-    return (
-      fullName.includes(term) ||
-      email.includes(term) ||
-      phone.includes(term) ||
-      whats.includes(term) ||
-      wechat.includes(term) ||
-      cargo.includes(term) ||
-      fabName.includes(term)
-    )
+    return textMatchesAll(haystack, search)
   })
 
   const handleDelete = async () => {

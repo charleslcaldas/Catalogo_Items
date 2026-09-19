@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Search, AlignJustify, Layers } from 'lucide-react'
 import { useData } from '@/contexts/data-context'
 import { Badge } from '@/components/ui/badge'
-import { getContrastColor } from '@/lib/utils'
+import { getContrastColor, textMatchesAll } from '@/lib/utils'
 
 export function LinePickerModal({
   open,
@@ -34,20 +34,12 @@ export function LinePickerModal({
   }
 
   const filtered = useMemo(() => {
-    const term = search.toLowerCase().trim()
     return linhas.filter((l) => {
       if (selectedCatId && l.categoria_id !== selectedCatId) return false
-      if (!term) return true
-      const catName = getCatName(l.categoria_id).toLowerCase()
-      const nomePt = (l.nome_pt || '').toLowerCase()
-      const nomeEn = (l.nome_en || '').toLowerCase()
-      const superPt = (l.superlinha_pt || '').toLowerCase()
-      return (
-        nomePt.includes(term) ||
-        nomeEn.includes(term) ||
-        catName.includes(term) ||
-        superPt.includes(term)
-      )
+      if (!search.trim()) return true
+      const catName = getCatName(l.categoria_id)
+      const haystack = [l.nome_pt, l.nome_en, catName, l.superlinha_pt].filter(Boolean).join(' ')
+      return textMatchesAll(haystack, search)
     })
   }, [linhas, categorias, search, selectedCatId])
 

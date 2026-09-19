@@ -23,6 +23,7 @@ import {
   ArrowDown,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { textMatchesAll } from '@/lib/utils'
 import { NcmModal } from '@/components/MetadataModals'
 import { NcmHistoryModal } from '@/components/NcmHistoryModal'
 import { NcmImportModal } from '@/components/NcmImportModal'
@@ -65,11 +66,9 @@ export default function NCMPage() {
   }
 
   const filteredNcms = ncms.filter((n) => {
-    const term = searchTerm.toLowerCase()
-    return (
-      n.codigo.toLowerCase().includes(term) ||
-      (n.observacoes && n.observacoes.toLowerCase().includes(term))
-    )
+    if (!searchTerm.trim()) return true
+    const haystack = [n.codigo, n.observacoes].filter(Boolean).join(' ')
+    return textMatchesAll(haystack, searchTerm)
   })
 
   const sortedNcms = [...filteredNcms].sort((a, b) => {

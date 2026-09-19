@@ -46,6 +46,7 @@ import { ContatoModal } from '@/components/MetadataModals'
 import { FornecedorFormModal } from '@/components/FornecedorFormModal'
 import { FornecedorDetailModal } from '@/components/FornecedorDetailModal'
 import { Fornecedor } from '@/types'
+import { textMatchesAll } from '@/lib/utils'
 import pb from '@/lib/pocketbase/client'
 
 export default function Fornecedores() {
@@ -105,39 +106,34 @@ export default function Fornecedores() {
 
     // Busca textual ampla
     if (!search.trim()) return true
-    const term = search.toLowerCase()
-    const matchNome = (f.nome || '').toLowerCase().includes(term)
-    const matchContato = (f.contato || '').toLowerCase().includes(term)
-    const matchEmail = (f.email || '').toLowerCase().includes(term)
-    const matchCnpj = (f.cnpj || '').toLowerCase().includes(term)
-    const matchBusinessLicense = (f.business_license || '').toLowerCase().includes(term)
-    const matchCidade = (f.cidade || '').toLowerCase().includes(term)
-    const matchEstado = (f.estado || '').toLowerCase().includes(term)
-    const matchPais = (f.pais || '').toLowerCase().includes(term)
-    const matchItens = (f.itens_base_produz || '').toLowerCase().includes(term)
-    const matchIncoterm = (f.incoterm || '').toLowerCase().includes(term)
 
-    // Match de contatos vinculados
+    // Textos do próprio fabricante
+    const fabText = [
+      f.nome,
+      f.contato,
+      f.email,
+      f.cnpj,
+      f.business_license,
+      f.cidade,
+      f.estado,
+      f.pais,
+      f.itens_base_produz,
+      f.incoterm,
+    ]
+      .filter(Boolean)
+      .join(' ')
+
+    // Textos de contatos vinculados
     const contatosFab = contatosFornecedor.filter((c) => c.fabricante_id === f.id)
-    const matchContatos = contatosFab.some((c) =>
-      `${c.nome || ''} ${c.sobrenome || ''} ${c.email || ''} ${c.telefone || ''} ${c.whatsapp || ''}`
-        .toLowerCase()
-        .includes(term),
-    )
+    const contatosText = contatosFab
+      .map(
+        (c) =>
+          `${c.nome || ''} ${c.sobrenome || ''} ${c.email || ''} ${c.telefone || ''} ${c.whatsapp || ''}`,
+      )
+      .join(' ')
 
-    return (
-      matchNome ||
-      matchContato ||
-      matchEmail ||
-      matchCnpj ||
-      matchBusinessLicense ||
-      matchCidade ||
-      matchEstado ||
-      matchPais ||
-      matchItens ||
-      matchIncoterm ||
-      matchContatos
-    )
+    const fullHaystack = `${fabText} ${contatosText}`
+    return textMatchesAll(fullHaystack, search)
   })
 
   // Sincronizar selectedFornecedor caso seja atualizado

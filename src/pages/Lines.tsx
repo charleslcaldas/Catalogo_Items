@@ -25,7 +25,7 @@ import {
 } from 'lucide-react'
 import { LineAttributesModal } from '@/components/LineAttributesModal'
 import { LineModal } from '@/components/MetadataModals'
-import { getContrastColor } from '@/lib/utils'
+import { getContrastColor, textMatchesAll } from '@/lib/utils'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   AlertDialog,
@@ -102,13 +102,11 @@ export default function Lines() {
 
   const filteredLinhas = linhas.filter((l) => {
     if (filterCatId && l.categoria_id !== filterCatId) return false
-    const term = searchTerm.toLowerCase().trim()
-    if (!term) return true
-    return (
-      (l.nome_pt && l.nome_pt.toLowerCase().includes(term)) ||
-      (l.nome_en && l.nome_en.toLowerCase().includes(term)) ||
-      getCatName(l.categoria_id).toLowerCase().includes(term)
-    )
+    if (!searchTerm.trim()) return true
+    const haystack = [l.nome_pt, l.nome_en, l.superlinha_pt, getCatName(l.categoria_id)]
+      .filter(Boolean)
+      .join(' ')
+    return textMatchesAll(haystack, searchTerm)
   })
 
   const sortedLinhas = [...filteredLinhas].sort((a, b) => {

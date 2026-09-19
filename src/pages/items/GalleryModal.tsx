@@ -8,6 +8,7 @@ import { Search, Upload } from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
 import type { FotoCatalogo } from '@/types'
 import { toast } from 'sonner'
+import { textMatchesAll } from '@/lib/utils'
 
 export function GalleryModal({
   open,
@@ -34,11 +35,11 @@ export function GalleryModal({
         .catch(console.error)
   }, [open])
 
-  const filtered = fotos.filter(
-    (f) =>
-      (f.descricao || '').toLowerCase().includes(search.toLowerCase()) ||
-      (f.tipo || '').toLowerCase().includes(search.toLowerCase()),
-  )
+  const filtered = fotos.filter((f) => {
+    if (!search.trim()) return true
+    const text = `${f.descricao || ''} ${f.tipo || ''}`
+    return textMatchesAll(text, search)
+  })
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault()
