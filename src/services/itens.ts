@@ -1,5 +1,6 @@
 import pb from '@/lib/pocketbase/client'
 import type { Item } from '@/types'
+import { buildFieldAccentCondition } from '@/lib/utils'
 
 export const getItensPaginated = (
   page: number,
@@ -13,11 +14,19 @@ export const getItensPaginated = (
       .split(' ')
       .map((t) => t.trim().replace(/"/g, ''))
       .filter(Boolean)
+    const fields = [
+      'sku',
+      'descr_pt',
+      'descr_en',
+      'tamanho',
+      'acabamento_id.codigo',
+      'acabamento_id.nome_pt',
+    ]
     filter = terms
-      .map(
-        (term) =>
-          `(sku ~ "${term}" || descr_pt ~ "${term}" || descr_en ~ "${term}" || tamanho ~ "${term}" || acabamento_id.codigo ~ "${term}" || acabamento_id.nome_pt ~ "${term}")`,
-      )
+      .map((term) => {
+        const clauses = fields.map((f) => buildFieldAccentCondition(f, term))
+        return `(${clauses.join(' || ')})`
+      })
       .join(' && ')
   }
   return pb.collection<Item>('itens').getList(page, perPage, {

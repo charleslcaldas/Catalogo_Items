@@ -4,15 +4,26 @@ import { type DialogProps } from '@radix-ui/react-dialog'
 import { Command as CommandPrimitive } from 'cmdk'
 import { Search } from 'lucide-react'
 
-import { cn } from '@/lib/utils'
+import { cn, normalizeText } from '@/lib/utils'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
+
+const defaultCommandFilter = (value: string, search: string): number => {
+  if (!search) return 1
+  const normVal = normalizeText(value)
+  const normSearch = normalizeText(search)
+  if (!normSearch) return 1
+  const tokens = normSearch.split(/\s+/).filter(Boolean)
+  if (tokens.length === 0) return 1
+  return tokens.every((token) => normVal.includes(token)) ? 1 : 0
+}
 
 const Command = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive>
->(({ className, ...props }, ref) => (
+>(({ className, filter, ...props }, ref) => (
   <CommandPrimitive
     ref={ref}
+    filter={filter || defaultCommandFilter}
     className={cn(
       'flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground',
       className,

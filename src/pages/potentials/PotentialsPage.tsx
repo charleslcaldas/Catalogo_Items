@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Search, Loader2, LayoutGrid, LayoutList, Settings2 } from 'lucide-react'
+import { buildFieldAccentCondition } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -75,10 +76,16 @@ export default function PotentialsPage() {
       if (search) {
         const t = search.replace(/"/g, '')
 
+        const itemClauses = [
+          buildFieldAccentCondition('item_id.descr_pt', t),
+          buildFieldAccentCondition('item_id.descr_en', t),
+          buildFieldAccentCondition('item_id.acabamento_id.nome_pt', t),
+          buildFieldAccentCondition('item_id.acabamento_id.nome_en', t),
+        ]
         const pItens = await pb
           .collection('potencial_itens')
           .getFullList({
-            filter: `item_id.descr_pt ~ "${t}" || item_id.descr_en ~ "${t}" || item_id.acabamento_id.nome_pt ~ "${t}" || item_id.acabamento_id.nome_en ~ "${t}"`,
+            filter: itemClauses.join(' || '),
             fields: 'potencial_id',
           })
           .catch(() => [])
@@ -89,9 +96,14 @@ export default function PotentialsPage() {
             ? ` || ${matchedPotIds.map((id) => `id="${id}"`).join(' || ')}`
             : ''
 
-        filters.push(
-          `((numero_potencial ~ "${t}" || cliente ~ "${t}" || nome_potencial ~ "${t}" || proprietario ~ "${t}")${extraFilter})`,
-        )
+        const potClauses = [
+          buildFieldAccentCondition('numero_potencial', t),
+          buildFieldAccentCondition('cliente', t),
+          buildFieldAccentCondition('nome_potencial', t),
+          buildFieldAccentCondition('proprietario', t),
+        ]
+
+        filters.push(`((${potClauses.join(' || ')})${extraFilter})`)
       }
       if (selectedEstagios.length > 0) {
         const selectedIds = selectedEstagios

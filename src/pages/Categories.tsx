@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Plus, Pencil, Search, ArrowUpDown, ArrowUp, ArrowDown, FilterX } from 'lucide-react'
 import { CategoryModal } from '@/components/MetadataModals'
-import { getContrastColor } from '@/lib/utils'
+import { getContrastColor, textMatchesAll } from '@/lib/utils'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Categoria } from '@/types'
 
@@ -58,12 +58,9 @@ export default function Categories() {
 
   const filteredCategories = categorias.filter((c) => {
     if (filterCategoriaId && c.id !== filterCategoriaId) return false
-    const term = searchTerm.toLowerCase().trim()
-    if (!term) return true
-    return (
-      c.nome_pt.toLowerCase().includes(term) ||
-      (c.nome_en && c.nome_en.toLowerCase().includes(term))
-    )
+    if (!searchTerm.trim()) return true
+    const haystack = `${c.nome_pt || ''} ${c.nome_en || ''}`
+    return textMatchesAll(haystack, searchTerm)
   })
 
   const sortedCategories = [...filteredCategories].sort((a, b) => {

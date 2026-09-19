@@ -47,7 +47,7 @@ import {
   CommandList,
 } from '@/components/ui/command'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { cn } from '@/lib/utils'
+import { cn, textMatchesAll } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { CounterProposalModal } from './CounterProposalModal'
 import { QuotationNotes } from './QuotationNotes'
@@ -999,19 +999,20 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
 
   const filteredPotencialItens = potencialItens.filter((pi) => {
     if (!searchTerm) return true
-    const term = searchTerm.toLowerCase()
-    const sku = (pi.expand?.item_id?.sku || '').toLowerCase()
-    const pt = (
-      pi.expand?.item_id?.descr_pt ||
-      pi.expand?.item_id?.descricao_curta ||
-      ''
-    ).toLowerCase()
-    const en = (
-      pi.expand?.item_id?.descr_en ||
-      pi.expand?.item_id?.descricao_curta_en ||
-      ''
-    ).toLowerCase()
-    return sku.includes(term) || pt.includes(term) || en.includes(term)
+    const haystack = [
+      pi.expand?.item_id?.sku,
+      pi.expand?.item_id?.descr_pt,
+      pi.expand?.item_id?.descricao_curta,
+      pi.expand?.item_id?.descr_en,
+      pi.expand?.item_id?.descricao_curta_en,
+      pi.expand?.item_id?.tamanho,
+      pi.expand?.item_id?.linha_id?.nome_pt,
+      pi.expand?.item_id?.acabamento_id?.nome_pt,
+      pi.expand?.item_id?.acabamento_id?.codigo,
+    ]
+      .filter(Boolean)
+      .join(' ')
+    return textMatchesAll(haystack, searchTerm)
   })
 
   return (

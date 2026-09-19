@@ -1,5 +1,6 @@
 import pb from '@/lib/pocketbase/client'
 import type { Potencial, PotencialItem } from '@/types'
+import { buildFieldAccentCondition } from '@/lib/utils'
 
 export const getPotenciais = () => {
   return pb
@@ -10,8 +11,15 @@ export const getPotenciais = () => {
 export const searchPotenciais = (term: string) => {
   let filter = ''
   if (term) {
-    const t = term.replace(/"/g, '')
-    filter = `numero_potencial ~ "${t}" || cliente ~ "${t}" || nome_potencial ~ "${t}" || proprietario ~ "${t}" || nome_comprador ~ "${t}"`
+    const fields = [
+      'numero_potencial',
+      'cliente',
+      'nome_potencial',
+      'proprietario',
+      'nome_comprador',
+    ]
+    const clauses = fields.map((f) => buildFieldAccentCondition(f, term))
+    filter = clauses.join(' || ')
   }
   return pb.collection<Potencial>('potenciais').getList(1, 50, {
     filter,

@@ -13,7 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useData } from '@/contexts/data-context'
-import { cn, getContrastColor } from '@/lib/utils'
+import { cn, getContrastColor, textMatchesAll } from '@/lib/utils'
 import type { Item } from '@/types'
 import type { SelectedItemRecord } from '../AddItemsToPotential'
 import pb from '@/lib/pocketbase/client'
@@ -46,12 +46,6 @@ export function ProductCatalog({
 
   const filteredItems = useMemo(() => {
     if (!searchTerm.trim()) return itens.filter((i) => i.ativo)
-
-    const term = searchTerm
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-    const tokens = term.split(/\s+/).filter(Boolean)
 
     const getLinhaName = (id: string) => linhas.find((l) => l.id === id)?.nome_pt || ''
     const getCategoriaName = (linhaId: string) => {
@@ -89,11 +83,8 @@ export function ProductCatalog({
       ]
         .filter(Boolean)
         .join(' ')
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
 
-      return tokens.every((token) => text.includes(token))
+      return textMatchesAll(text, searchTerm)
     })
   }, [itens, searchTerm, acabamentos])
 

@@ -65,7 +65,12 @@ import { UploadImagesModal } from './UploadImagesModal'
 import { PhotoPickerModal } from '@/components/PhotoPickerModal'
 import { LinePickerModal } from '@/components/LinePickerModal'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { cn, getContrastColor } from '@/lib/utils'
+import {
+  cn,
+  getContrastColor,
+  buildFieldAccentCondition,
+  generateAccentVariants,
+} from '@/lib/utils'
 import pb from '@/lib/pocketbase/client'
 import { getItemImageUrl } from '@/lib/item-image'
 import { useRealtime } from '@/hooks/use-realtime'
@@ -256,15 +261,35 @@ export default function ItemsPage() {
         }
       }
 
+      const searchableFields = [
+        'sku',
+        'descr_pt',
+        'descr_en',
+        'descricao_curta',
+        'descricao_curta_en',
+        'descricao_catalogo_pt',
+        'descricao_catalogo_en',
+        'tamanho',
+        'linha_id.nome_pt',
+        'acabamento_id.nome_pt',
+        'acabamento_id.codigo',
+      ]
+
       for (const token of includeTokens) {
-        filters.push(
-          `(sku ~ "${token}" || descr_pt ~ "${token}" || descr_en ~ "${token}" || descricao_curta ~ "${token}" || descricao_curta_en ~ "${token}" || descricao_catalogo_pt ~ "${token}" || descricao_catalogo_en ~ "${token}" || tamanho ~ "${token}" || linha_id.nome_pt ~ "${token}" || acabamento_id.nome_pt ~ "${token}" || acabamento_id.codigo ~ "${token}")`,
+        const fieldClauses = searchableFields.map((field) =>
+          buildFieldAccentCondition(field, token),
         )
+        filters.push(`(${fieldClauses.join(' || ')})`)
       }
       for (const token of excludeTokens) {
-        filters.push(
-          `(sku !~ "${token}" && descr_pt !~ "${token}" && descr_en !~ "${token}" && descricao_curta !~ "${token}" && descricao_curta_en !~ "${token}" && descricao_catalogo_pt !~ "${token}" && descricao_catalogo_en !~ "${token}" && tamanho !~ "${token}" && linha_id.nome_pt !~ "${token}" && acabamento_id.nome_pt !~ "${token}" && acabamento_id.codigo !~ "${token}")`,
-        )
+        const variants = generateAccentVariants(token)
+        const excludeParts: string[] = []
+        for (const field of searchableFields) {
+          for (const v of variants) {
+            excludeParts.push(`${field} !~ "${v}"`)
+          }
+        }
+        filters.push(`(${excludeParts.join(' && ')})`)
       }
     }
 
