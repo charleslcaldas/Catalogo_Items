@@ -25,9 +25,10 @@ export const searchPotenciais = (term: string) => {
     if (tokens.length > 0) {
       filter = tokens
         .map((token) => {
-          const clauses = fields.map((f) => buildFieldAccentCondition(f, token))
+          const clauses = fields.map((f) => buildFieldAccentCondition(f, token, 2)).filter(Boolean)
           return `(${clauses.join(' || ')})`
         })
+        .filter((clause) => clause !== '()')
         .join(' && ')
     }
   }

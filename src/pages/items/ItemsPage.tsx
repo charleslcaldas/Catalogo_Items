@@ -247,8 +247,12 @@ export default function ItemsPage() {
       filters.push(`unidade_id = "${filterUnidadeId}"`)
     }
 
-    if (searchStr.trim()) {
-      const normalizedTerm = searchStr.toLowerCase().replace(/["']/g, '')
+    // Função auxiliar para construir o filtro de busca com controle de tamanho
+    const buildSearchFilter = (mode: 'accent' | 'simple') => {
+      const parts: string[] = [...filters]
+      if (!searchStr.trim()) return parts.join(' && ')
+
+      const normalizedTerm = searchStr.toLowerCase().replace(/["'\\]/g, '')
       const tokens = normalizedTerm.split(/\s+/).filter(Boolean)
       const includeTokens: string[] = []
       const excludeTokens: string[] = []
@@ -261,71 +265,104 @@ export default function ItemsPage() {
         }
       }
 
+      // Campos prioritários para busca
       const searchableFields = [
         'sku',
         'descr_pt',
         'descr_en',
         'descricao_curta',
-        'descricao_curta_en',
-        'descricao_catalogo_pt',
-        'descricao_catalogo_en',
         'tamanho',
         'linha_id.nome_pt',
         'acabamento_id.nome_pt',
-        'acabamento_id.codigo',
       ]
 
       for (const token of includeTokens) {
-        const fieldClauses = searchableFields.map((field) =>
-          buildFieldAccentCondition(field, token),
-        )
-        filters.push(`(${fieldClauses.join(' || ')})`)
+        let fieldClauses: string[]
+        if (mode === 'accent') {
+          // Limita variantes a 2 por campo para manter a query sob limite seguro do PocketBase
+          fieldClauses = searchableFields
+            .map((field) => buildFieldAccentCondition(field, token, 2))
+            .filter(Boolean)
+        } else {
+          // Filtro simples direto sem expansão
+          fieldClauses = searchableFields.map((field) => `${field} ~ "${token}"`)
+        }
+        if (fieldClauses.length > 0) {
+          parts.push(`(${fieldClauses.join(' || ')})`)
+        }
       }
+
       for (const token of excludeTokens) {
-        const variants = generateAccentVariants(token)
+        const variants = mode === 'accent' ? generateAccentVariants(token, 2) : [token]
         const excludeParts: string[] = []
         for (const field of searchableFields) {
           for (const v of variants) {
             excludeParts.push(`${field} !~ "${v}"`)
           }
         }
-        filters.push(`(${excludeParts.join(' && ')})`)
+        if (excludeParts.length > 0) {
+          parts.push(`(${excludeParts.join(' && ')})`)
+        }
       }
+
+      return parts.join(' && ')
     }
 
-    const filterStr = filters.join(' && ')
+    const filterWithAccents = buildSearchFilter('accent')
+    const filterSimple = buildSearchFilter('simple')
+    const baseFilterOnly = filters.join(' && ')
+
+    const expandStr =
+      'linha_id,linha_id.categoria_id,acabamento_id,ncm_id,descricao_base_id,unidade_id,foto_catalogo_id'
 
     try {
+      // Tentativa 1: Busca completa com suporte a acentos e expand
       const records = await pb.collection('itens').getList(currentPage, perPage, {
         sort: sortStr,
-        filter: filterStr,
-        expand:
-          'linha_id,linha_id.categoria_id,acabamento_id,ncm_id,descricao_base_id,unidade_id,foto_catalogo_id',
-        requestKey: 'items_page_search', // Auto-cancel previous identical requests to save bandwidth and rate limits
+        filter: filterWithAccents,
+        expand: expandStr,
+        requestKey: 'items_page_search',
       })
       setApiItens(records.items)
       setTotalPages(records.totalPages || 1)
       setTotalItems(records.totalItems || 0)
     } catch (e: any) {
-      if (e.isAbort) return // Skip updating state if the request was naturally cancelled by a newer one
+      if (e.isAbort) return
 
-      // Fallback: Retry with simple or no expand to ensure items load gracefully if relations fail
+      // Tentativa 2: Fallback para filtro simples (sem expansão complexa de acentos no servidor)
       try {
-        const fallbackRecords = await pb.collection('itens').getList(currentPage, perPage, {
+        const records = await pb.collection('itens').getList(currentPage, perPage, {
           sort: sortStr,
-          filter: filterStr,
-          requestKey: 'items_page_search_fallback',
+          filter: filterSimple,
+          expand: expandStr,
+          requestKey: 'items_page_search_simple',
         })
-        setApiItens(fallbackRecords.items)
-        setTotalPages(fallbackRecords.totalPages || 1)
-        setTotalItems(fallbackRecords.totalItems || 0)
-      } catch (err: any) {
-        if (err.isAbort) return
-        if (err.status === 429 || e.status === 429) {
-          setError('Muitas requisições. Por favor, aguarde um momento e tente novamente.')
-        } else {
-          console.error(err)
-          setError('Erro ao carregar itens.')
+        setApiItens(records.items)
+        setTotalPages(records.totalPages || 1)
+        setTotalItems(records.totalItems || 0)
+      } catch (err2: any) {
+        if (err2.isAbort) return
+
+        // Tentativa 3: Se o filtro do termo falhou completamente (ex: caracteres especiais ou 400),
+        // busca apenas os filtros base de categoria/linha e faz fallback gracioso
+        try {
+          const records = await pb.collection('itens').getList(currentPage, perPage, {
+            sort: sortStr,
+            filter: baseFilterOnly,
+            expand: expandStr,
+            requestKey: 'items_page_search_base',
+          })
+          setApiItens(records.items)
+          setTotalPages(records.totalPages || 1)
+          setTotalItems(records.totalItems || 0)
+        } catch (errFinal: any) {
+          if (errFinal.isAbort) return
+          if (errFinal.status === 429 || e.status === 429) {
+            setError('Muitas requisições. Por favor, aguarde um momento e tente novamente.')
+          } else {
+            console.error(errFinal)
+            setError('Erro ao carregar itens.')
+          }
         }
       }
     } finally {

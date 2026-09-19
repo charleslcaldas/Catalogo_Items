@@ -77,18 +77,21 @@ export default function PotentialsPage() {
         const t = search.replace(/"/g, '')
 
         const itemClauses = [
-          buildFieldAccentCondition('item_id.descr_pt', t),
-          buildFieldAccentCondition('item_id.descr_en', t),
-          buildFieldAccentCondition('item_id.acabamento_id.nome_pt', t),
-          buildFieldAccentCondition('item_id.acabamento_id.nome_en', t),
-        ]
-        const pItens = await pb
-          .collection('potencial_itens')
-          .getFullList({
-            filter: itemClauses.join(' || '),
-            fields: 'potencial_id',
-          })
-          .catch(() => [])
+          buildFieldAccentCondition('item_id.descr_pt', t, 2),
+          buildFieldAccentCondition('item_id.descr_en', t, 2),
+          buildFieldAccentCondition('item_id.acabamento_id.nome_pt', t, 2),
+          buildFieldAccentCondition('item_id.acabamento_id.nome_en', t, 2),
+        ].filter(Boolean)
+        const pItens =
+          itemClauses.length > 0
+            ? await pb
+                .collection('potencial_itens')
+                .getFullList({
+                  filter: itemClauses.join(' || '),
+                  fields: 'potencial_id',
+                })
+                .catch(() => [])
+            : []
 
         const matchedPotIds = Array.from(new Set(pItens.map((p) => p.potencial_id)))
         const extraFilter =
@@ -97,13 +100,16 @@ export default function PotentialsPage() {
             : ''
 
         const potClauses = [
-          buildFieldAccentCondition('numero_potencial', t),
-          buildFieldAccentCondition('cliente', t),
-          buildFieldAccentCondition('nome_potencial', t),
-          buildFieldAccentCondition('proprietario', t),
-        ]
+          buildFieldAccentCondition('numero_potencial', t, 2),
+          buildFieldAccentCondition('cliente', t, 2),
+          buildFieldAccentCondition('nome_potencial', t, 2),
+          buildFieldAccentCondition('proprietario', t, 2),
+        ].filter(Boolean)
 
-        filters.push(`((${potClauses.join(' || ')})${extraFilter})`)
+        if (potClauses.length > 0 || extraFilter) {
+          const mainPart = potClauses.length > 0 ? potClauses.join(' || ') : '1=0'
+          filters.push(`((${mainPart})${extraFilter})`)
+        }
       }
       if (selectedEstagios.length > 0) {
         const selectedIds = selectedEstagios

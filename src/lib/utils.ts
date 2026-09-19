@@ -81,25 +81,28 @@ const ACCENT_GROUPS: Record<string, string[]> = {
  * encontrem tanto versões acentuadas quanto desprovidas de acento.
  * Limita a no máximo 10 variantes para não inflar a query.
  */
-export function generateAccentVariants(token: string): string[] {
-  const clean = normalizeText(token).replace(/["']/g, '')
+export function generateAccentVariants(token: string, maxVariants: number = 3): string[] {
+  const clean = normalizeText(token)
+    .replace(/["'\\]/g, '')
+    .trim()
   if (!clean) return []
 
   const variants = new Set<string>()
   variants.add(clean)
 
-  // Encontra todas as posições com letras acentuáveis
+  // Encontra as posições com letras acentuáveis (limitando a até 2 posições para evitar explosão combinatória)
   const positions: { index: number; options: string[] }[] = []
   for (let i = 0; i < clean.length; i++) {
     const char = clean[i]
     if (ACCENT_GROUPS[char]) {
       positions.push({ index: i, options: ACCENT_GROUPS[char] })
+      if (positions.length >= 2) break
     }
   }
 
-  // Gera combinações com limite de variantes
+  // Gera variantes mais comuns primeiro (ex: c->ç, a->ã/á, e->é/ê, o->õ/ó)
   const generate = (curr: string[], posIdx: number) => {
-    if (variants.size >= 12) return
+    if (variants.size >= maxVariants) return
     if (posIdx >= positions.length) {
       variants.add(curr.join(''))
       return
@@ -107,23 +110,30 @@ export function generateAccentVariants(token: string): string[] {
 
     const { index, options } = positions[posIdx]
     for (const opt of options) {
-      if (variants.size >= 12) break
+      if (variants.size >= maxVariants) break
       curr[index] = opt
       generate(curr, posIdx + 1)
     }
   }
 
   generate(clean.split(''), 0)
-  return Array.from(variants)
+  return Array.from(variants).slice(0, maxVariants)
 }
 
 /**
  * Constrói a cláusula PocketBase para um campo e um token, cobrindo as variantes de acento.
  * Exemplo: buildFieldAccentCondition("descr_pt", "frances") ->
- * '(descr_pt ~ "frances" || descr_pt ~ "francês" || descr_pt ~ "francés")'
+ * '(descr_pt ~ "frances" || descr_pt ~ "francês")'
  */
-export function buildFieldAccentCondition(field: string, token: string): string {
-  const variants = generateAccentVariants(token)
+export function buildFieldAccentCondition(
+  field: string,
+  token: string,
+  maxVariants: number = 2,
+): string {
+  const variants = generateAccentVariants(token, maxVariants)
+  if (variants.length === 0) {
+    return ''
+  }
   if (variants.length === 1) {
     return `${field} ~ "${variants[0]}"`
   }

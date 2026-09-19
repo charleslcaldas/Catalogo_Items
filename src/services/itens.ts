@@ -24,9 +24,10 @@ export const getItensPaginated = (
     ]
     filter = terms
       .map((term) => {
-        const clauses = fields.map((f) => buildFieldAccentCondition(f, term))
+        const clauses = fields.map((f) => buildFieldAccentCondition(f, term, 2)).filter(Boolean)
         return `(${clauses.join(' || ')})`
       })
+      .filter((clause) => clause !== '()')
       .join(' && ')
   }
   return pb.collection<Item>('itens').getList(page, perPage, {
