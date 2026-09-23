@@ -29,7 +29,8 @@ import {
   SidebarFooter,
   useSidebar,
 } from '@/components/ui/sidebar'
-import { Button } from '@/components/ui/button'
+import { useAuth } from '@/hooks/use-auth'
+import { LogOut } from 'lucide-react'
 
 const items = [
   { title: 'Dashboard', url: '/', icon: LayoutDashboard },
@@ -50,6 +51,7 @@ const items = [
 export function AppSidebar() {
   const location = useLocation()
   const { toggleSidebar, state } = useSidebar()
+  const { user, signOut } = useAuth()
 
   return (
     <Sidebar collapsible="icon">
@@ -61,10 +63,10 @@ export function AppSidebar() {
             </div>
             <div className="flex flex-col">
               <span className="font-bold tracking-tight text-sidebar-foreground leading-none">
-                Skip
+                C2 International
               </span>
               <span className="text-xs text-sidebar-foreground/70 leading-none">
-                Inventory System
+                Catálogo & Suprimentos
               </span>
             </div>
           </div>
@@ -101,6 +103,18 @@ export function AppSidebar() {
               <span>{state === 'expanded' ? 'Recolher Menu' : 'Expandir Menu'}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
+          {user && (
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                onClick={() => signOut()}
+                tooltip="Sair do sistema"
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                <LogOut className="h-4 w-4 shrink-0" />
+                <span>Sair ({user.name || user.email?.split('@')[0]})</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
