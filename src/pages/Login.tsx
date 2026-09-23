@@ -169,34 +169,64 @@ export default function Login() {
             O acesso a todas as rotas e operações está protegido. Você pode usar uma das contas
             pré-configuradas para validação:
           </p>
-          <div className="grid grid-cols-1 gap-1.5 pt-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
             <button
               type="button"
               onClick={() => handleFillDemoUser('charles@c2international.com.br')}
               className="text-left p-2 rounded bg-background border border-border hover:border-primary/50 transition-colors flex items-center justify-between"
             >
               <div>
-                <span className="font-medium text-foreground block">
+                <span className="font-medium text-foreground block text-xs">
                   charles@c2international.com.br
                 </span>
                 <span className="text-[11px] text-muted-foreground">Charles (Admin)</span>
               </div>
-              <span className="text-primary font-medium hover:underline text-[11px]">
+              <span className="text-primary font-medium hover:underline text-[11px] shrink-0 ml-1">
                 Preencher
               </span>
             </button>
             <button
               type="button"
-              onClick={() => handleFillDemoUser('equipe@c2international.com.br')}
+              onClick={() => handleFillDemoUser('luana@c2international.com.br')}
               className="text-left p-2 rounded bg-background border border-border hover:border-primary/50 transition-colors flex items-center justify-between"
             >
               <div>
-                <span className="font-medium text-foreground block">
-                  equipe@c2international.com.br
+                <span className="font-medium text-foreground block text-xs">
+                  luana@c2international.com.br
                 </span>
-                <span className="text-[11px] text-muted-foreground">Equipe C2 (Operação)</span>
+                <span className="text-[11px] text-muted-foreground">Luana Caldas</span>
               </div>
-              <span className="text-primary font-medium hover:underline text-[11px]">
+              <span className="text-primary font-medium hover:underline text-[11px] shrink-0 ml-1">
+                Preencher
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleFillDemoUser('comercial1@c2international.com.br')}
+              className="text-left p-2 rounded bg-background border border-border hover:border-primary/50 transition-colors flex items-center justify-between"
+            >
+              <div>
+                <span className="font-medium text-foreground block text-xs">
+                  comercial1@c2international.com.br
+                </span>
+                <span className="text-[11px] text-muted-foreground">Jaqueline Vicente</span>
+              </div>
+              <span className="text-primary font-medium hover:underline text-[11px] shrink-0 ml-1">
+                Preencher
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleFillDemoUser('purchaser@c2international.com.br')}
+              className="text-left p-2 rounded bg-background border border-border hover:border-primary/50 transition-colors flex items-center justify-between"
+            >
+              <div>
+                <span className="font-medium text-foreground block text-xs">
+                  purchaser@c2international.com.br
+                </span>
+                <span className="text-[11px] text-muted-foreground">Liu</span>
+              </div>
+              <span className="text-primary font-medium hover:underline text-[11px] shrink-0 ml-1">
                 Preencher
               </span>
             </button>
