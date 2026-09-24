@@ -1,4 +1,6 @@
 onRecordCreate((e) => {
+  if (e.context.value('c2.commercialIntake.skipPriceReference') === true) return e.next()
+
   const itemId = e.record.get('item_id')
   if (!itemId) return e.next()
 
