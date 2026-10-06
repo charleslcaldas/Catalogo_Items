@@ -79,7 +79,7 @@ export default function PendenciasCliente({ potencialId }: PendenciasClienteProp
   }
 
   return (
-    <Card className="m-4 border-amber-300/60 bg-amber-50/20 dark:bg-amber-950/10">
+    <Card className="border-amber-300/60 bg-amber-50/20 dark:bg-amber-950/10 shadow-sm">
       <CardHeader className="py-3 px-4 pb-2">
         <div className="flex items-center gap-2">
           <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-500" />
@@ -94,7 +94,7 @@ export default function PendenciasCliente({ potencialId }: PendenciasClienteProp
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent className="p-0 overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
@@ -102,7 +102,7 @@ export default function PendenciasCliente({ potencialId }: PendenciasClienteProp
               <TableHead className="text-xs font-semibold w-24 text-right">Qtd</TableHead>
               <TableHead className="text-xs font-semibold w-20">Unidade</TableHead>
               <TableHead className="text-xs font-semibold w-32">Status</TableHead>
-              <TableHead className="text-xs font-semibold">
+              <TableHead className="text-xs font-semibold min-w-[280px]">
                 Item Candidato (SKU + Descrição)
               </TableHead>
             </TableRow>
@@ -112,14 +112,14 @@ export default function PendenciasCliente({ potencialId }: PendenciasClienteProp
               const itemCandidato = p.expand?.item_candidato_id
               return (
                 <TableRow key={p.id} className="text-xs">
-                  <TableCell className="font-mono text-xs whitespace-pre-wrap py-2">
+                  <TableCell className="font-mono text-xs whitespace-pre-wrap py-2.5">
                     {p.descricao_cliente_original}
                   </TableCell>
-                  <TableCell className="text-right font-medium py-2">{p.quantidade}</TableCell>
-                  <TableCell className="text-muted-foreground py-2">
+                  <TableCell className="text-right font-medium py-2.5">{p.quantidade}</TableCell>
+                  <TableCell className="text-muted-foreground py-2.5">
                     {p.unidade_medida || '—'}
                   </TableCell>
-                  <TableCell className="py-2">
+                  <TableCell className="py-2.5">
                     {p.status ? (
                       <Badge variant="secondary" className="text-[11px] font-normal">
                         {p.status}
@@ -128,12 +128,12 @@ export default function PendenciasCliente({ potencialId }: PendenciasClienteProp
                       '—'
                     )}
                   </TableCell>
-                  <TableCell className="py-2">
+                  <TableCell className="py-2.5">
                     {itemCandidato ? (
                       <div className="flex flex-col gap-0.5">
                         <span className="font-semibold text-foreground">{itemCandidato.sku}</span>
                         {itemCandidato.descr_pt && (
-                          <span className="text-muted-foreground line-clamp-2">
+                          <span className="text-muted-foreground text-[11px] leading-tight">
                             {itemCandidato.descr_pt}
                           </span>
                         )}

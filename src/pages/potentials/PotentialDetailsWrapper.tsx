@@ -192,13 +192,17 @@ export default function PotentialDetailsWrapper() {
         )}
       </div>
       <div className="flex-1 overflow-hidden relative">
-        {tab === 'items' && <PendenciasCliente potencialId={potencialId} />}
-        <div className={cn('absolute inset-0 overflow-auto', tab === 'items' ? 'block' : 'hidden')}>
+        <div className={cn('h-full overflow-auto', tab === 'items' ? 'block' : 'hidden')}>
+          {potencialId && (
+            <div className="max-w-[1600px] mx-auto px-4 md:px-6 pt-4">
+              <PendenciasCliente potencialId={potencialId} />
+            </div>
+          )}
           <AddItemsToPotential ref={addItemsRef} />
         </div>
         <div
           className={cn(
-            'absolute inset-0 overflow-auto p-6 bg-muted/20',
+            'h-full overflow-auto p-6 bg-muted/20',
             tab === 'quotations' ? 'block' : 'hidden',
           )}
         >
