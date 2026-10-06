@@ -488,21 +488,25 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
 
     try {
       const items = await getPotencialItens(quote.id)
-      const formattedItems = items.map((pi) => ({
-        id: pi.item_id,
-        recordId: pi.id,
-        data: {
-          item: pi.expand?.item_id || ({ id: pi.item_id } as any),
-          quantidade: pi.quantidade,
-          unidade_medida: pi.unidade_medida || 'Pcs',
-          preco_unitario: pi.preco_unitario !== undefined ? pi.preco_unitario : '',
-          observacoes: pi.observacoes || '',
-          ordem: pi.ordem || 0,
-          referencia_preco: pi.referencia_preco,
-          referencia_fornecedor: pi.referencia_fornecedor,
-          referencia_data: pi.referencia_data,
-        },
-      }))
+      const formattedItems = items.map((pi) => {
+        const itemObj = pi.expand?.item_id || ({ id: pi.item_id } as any)
+        const fallbackUnidade = itemObj.unidade || 'Pcs'
+        return {
+          id: pi.item_id,
+          recordId: pi.id,
+          data: {
+            item: itemObj,
+            quantidade: pi.quantidade,
+            unidade_medida: pi.unidade_medida || fallbackUnidade,
+            preco_unitario: pi.preco_unitario !== undefined ? pi.preco_unitario : '',
+            observacoes: pi.observacoes || '',
+            ordem: pi.ordem || 0,
+            referencia_preco: pi.referencia_preco,
+            referencia_fornecedor: pi.referencia_fornecedor,
+            referencia_data: pi.referencia_data,
+          },
+        }
+      })
 
       formattedItems.sort((a, b) => (a.data.ordem || 0) - (b.data.ordem || 0))
       setSelectedItems(formattedItems)
@@ -556,21 +560,25 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
           })
           setSelectedItems((prev) => {
             if (prev.length === 0 && updatedItems.length > 0) {
-              return updatedItems.map((pi) => ({
-                id: pi.item_id,
-                recordId: pi.id,
-                data: {
-                  item: pi.expand?.item_id || ({ id: pi.item_id } as any),
-                  quantidade: pi.quantidade,
-                  unidade_medida: pi.unidade_medida || 'Pcs',
-                  preco_unitario: pi.preco_unitario !== undefined ? pi.preco_unitario : '',
-                  observacoes: pi.observacoes || '',
-                  ordem: pi.ordem || 0,
-                  referencia_preco: pi.referencia_preco,
-                  referencia_fornecedor: pi.referencia_fornecedor,
-                  referencia_data: pi.referencia_data,
-                },
-              }))
+              return updatedItems.map((pi) => {
+                const itemObj = pi.expand?.item_id || ({ id: pi.item_id } as any)
+                const fallbackUnidade = itemObj.unidade || 'Pcs'
+                return {
+                  id: pi.item_id,
+                  recordId: pi.id,
+                  data: {
+                    item: itemObj,
+                    quantidade: pi.quantidade,
+                    unidade_medida: pi.unidade_medida || fallbackUnidade,
+                    preco_unitario: pi.preco_unitario !== undefined ? pi.preco_unitario : '',
+                    observacoes: pi.observacoes || '',
+                    ordem: pi.ordem || 0,
+                    referencia_preco: pi.referencia_preco,
+                    referencia_fornecedor: pi.referencia_fornecedor,
+                    referencia_data: pi.referencia_data,
+                  },
+                }
+              })
             }
 
             return prev.map((si) => {
@@ -581,6 +589,12 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
                   recordId: it.id,
                   data: {
                     ...si.data,
+                    unidade_medida:
+                      si.data.unidade_medida || it.unidade_medida || si.data.item.unidade || 'Pcs',
+                    observacoes:
+                      si.data.observacoes !== undefined && si.data.observacoes !== ''
+                        ? si.data.observacoes
+                        : it.observacoes || '',
                     quantidade: it.quantidade !== undefined ? it.quantidade : si.data.quantidade,
                     preco_unitario:
                       typeof it.preco_unitario === 'number'

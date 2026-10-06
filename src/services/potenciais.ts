@@ -75,6 +75,8 @@ export const savePotencialFull = async (
         ...item,
         potencial_id: savedPotencial.id,
       }
+      if (item.unidade_medida !== undefined) payload.unidade_medida = item.unidade_medida
+      if (item.observacoes !== undefined) payload.observacoes = item.observacoes
       if (item.referencia_preco !== undefined) payload.referencia_preco = item.referencia_preco
       if (item.referencia_fornecedor !== undefined)
         payload.referencia_fornecedor = item.referencia_fornecedor
