@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-23T13:06:27.013Z",
+  "generatedAt": "2026-10-06T14:19:44.824Z",
   "collections": [
     {
       "name": "users",
@@ -2397,6 +2397,93 @@
         "CREATE INDEX idx_redflags_supplier ON supplier_red_flags (supplier_id)",
         "CREATE INDEX idx_redflags_severity ON supplier_red_flags (severity)",
         "CREATE INDEX idx_redflags_resolved ON supplier_red_flags (resolved)"
+      ]
+    },
+    {
+      "name": "solicitacoes_itens_cliente",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != \"\" && @request.auth.collectionName = \"users\"",
+        "view": "@request.auth.id != \"\" && @request.auth.collectionName = \"users\"",
+        "create": null,
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "potencial_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "potenciais"
+        },
+        {
+          "name": "descricao_cliente_original",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "quantidade",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "unidade_medida",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "item_candidato_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "itens"
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "origem",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "aprovacao_ref",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "chave_idempotencia",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_solicitacoes_chave ON solicitacoes_itens_cliente (chave_idempotencia)",
+        "CREATE INDEX idx_solicitacoes_potencial ON solicitacoes_itens_cliente (potencial_id)"
       ]
     }
   ]

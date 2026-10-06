@@ -1,0 +1,105 @@
+=== SNAPSHOT DO SCHEMA: potenciais ===
+## Collection: potenciais (base)
+
+### Fields
+- numero_potencial: text (required)
+- cliente: text (required)
+- status: text (required)
+- created: autodate triggers: onCreate
+- updated: autodate triggers: onCreate,onUpdate
+- observacoes: text
+- nome_potencial: text
+- proprietario: text
+- nome_comprador: text
+- notas: text
+- anexos: file
+- estagio_id: relation → estagios_potencial
+- incoterm_cliente: text
+- condicao_pagamento_cliente: text
+- tempo_fabricacao_cliente: text
+
+### Indexes
+- CREATE UNIQUE INDEX idx_potenciais_numero ON potenciais (numero_potencial)
+- CREATE INDEX `idx_potenciais_nome` ON `potenciais` (nome_potencial)
+- CREATE INDEX `idx_potenciais_proprietario` ON `potenciais` (proprietario)
+- CREATE INDEX `idx_potenciais_estagio_id` ON `potenciais` (estagio_id)
+
+### API rules
+- list: @request.auth.id != ''
+- view: @request.auth.id != ''
+- create: @request.auth.id != ''
+- update: @request.auth.id != ''
+- delete: @request.auth.id != ''
+
+### Related collections
+- estagios_potencial(nome text, cor_hex text, ordem number, created autodate, updated autodate)
+
+=== SNAPSHOT DO SCHEMA: itens ===
+## Collection: itens (base)
+
+### Fields
+- sku: text (required)
+- linha_id: relation (required) → linhas
+- descr_pt: text
+- descr_en: text
+- tamanho: text
+- acabamento_id: relation → acabamentos
+- ncm_id: relation → ncm
+- preco_compra: number
+- preco_venda: number
+- item_id_books: text
+- foto_url: url
+- ativo: bool
+- sincronizado_com_zoho: bool
+- data_sincronizacao: date
+- created: autodate triggers: onCreate
+- updated: autodate triggers: onCreate,onUpdate
+- norma: text
+- descricao_base_pt: text
+- descricao_base_en: text
+- tipo_rosca: text
+- comprimento_rosca: text
+- informacao_extra: text
+- descricao_extra: text
+- fornecedor_ultima_atualizacao: text
+- descricao_base_id: relation → descricoes_base
+- unidade_id: relation → unidades_medida
+- ii: number
+- ipi: number
+- pis: number
+- cofins: number
+- comprimento_rosca_en: text
+- data_atualizacao: date
+- validade_preco: date
+- descricao_catalogo_pt: text
+- descricao_catalogo_en: text
+- descricao_curta: text
+- descricao_curta_en: text
+- informacao_extra_en: text
+- descricao_extra_en: text
+- grau: text
+- unidade: text
+- foto_catalogo_id: relation → foto_catalogo
+
+### Indexes
+- CREATE UNIQUE INDEX idx_itens_sku ON itens (sku)
+- CREATE INDEX idx_itens_linha_id ON itens (linha_id)
+- CREATE INDEX idx_itens_acabamento_id ON itens (acabamento_id)
+- CREATE INDEX idx_itens_ncm_id ON itens (ncm_id)
+- CREATE INDEX `idx_itens_descricao_curta` ON `itens` (descricao_curta)
+- CREATE INDEX `idx_itens_tamanho` ON `itens` (tamanho)
+
+### API rules
+- list: @request.auth.id != ''
+- view: @request.auth.id != ''
+- create: @request.auth.id != ''
+- update: @request.auth.id != ''
+- delete: @request.auth.id != ''
+
+### Related collections
+- linhas(categoria_id relation, nome_pt text, nome_en text, created autodate, updated autodate, color text, margem_padrao number)
+- acabamentos(codigo text, nome_pt text, nome_en text, created autodate, updated autodate, cor_hex text)
+- ncm(codigo text, ii number, ipi number, pis number, cofins number, created autodate, updated autodate, observacoes text)
+- descricoes_base(codigo text, nome_pt text, nome_en text, categoria_id relation, linha_id relation, ncm_id relation, ativo bool, created autodate, updated autodate)
+- unidades_medida(nome text, created autodate, updated autodate)
+- foto_catalogo(tipo text, subtipo text, tamanho text, acabamento_id relation, url_foto url, created autodate, updated autodate, descricao text, arquivo file)

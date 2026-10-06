@@ -4,7 +4,6 @@ import { ArrowLeft } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import AddItemsToPotential, { AddItemsToPotentialRef } from './AddItemsToPotential'
 import QuotationMatrix from './components/QuotationMatrix'
-import PendenciasCliente from './components/PendenciasCliente'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -82,7 +81,6 @@ export default function PotentialDetailsWrapper() {
     const margin = parseFloat(globalMargin)
     if (isNaN(margin) || margin >= 100 || margin < 0) {
       toast({ title: 'Margem inválida', variant: 'destructive' })
-      return
     }
     try {
       setIsApplying(true)
@@ -192,7 +190,6 @@ export default function PotentialDetailsWrapper() {
         )}
       </div>
       <div className="flex-1 overflow-hidden relative">
-        {tab === 'items' && <PendenciasCliente potencialId={potencialId} />}
         <div className={cn('absolute inset-0 overflow-auto', tab === 'items' ? 'block' : 'hidden')}>
           <AddItemsToPotential ref={addItemsRef} />
         </div>

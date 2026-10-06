@@ -1,0 +1,129 @@
+RECONCILIAÇÃO DO LEDGER DE MIGRATIONS — 0057-PRE
+Data de conferência: Pré-aplicação 0057
+Estado esperado verificado:
+- Backend list_migrations: 58 entradas (todas com status applied)
+- Repositório local pocketbase/migrations/: 52 arquivos
+- Nenhuma migration pendente (0 pending)
+- Nenhuma migration com falha (0 failed)
+- Todos os 52 arquivos locais constam como applied no ledger do backend
+- As 6 entradas adicionais no backend correspondem a migrações aplicadas diretamente via console ou histórico do sistema:
+  * 3x updated_linhas.js (applied)
+  * 0034_create_potencial_notas.js (applied)
+  * 0050_create_supplier_qualification_and_assessments.js (applied)
+  * updated_users.js (applied)
+
+Lista de migrações no backend (58 entradas, todas applied):
+1. 0001_create_collections.js (applied)
+2. 0002_seed_data.js (applied)
+3. 0003_create_logs_importacao.js (applied)
+4. 0004_create_potenciais.js (applied)
+5. 0005_update_collections.js (applied)
+6. 0006_update_metadata.js (applied)
+7. 0007_update_management_fields.js (applied)
+8. 0008_update_itens_fields.js (applied)
+9. 0009_create_foto_catalogo.js (applied)
+10. 0010_update_itens_fornecedor.js (applied)
+11. 0011_create_unidades_medida.js (applied)
+12. 0012_create_descricoes_base.js (applied)
+13. 0013_update_itens_relations.js (applied)
+14. 0014_update_itens_fields.js (applied)
+15. 0015_update_itens_and_fotos.js (applied)
+16. 0016_update_potenciais.js (applied)
+17. 0017_update_potenciais_ordem.js (applied)
+18. 0018_update_potenciais_fields.js (applied)
+19. 0019_update_atributos_linha.js (applied)
+20. updated_linhas.js (applied)
+21. updated_linhas.js (applied)
+22. updated_linhas.js (applied)
+23. 0020_linhas_cascade_delete.js (applied)
+24. 0021_format_item_descriptions.js (applied)
+25. 0022_sanitize_desc_curta.js (applied)
+26. 0023_add_unique_index_descricoes_base.js (applied)
+27. 0024_update_itens_descr_pt_optional.js (applied)
+28. 0025_schema_refinement.js (applied)
+29. 0026_cleanup_itens_fields.js (applied)
+30. 0027_add_indexes.js (applied)
+31. 0028_refine_itens_schema.js (applied)
+32. 0029_add_user_preferences.js (applied)
+33. 0030_create_ncm_audit_logs.js (applied)
+34. 0031_create_historico_precos.js (applied)
+35. 0032_seed_price_history.js (applied)
+36. 0033_update_potenciais_add_notas_anexos.js (applied)
+37. 0034_create_potencial_notas.js (applied)
+38. 0035_create_status_potencial.js (applied)
+39. 0036_create_estagios_potencial.js (applied)
+40. 0037_create_quotation_system.js (applied)
+41. 0038_quotation_enhancements.js (applied)
+42. 0039_quotation_v2.js (applied)
+43. 0040_add_referencia_potencial_itens.js (applied)
+44. 0041_add_line_margin.js (applied)
+45. 0042_add_foto_catalogo_id_to_itens.js (applied)
+46. 0043_add_tipo_cliente_to_historico_precos.js (applied)
+47. 0044_add_incoterm_tempo_fabricacao_to_fornecedores.js (applied)
+48. 0045_add_condicao_pagamento.js (applied)
+49. 0046_create_contatos_fornecedor.js (applied)
+50. 0047_enrich_fornecedores_fields.js (applied)
+51. 0048_allow_multiple_linhas_ids_fornecedores.js (applied)
+52. 0049_fix_fornecedores_linhas_ids_max_select.js (applied)
+53. 0050_create_supplier_qualification_and_assessments.js (applied)
+54. 0051_add_business_license_to_fornecedores.js (applied)
+55. 0052_add_condicoes_cliente_to_potenciais.js (applied)
+56. updated_users.js (applied)
+57. 0053_seed_auth_users.js (applied)
+58. 0054_seed_real_team_users.js (applied)
+
+Lista de arquivos locais em pocketbase/migrations/ (52 arquivos):
+- 0001_create_collections.js
+- 0002_seed_data.js
+- 0003_create_logs_importacao.js
+- 0004_create_potenciais.js
+- 0005_update_collections.js
+- 0006_update_metadata.js
+- 0007_update_management_fields.js
+- 0008_update_itens_fields.js
+- 0009_create_foto_catalogo.js
+- 0010_update_itens_fornecedor.js
+- 0011_create_unidades_medida.js
+- 0012_create_descricoes_base.js
+- 0013_update_itens_relations.js
+- 0014_update_itens_fields.js
+- 0015_update_itens_and_fotos.js
+- 0016_update_potenciais.js
+- 0017_update_potenciais_ordem.js
+- 0018_update_potenciais_fields.js
+- 0019_update_atributos_linha.js
+- 0020_linhas_cascade_delete.js
+- 0021_format_item_descriptions.js
+- 0022_sanitize_desc_curta.js
+- 0023_add_unique_index_descricoes_base.js
+- 0024_update_itens_descr_pt_optional.js
+- 0025_schema_refinement.js
+- 0026_cleanup_itens_fields.js
+- 0027_add_indexes.js
+- 0028_refine_itens_schema.js
+- 0029_add_user_preferences.js
+- 0030_create_ncm_audit_logs.js
+- 0031_create_historico_precos.js
+- 0032_seed_price_history.js
+- 0033_update_potenciais_add_notas_anexos.js
+- 0035_create_status_potencial.js
+- 0036_create_estagios_potencial.js
+- 0037_create_quotation_system.js
+- 0038_quotation_enhancements.js
+- 0039_quotation_v2.js
+- 0040_add_referencia_potencial_itens.js
+- 0041_add_line_margin.js
+- 0042_add_foto_catalogo_id_to_itens.js
+- 0043_add_tipo_cliente_to_historico_precos.js
+- 0044_add_incoterm_tempo_fabricacao_to_fornecedores.js
+- 0045_add_condicao_pagamento.js
+- 0046_create_contatos_fornecedor.js
+- 0047_enrich_fornecedores_fields.js
+- 0048_allow_multiple_linhas_ids_fornecedores.js
+- 0049_fix_fornecedores_linhas_ids_max_select.js
+- 0051_add_business_license_to_fornecedores.js
+- 0052_add_condicoes_cliente_to_potenciais.js
+- 0053_seed_auth_users.js
+- 0054_seed_real_team_users.js
+
+Status: APROVADO PARA CONTINUIDADE. Nenhuma migration pendente.
