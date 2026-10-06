@@ -310,7 +310,7 @@ export function SelectedItemsTable({
                     )}
                   </TableCell>
                   <TableCell className="py-1 text-xs text-center text-muted-foreground bg-slate-50/50">
-                    {data.item.unidade || '-'}
+                    {data.unidade_medida || data.item.unidade || '-'}
                   </TableCell>
                   <TableCell className="py-1">
                     <FormattedInput
