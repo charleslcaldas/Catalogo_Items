@@ -1,6 +1,8 @@
 // TEMPORARY operator maintenance only. Never attach this secret to Mei or quote broker.
 // No restore, SQL, commands, arbitrary filenames, settings edits or user records API.
 routerAdd('POST', '/backend/v1/mei-maintenance/backup', (e) => {
+  let authenticated = false
+  let stage = 'authentication'
   try {
     const secret = $os.getenv('MEI_SKIP_MAINTENANCE_KEY')
     const expiry = /^m1\.[0-9]{10}\.[0-9a-f]{64}$/.test(secret) ? Number(secret.split('.')[1]) : 0
@@ -29,11 +31,14 @@ routerAdd('POST', '/backend/v1/mei-maintenance/backup', (e) => {
       $security.sha256(raw),
     ].join('\n')
     if (!$security.equal(mac, $security.hs256(signed, secret))) throw new Error('Denied')
+    authenticated = true
+    stage = 'external-storage-check'
     if ($app.settings().s3.enabled)
       throw new Error('External uploaded files require separate export')
     const name = 'mei-prewrite-' + ts + '-' + nonce + '.zip'
     // Keep schema/rule inventory and all available supplier sources in the backup.
     // Missing source blocks later writer activation, never invent replacement hooks.
+    stage = 'inventory'
     const names = [
       'on_supplier_redflag_create',
       'on_supplier_redflag_update',
@@ -51,20 +56,18 @@ routerAdd('POST', '/backend/v1/mei-maintenance/backup', (e) => {
       }
       if (text !== null) source[name] = text
     })
-    const collections = $app
-      .findAllCollections()
-      .map((c) => ({
-        name: c.name,
-        type: c.type,
-        listRule: c.listRule,
-        viewRule: c.viewRule,
-        createRule: c.createRule,
-        updateRule: c.updateRule,
-        deleteRule: c.deleteRule,
-        manageRule: c.manageRule,
-        fields: c.fields,
-        indexes: c.indexes,
-      }))
+    const collections = $app.findAllCollections().map((c) => ({
+      name: c.name,
+      type: c.type,
+      listRule: c.listRule,
+      viewRule: c.viewRule,
+      createRule: c.createRule,
+      updateRule: c.updateRule,
+      deleteRule: c.deleteRule,
+      manageRule: c.manageRule,
+      fields: c.fields,
+      indexes: c.indexes,
+    }))
     const missing = names.filter((name) => !Object.prototype.hasOwnProperty.call(source, name))
     const inventory = {
       collections: collections,
@@ -77,6 +80,7 @@ routerAdd('POST', '/backend/v1/mei-maintenance/backup', (e) => {
       toBytes(JSON.stringify(inventory)),
       384,
     )
+    stage = 'backup-filesystem'
     const backupFs = $app.newBackupsFilesystem()
     let previous = null
     try {
@@ -88,7 +92,9 @@ routerAdd('POST', '/backend/v1/mei-maintenance/backup', (e) => {
       if (previous) previous.close()
       backupFs.close()
     }
+    stage = 'backup-create'
     $app.createBackup(e.request.context(), name)
+    stage = 'receipt'
     return e.json(200, {
       created: name,
       inventory_sha256: $security.sha256(JSON.stringify(inventory)),
@@ -97,6 +103,9 @@ routerAdd('POST', '/backend/v1/mei-maintenance/backup', (e) => {
       download_path: '/backend/v1/mei-maintenance/download/' + name,
     })
   } catch (_) {
-    return e.json(403, { error: 'MAINTENANCE_DENIED_OR_BACKUP_UNAVAILABLE' })
+    return e.json(403, {
+      error: 'MAINTENANCE_DENIED_OR_BACKUP_UNAVAILABLE',
+      stage: authenticated ? stage : 'authentication',
+    })
   }
 })

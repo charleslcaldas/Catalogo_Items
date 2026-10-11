@@ -1,5 +1,7 @@
 routerAdd('GET', '/backend/v1/mei-maintenance/download/{name}', (e) => {
   let reader = null
+  let authenticated = false
+  let stage = 'authentication'
   try {
     const secret = $os.getenv('MEI_SKIP_MAINTENANCE_KEY')
     const expiry = /^m1\.[0-9]{10}\.[0-9a-f]{64}$/.test(secret) ? Number(secret.split('.')[1]) : 0
@@ -23,15 +25,22 @@ routerAdd('GET', '/backend/v1/mei-maintenance/download/{name}', (e) => {
       '\n',
     )
     if (!$security.equal(mac, $security.hs256(signed, secret))) throw new Error('Denied')
+    authenticated = true
+    stage = 'backup-filesystem'
     const fs = $app.newBackupsFilesystem()
     try {
+      stage = 'backup-read'
       reader = fs.getReader(name)
+      stage = 'stream'
       return e.stream(200, 'application/zip', reader)
     } finally {
       if (reader) reader.close()
       fs.close()
     }
   } catch (_) {
-    return e.json(403, { error: 'MAINTENANCE_DENIED_OR_BACKUP_UNAVAILABLE' })
+    return e.json(403, {
+      error: 'MAINTENANCE_DENIED_OR_BACKUP_UNAVAILABLE',
+      stage: authenticated ? stage : 'authentication',
+    })
   }
 })
