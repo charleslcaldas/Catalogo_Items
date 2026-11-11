@@ -36,6 +36,20 @@ onRecordAfterUpdateSuccess((e) => {
 }, 'potencial_itens')
 
 onRecordAfterCreateSuccess((e) => {
+  // Runtime marker signed by the private writer; never a client-set boolean.
+  try {
+    const plan = e.record.getString('__mei_plan_digest')
+    const mac = e.record.getString('__mei_runtime_mac')
+    const secret = $os.getenv('MEI_QUOTES_HMAC_KEY')
+    if (
+      secret &&
+      secret.length >= 32 &&
+      /^[0-9a-f]{64}$/.test(plan) &&
+      /^[0-9a-f]{64}$/.test(mac) &&
+      $security.equal(mac, $security.hs256('mei-record-v1\n' + e.record.id + '\n' + plan, secret))
+    )
+      return e.next()
+  } catch (_) {}
   const preco = e.record.get('preco_unitario')
   const fornecedor = e.record.get('observacoes')
 
