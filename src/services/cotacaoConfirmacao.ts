@@ -8,6 +8,25 @@
  * NESTA RODADA: apenas contrato + função cliente. NENHUMA chamada de UI.
  * O frontend continua usando os caminhos atuais até o frontend ser migrado.
  *
+ * MARGEM AUTORITATIVA (v0.0.266): a venda usa EXCLUSIVAMENTE a margem PERSISTIDA
+ * em cotacoes_itens.margem_negociada (migration 0066) — NUNCA a margem enviada
+ * como número no payload, NUNCA linhas.margem_padrao, NUNCA 7,5 fixo.
+ *
+ * FLUXO DE EDIÇÃO AUTORIZADA da margem (contrato para o frontend FUTURO —
+ * nenhum endpoint novo nesta rodada; documentação apenas):
+ *   1. O usuário edita a margem negociada na UI.
+ *   2. O frontend PERSISTE a edição ANTES de chamar a confirmação: update em
+ *      cotacoes_itens (regra de API update do time, inalterada) enviando
+ *      margem_negociada + precisao_negociada (2 ou 3) + margem_versao
+ *      INCREMENTADA (+1), com checagem de versão esperada (concorrência
+ *      otimista: ler margem_versao atual; o save deve partir da versão lida —
+ *      se outro usuário editou entre leitura e save, refazer a leitura).
+ *   3. Somente então chamar a confirmação com margem_versao_esperada = versão
+ *      recém-persistida. Divergência → 409 conflito_margem (a margem mudou).
+ *   4. Margem ausente/vazia persistida → 422 pendencia_margem (nunca fallback).
+ *   5. A confirmação consome a margem e incrementa margem_versao (+1) DENTRO da
+ *      transação — evita confirmação dupla sob versão obsoleta.
+ *
  * AUTORIZAÇÃO (v0.0.264): servidor, dentro da transação, nunca booleano do
  * cliente. Espelho EXATO das API rules auditadas das coleções envolvidas —
  * regras puras em src/lib/confirmacaoCompra.ts (resolverIdentidade,
@@ -25,6 +44,9 @@
  *                           do fornecedor → potencial ≠ potencial do potencial_iten / item divergente)
  *  - identidade não-resolvida ou indeterminado → NEGADO (403 acesso_negado)
  */
+
+/** Versão da margem negociada: 0/vazio = nunca editada; incrementada a cada edição autorizada e a cada consumo pela confirmação. */
+export type MargemVersao = number
 
 import pb from '../lib/pocketbase/client'
 import { ClientResponseError } from 'pocketbase'
@@ -61,6 +83,16 @@ export interface ConfirmarCompraPayload {
    * a confirmação é rejeitada (oferta vencida).
    */
   oferta_validade?: string
+  /**
+   * Concorrência otimista da MARGEM NEGOCIADA: valor `margem_versao` persistido
+   * em cotacoes_itens no momento da leitura. Obrigatório (inteiro >= 0).
+   * Divergência da persistida → 409 conflito_margem.
+   *
+   * NOTA: a margem em si NUNCA vem no payload — o servidor usa EXCLUSIVAMENTE a
+   * margem persistida em cotacoes_itens.margem_negociada (fluxo de edição
+   * autorizada acima; qualquer `margem`/valor enviado pelo cliente é IGNORADO).
+   */
+  margem_versao_esperada: number
 }
 
 // ---------- recibo ----------
@@ -83,8 +115,10 @@ export interface ConfirmarCompraRecibo {
   preco_compra: number
   /** Venda gravada em potencial_itens.preco_unitario (margem vigente, precisão do item). */
   preco_unitario: number
-  /** Margem vigente usada no cálculo (% da linha do item). */
+  /** Margem negociada PERSISTIDA em cotacoes_itens.margem_negociada usada no cálculo. */
   margem: number
+  /** margem_versao APÓS o consumo (+1 incrementado dentro da transação). */
+  margem_versao: MargemVersao
   /** Precisão (2 ou 3 casas) usada no arredondamento da venda. */
   precisao: 2 | 3
   moeda: string
@@ -137,7 +171,9 @@ export type ConfirmarCompraErrorCode =
   | 'identidade_nao_resolvida'
   | 'pendencia_dados'
   | 'precisao_ausente'
+  | 'precisao_invalida'
   | 'margem_invalida'
+  | 'conflito_margem'
 
 /** Erro tipado do endpoint (código estável + mensagem em português). */
 export class ConfirmarCompraError extends Error {
@@ -189,6 +225,18 @@ export async function confirmarCompra(
   }
   if (!payload.versao) {
     throw new ConfirmarCompraError(400, 'payload_invalido', 'versao é obrigatória.')
+  }
+  if (
+    typeof payload.margem_versao_esperada !== 'number' ||
+    !Number.isFinite(payload.margem_versao_esperada) ||
+    payload.margem_versao_esperada < 0 ||
+    payload.margem_versao_esperada !== Math.floor(payload.margem_versao_esperada)
+  ) {
+    throw new ConfirmarCompraError(
+      400,
+      'payload_invalido',
+      'margem_versao_esperada é obrigatória (número inteiro >= 0).',
+    )
   }
 
   try {

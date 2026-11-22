@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-22T22:48:13.949Z",
+  "generatedAt": "2026-11-22T23:08:26.395Z",
   "collections": [
     {
       "name": "users",
@@ -1957,6 +1957,24 @@
         },
         {
           "name": "preco_original",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "margem_negociada",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "margem_versao",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "precisao_negociada",
           "type": "number",
           "required": false,
           "system": false

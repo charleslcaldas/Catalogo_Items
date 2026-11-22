@@ -29,6 +29,7 @@ const payloadBase: ConfirmarCompraPayload = {
   cotacao_iten_id: 'abc123',
   versao: '2026-01-01 00:00:00.000Z',
   idempotency_key: 'confirmar-compra:abc123:-:v1',
+  margem_versao_esperada: 0,
 }
 
 describe('canonicalização do payload de idempotência', () => {
@@ -38,6 +39,7 @@ describe('canonicalização do payload de idempotência', () => {
       idempotency_key: 'confirmar-compra:abc123:-:v1',
       versao: '2026-01-01 00:00:00.000Z',
       cotacao_iten_id: 'abc123',
+      margem_versao_esperada: 0,
     })
     expect(canonicalize(a)).toBe(canonicalize(b))
   })
@@ -223,29 +225,71 @@ describe('MOQ: nunca muda quantidade silenciosamente', () => {
   })
 })
 
-describe('margem vigente / precisão 2-3 (nunca 7,5 fixo)', () => {
-  it('venda calculada com margem da linha (12,5%) e arredondamento 2 casas', () => {
-    const r = calcularVendaConfirmacao(4.5, 12.5, 2)
+describe('margem AUTORITATIVA PERSISTIDA / precisão 2-3 (nunca 7,5 fixo)', () => {
+  it('margem negociada 12% PERSISTIDA vence o padrão 7,5 da linha', () => {
+    // compra 4.5 com margem PERSISTIDA 12 → 4.5 / 0.88 = 5.113636… → 5.11 (2 casas);
+    // com o padrão 7,5 seria 4.864… — o serviço NUNCA usa o padrão da linha.
+    const r = calcularVendaConfirmacao(4.5, 12, 2, 0, 0)
     expect(r.pendencia).toBeNull()
-    // 4.5 / 0.875 = 5.142857… → 5.14
-    expect(r.venda).toBe(5.14)
+    expect(r.venda).toBe(5.11)
+    // prova da diferença: 7,5 daria outro valor (a persistida é a única fonte)
+    expect(calcularVendaConfirmacao(4.5, 7.5, 2, 0, 0).venda).toBe(4.86)
+    expect(r.venda).not.toBe(calcularVendaConfirmacao(4.5, 7.5, 2, 0, 0).venda)
   })
 
-  it('precisão 3 casas arredonda em milésimos', () => {
-    const r = calcularVendaConfirmacao(4.5, 12.5, 3)
-    // 5.142857… → 5.143
-    expect(r.venda).toBe(5.143)
+  it('margem enviada no payload do cliente é IGNORADA (não existe no contrato)', () => {
+    // a função não aceita margem do cliente — só a persistida + versão esperada.
+    // Qualquer "margem: 50" que o cliente envie no body não muda o cálculo:
+    // o servidor lê margem_negociada do registro (espelho do hook).
+    const r = calcularVendaConfirmacao(4.5, 12, 2, 3, 3)
+    expect(r.pendencia).toBeNull()
+    expect(r.venda).toBe(5.11)
+    // mesmo pedido com versão adulterada divergente → rejeitado, não recalculado
+    const conflito = calcularVendaConfirmacao(4.5, 12, 2, 3, 2)
+    expect(conflito.pendencia?.code).toBe('conflito_margem')
+    expect(conflito.venda).toBeUndefined()
   })
 
-  it('margem ausente → pendência explícita (não inventa 7,5)', () => {
-    const r = calcularVendaConfirmacao(4.5, null, 2)
-    expect(r.pendencia?.code).toBe('pendencia_margem')
+  it('margem ausente/vazia → pendencia_margem (não inventa 7,5)', () => {
+    expect(calcularVendaConfirmacao(4.5, null, 2, 0, 0).pendencia?.code).toBe('pendencia_margem')
+    expect(calcularVendaConfirmacao(4.5, undefined, 2, 0, 0).pendencia?.code).toBe(
+      'pendencia_margem',
+    )
+    expect(calcularVendaConfirmacao(4.5, null, 2, 0, 0).venda).toBeUndefined()
+  })
+
+  it('margem_versao divergente → conflito_margem (rejeita, não calcula)', () => {
+    const r = calcularVendaConfirmacao(4.5, 12, 2, 4, 3)
+    expect(r.pendencia?.code).toBe('conflito_margem')
     expect(r.venda).toBeUndefined()
   })
 
-  it('margem >= 100 → pendência (guarda divisão por zero)', () => {
-    expect(calcularVendaConfirmacao(4.5, 100, 2).pendencia?.code).toBe('pendencia_margem')
-    expect(calcularVendaConfirmacao(4.5, 150, 2).pendencia?.code).toBe('pendencia_margem')
+  it('margem inválida: 0 é válido; negativa, ≥ 100 e não finita → margem_invalida', () => {
+    expect(calcularVendaConfirmacao(4.5, 0, 2, 0, 0).pendencia).toBeNull()
+    expect(calcularVendaConfirmacao(4.5, -0.1, 2, 0, 0).pendencia?.code).toBe('margem_invalida')
+    expect(calcularVendaConfirmacao(4.5, 100, 2, 0, 0).pendencia?.code).toBe('margem_invalida')
+    expect(calcularVendaConfirmacao(4.5, 150, 2, 0, 0).pendencia?.code).toBe('margem_invalida')
+    expect(calcularVendaConfirmacao(4.5, Number.NaN, 2, 0, 0).pendencia?.code).toBe(
+      'pendencia_margem',
+    )
+  })
+
+  it('fórmula venda = compra / (1 - m/100), arredondada na precisão', () => {
+    // 2 casas: 4.5 / 0.88 = 5.1136… → 5.11; 3 casas → 5.114
+    expect(calcularVendaConfirmacao(4.5, 12, 2, 0, 0).venda).toBe(5.11)
+    expect(calcularVendaConfirmacao(4.5, 12, 3, 0, 0).venda).toBe(5.114)
+    // 12,5%: 4.5 / 0.875 = 5.142857… → 5.14 / 5.143
+    expect(calcularVendaConfirmacao(4.5, 12.5, 2, 0, 0).venda).toBe(5.14)
+    expect(calcularVendaConfirmacao(4.5, 12.5, 3, 0, 0).venda).toBe(5.143)
+  })
+
+  it('precisão: ausente → precisao_ausente; fora de 2/3 → precisao_invalida (sem default silencioso)', () => {
+    const ausente = calcularVendaConfirmacao(4.5, 12, undefined, 0, 0)
+    expect(ausente.pendencia?.code).toBe('precisao_ausente')
+    expect(ausente.venda).toBeUndefined()
+    const invalida = calcularVendaConfirmacao(4.5, 12, 5, 0, 0)
+    expect(invalida.pendencia?.code).toBe('precisao_invalida')
+    expect(invalida.venda).toBeUndefined()
   })
 
   it('coerência com computeVenda/isValidMargin de money.ts', () => {
@@ -253,10 +297,30 @@ describe('margem vigente / precisão 2-3 (nunca 7,5 fixo)', () => {
     expect(isValidMargin(100)).toBe(false)
     expect(isValidMargin(12.5)).toBe(true)
   })
+})
 
-  it('precisao_preco ausente/outra → 2 casas (fallback)', () => {
-    expect(calcularVendaConfirmacao(4.5, 12.5, undefined).precisao).toBe(2)
-    expect(calcularVendaConfirmacao(4.5, 12.5, 5).precisao === 2).toBe(true)
+describe('margem_versao_esperada — validação de payload (borda do cliente)', () => {
+  it('obrigatória: ausente → payload_invalido', () => {
+    const erros = validarPayload({ ...payloadBase, margem_versao_esperada: undefined })
+    expect(erros.map((e) => e.code)).toContain('payload_invalido')
+  })
+
+  it('negativa, não finita ou fracionada → payload_invalido', () => {
+    expect(
+      validarPayload({ ...payloadBase, margem_versao_esperada: -1 }).map((e) => e.code),
+    ).toContain('payload_invalido')
+    expect(
+      validarPayload({ ...payloadBase, margem_versao_esperada: Number.NaN }).map((e) => e.code),
+    ).toContain('payload_invalido')
+    expect(
+      validarPayload({ ...payloadBase, margem_versao_esperada: 1.5 }).map((e) => e.code),
+    ).toContain('payload_invalido')
+  })
+
+  it('entra no cânone de idempotência (retry com outra versão → hash diferente)', () => {
+    const a = canonicalize(payloadCanonico(payloadBase))
+    const b = canonicalize(payloadCanonico({ ...payloadBase, margem_versao_esperada: 1 }))
+    expect(a).not.toBe(b)
   })
 })
 
@@ -281,6 +345,9 @@ describe('hook — invariantes que não são executáveis aqui (NÃO EXECUTADO)'
     //  - gravação efetiva em cotacoes_rodadas/potencial_itens/historico_precos
     //  - reavaliação da autorização DENTRO da transação (rollback em negativa)
     //  - não-duplicação de histórico com price_history_logger/on_cotacao_finalizada
+    //  - incrementar margem_versao (+1) dentro da transação ao consumir a margem
+    //    (concorrência otimista real — confirmação dupla sob versão obsoleta
+    //    cai no conflito_margem da re-leitura, mas só com POST real)
     expect(true).toBe(true)
   })
 })

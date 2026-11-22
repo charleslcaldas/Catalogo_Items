@@ -6,10 +6,16 @@
 // caminhos de aceite hoje espalhados no frontend — sem alterar o frontend nesta rodada):
 //   1. marca vencedor em cotacoes_itens (e desmarca outros vencedores do item);
 //   2. grava potencial_itens (referencia_preco, referencia_fornecedor, referencia_data)
-//      e preco_unitario = venda calculada com a MARGEM NEGOCIADA recebida no payload
-//      (validada; ausente → 422 pendência; nunca linhas.margem_padrao, nunca 7,5),
-//      fórmula venda = compra / (1 - margem/100), arredondada na precisão 2/3 enviada
-//      no payload; moeda/unidade preservadas, sem conversão;
+//      e preco_unitario = venda calculada com a MARGEM NEGOCIADA PERSISTIDA em
+//      cotacoes_itens.margem_negociada (migration 0066) — NUNCA margem enviada no
+//      payload, NUNCA linhas.margem_padrao, NUNCA 7,5 fixo. Ausente/vazia → 422
+//      pendência explícita; inválida (<0 ou >=100) → 422 margem_invalida. A versão
+//      margem_versao (concorrência otimista da edição autorizada) deve bater com
+//      margem_versao_esperada do payload (divergente → 409 conflito_margem) e é
+//      incrementada (+1) DENTRO da mesma transação quando a confirmação consome a
+//      margem. Precisão 2/3 vem de cotacoes_itens.precisao_negociada (ausente →
+//      pendência, sem default silencioso); fórmula venda = compra / (1 - margem/100);
+//      moeda/unidade preservadas, sem conversão;
 //   3. grava histórico ÚNICO em historico_precos (tipo 'compra'). Hooks legados
 //      (price_history_logger.js e on_cotacao_finalizada.js) disparam por atualização
 //      em `itens`/status 'finalizada' em `cotacoes_fornecedor` — este serviço NÃO toca
@@ -263,6 +269,22 @@ routerAdd(
     const ajustarMoq = body.ajustar_quantidade_para_moq === true
     const moqExplicito = isFiniteNum(body.moq) ? body.moq : null
     const ofertaValidade = typeof body.oferta_validade === 'string' ? body.oferta_validade : ''
+    // Concorrência otimista da MARGEM: versão esperada da edição autorizada
+    // (margem_versao persistida em cotacoes_itens no momento da leitura do cliente).
+    // Obrigatória, número inteiro >= 0. A margem em si NUNCA vem no payload —
+    // o servidor usa EXCLUSIVAMENTE a margem persistida no registro.
+    const margemVersaoEsperada = body.margem_versao_esperada
+    if (
+      !isFiniteNum(margemVersaoEsperada) ||
+      margemVersaoEsperada < 0 ||
+      margemVersaoEsperada !== Math.floor(margemVersaoEsperada)
+    ) {
+      return jsonError(
+        400,
+        'payload_invalido',
+        'margem_versao_esperada é obrigatória (número inteiro >= 0) — concorrência otimista da margem negociada.',
+      )
+    }
 
     if (!cotacaoItenId) {
       return jsonError(400, 'payload_invalido', 'cotacao_iten_id é obrigatório.')
@@ -289,6 +311,7 @@ routerAdd(
       ajustar_quantidade_para_moq: ajustarMoq === true,
       moq: moqExplicito,
       oferta_validade: ofertaValidade,
+      margem_versao_esperada: margemVersaoEsperada,
     }
     const payloadHash = sha256Hex(canonicalize(idemPayload))
     const ESCOPO = 'confirmar_compra'
@@ -475,16 +498,34 @@ routerAdd(
       )
     }
 
-    // ---------- margem negociada (recebida no contrato; nunca linhas.margem_padrao; nunca 7,5) ----------
-    const margem = body.margem
-    if (typeof margem !== 'number' || !isFiniteNum(margem)) {
+    // ---------- margem negociada (FONTE ÚNICA: persistida em cotacoes_itens) ----------
+    // margem_negociada é lida do PRÓPRIO registro da oferta (migration 0066),
+    // editada previamente pelo fluxo de EDIÇÃO AUTORIZADA (contrato em
+    // src/services/cotacaoConfirmacao.ts). NUNCA body.margem, NUNCA
+    // linhas.margem_padrao, NUNCA 7,5 fixo. Ausente/vazia → 422 pendência
+    // explícita; inválida → 422 margem_invalida. Nada é inventado.
+    const margemRaw = oferta.get('margem_negociada')
+    if (!isFiniteNum(margemRaw)) {
       return e.json(422, {
         error: 'pendencia_margem',
-        message: 'Margem negociada ausente ou inválida — pendência explícita. Nada foi gravado.',
+        message:
+          'Margem negociada não persistida em cotacoes_itens.margem_negociada — pendência explícita. Persista a edição autorizada da margem antes de confirmar. Nada foi gravado.',
       })
     }
+    const margem = margemRaw
     if (margem < 0 || margem >= 100) {
       return e.json(422, { error: 'margem_invalida', message: 'Margem deve ser >= 0 e < 100.' })
+    }
+
+    // concorrência otimista da margem: versão persistida deve bater com a esperada
+    const margemVersaoPersistida = oferta.getInt('margem_versao')
+    if (margemVersaoPersistida !== margemVersaoEsperada) {
+      return e.json(409, {
+        error: 'conflito_margem',
+        message:
+          'A margem negociada mudou desde a leitura (margem_versao divergente). Recarregue a margem autorizada e confirme novamente.',
+        margem_versao_atual: margemVersaoPersistida,
+      })
     }
 
     // ---------- quantidade x MOQ (nunca muda quantidade silenciosamente) ----------
@@ -526,11 +567,23 @@ routerAdd(
     }
 
     // ---------- cálculo da venda (fórmula obrigatória) ----------
-    const precisao = body.precisao === 3 ? 3 : body.precisao === 2 ? 2 : 0
-    if (precisao === 0) {
+    // Precisão PERSISTIDA em cotacoes_itens.precisao_negociada (migration 0066):
+    // ausente/vazia → 422 precisao_ausente; presente fora de 2/3 → 422
+    // precisao_invalida. Mantém a política anterior de NUNCA assumir precisão
+    // (sem default silencioso), agora com fonte autoritativa persistida.
+    const precisaoRaw = oferta.get('precisao_negociada')
+    if (!isFiniteNum(precisaoRaw)) {
       return e.json(422, {
         error: 'precisao_ausente',
-        message: 'precisao (2 ou 3) ausente ou inválida — pendência explícita. Nada foi gravado.',
+        message:
+          'precisao_negociada não persistida (2 ou 3) — pendência explícita. Nada foi gravado.',
+      })
+    }
+    const precisao = precisaoRaw
+    if (precisao !== 2 && precisao !== 3) {
+      return e.json(422, {
+        error: 'precisao_invalida',
+        message: 'precisao_negociada deve ser 2 ou 3 — pendência explícita. Nada foi gravado.',
       })
     }
     const vendaBruta = precoOferta / (1 - margem / 100)
@@ -570,6 +623,33 @@ routerAdd(
         if (isoOf(ofertaTx.get('updated')) !== versaoEsperada) {
           throw new BadRequestError(
             'conflito_versao: a oferta mudou durante a confirmação — tente novamente.',
+          )
+        }
+
+        // re-leitura da MARGEM AUTORITATIVA dentro da transação (nada gravado pela
+        // metade): margem persistida ainda presente e igual, versão ainda a esperada
+        // e precisão ainda 2/3 — qualquer divergência → rollback total.
+        const margemTxRaw = ofertaTx.get('margem_negociada')
+        if (!isFiniteNum(margemTxRaw)) {
+          throw new BadRequestError(
+            'pendencia_margem: margem negociada não persistida na gravação — nada aplicado.',
+          )
+        }
+        if (margemTxRaw !== margem) {
+          throw new BadRequestError(
+            'conflito_margem: a margem negociada mudou durante a confirmação — recarregue e tente novamente.',
+          )
+        }
+        const margemVersaoTx = ofertaTx.getInt('margem_versao')
+        if (margemVersaoTx !== margemVersaoEsperada) {
+          throw new BadRequestError(
+            'conflito_margem: margem_versao divergente na gravação — recarregue e tente novamente.',
+          )
+        }
+        const precisaoTxRaw = ofertaTx.get('precisao_negociada')
+        if (!isFiniteNum(precisaoTxRaw) || (precisaoTxRaw !== 2 && precisaoTxRaw !== 3)) {
+          throw new BadRequestError(
+            'precisao_invalida: precisao_negociada ausente ou fora de 2/3 na gravação — nada aplicado.',
           )
         }
 
@@ -629,6 +709,10 @@ routerAdd(
         if (ofertaTx.getFloat('preco_original') === 0) {
           ofertaTx.set('preco_original', precoOferta)
         }
+        // consome a margem: incrementa margem_versao na MESMA transação — evita
+        // confirmação dupla sob versão obsoleta (um novo confirmar com a versão
+        // esperada antiga → conflito_margem na re-leitura acima; rollback total).
+        ofertaTx.set('margem_versao', margemVersaoTx + 1)
         tx.save(ofertaTx)
 
         // 2. potencial_itens (referências + venda calculada com margem vigente)
@@ -714,6 +798,7 @@ routerAdd(
           preco_compra: precoOferta,
           preco_unitario: venda,
           margem: margem,
+          margem_versao: margemVersaoTx + 1,
           precisao: precisao,
           moeda: moedaFinal,
           unidade: unidadeFinal,
@@ -775,6 +860,30 @@ routerAdd(
         return e.json(409, {
           error: 'conflito_versao',
           message: 'A oferta mudou durante a confirmação — recarregue e tente novamente.',
+        })
+      }
+      if (msg.indexOf('conflito_margem') !== -1) {
+        return e.json(409, {
+          error: 'conflito_margem',
+          message: 'A margem negociada mudou durante a confirmação — recarregue e tente novamente.',
+        })
+      }
+      if (msg.indexOf('pendencia_margem') !== -1) {
+        return e.json(422, {
+          error: 'pendencia_margem',
+          message: 'Margem negociada não persistida na gravação — nada foi aplicado (rollback).',
+        })
+      }
+      if (msg.indexOf('margem_invalida') !== -1) {
+        return e.json(422, {
+          error: 'margem_invalida',
+          message: 'Margem persistida inválida na gravação — nada foi aplicado (rollback).',
+        })
+      }
+      if (msg.indexOf('precisao_invalida') !== -1) {
+        return e.json(422, {
+          error: 'precisao_invalida',
+          message: 'Precisão persistida inválida na gravação — nada foi aplicado (rollback).',
         })
       }
       return e.json(500, {

@@ -9,6 +9,14 @@
  *
  * Qualquer mudança de regra DEVE ser aplicada nos dois lugares.
  *
+ * MARGEM AUTORITATIVA (v0.0.266): a venda usa EXCLUSIVAMENTE a margem PERSISTIDA
+ * em cotacoes_itens.margem_negociada (migration 0066) — NUNCA a margem enviada
+ * como número no payload, NUNCA linhas.margem_padrao, NUNCA 7,5 fixo.
+ * Concorrência otimista: margem_versao persistida deve bater com
+ * margem_versao_esperada do payload (divergente → conflito_margem). A
+ * confirmação incrementa margem_versao (+1) dentro da transação ao consumir a
+ * margem. Fluxo de EDIÇÃO AUTORIZADA documentado em src/services/cotacaoConfirmacao.ts.
+ *
  * AUTORIZAÇÃO (v0.0.264): espelho EXATO das API rules auditadas das coleções
  * envolvidas — negar por padrão, reavaliada dentro da transação (hook). A
  * matriz completa PERMITIDO/NEGADO está em AUTORIZACAO_CONFIRMACAO (abaixo) e
@@ -38,7 +46,9 @@ export type ConfirmarCompraErrorCode =
   | 'pendencia_margem'
   | 'pendencia_dados'
   | 'precisao_ausente'
+  | 'precisao_invalida'
   | 'margem_invalida'
+  | 'conflito_margem'
   | 'conflito_versao'
   | 'conflito_idempotencia'
   | 'falha_transacao'
@@ -54,6 +64,14 @@ export interface ConfirmarCompraPayload {
   ajustar_quantidade_para_moq?: boolean
   moq?: number
   oferta_validade?: string
+  /**
+   * Concorrência otimista da MARGEM NEGOCIADA: valor `margem_versao` persistido
+   * em cotacoes_itens no momento da leitura. Obrigatório (inteiro >= 0).
+   * Divergência da persistida → 409 conflito_margem. A margem em si NUNCA vai no
+   * payload — o servidor usa EXCLUSIVAMENTE a margem persistida; qualquer valor
+   * de margem enviado pelo cliente é IGNORADO.
+   */
+  margem_versao_esperada: number
 }
 
 // ---------- canonicalização (mesma do hook) ----------
@@ -83,6 +101,8 @@ export function payloadCanonico(p: ConfirmarCompraPayload) {
     ajustar_quantidade_para_moq: p.ajustar_quantidade_para_moq === true,
     moq: typeof p.moq === 'number' && Number.isFinite(p.moq) ? p.moq : null,
     oferta_validade: p.oferta_validade ?? '',
+    margem_versao_esperada:
+      typeof p.margem_versao_esperada === 'number' ? p.margem_versao_esperada : null,
   }
 }
 
@@ -231,6 +251,17 @@ export function validarPayload(p: Partial<ConfirmarCompraPayload>): Pendencia[] 
   if (p.moq !== undefined && (!Number.isFinite(p.moq) || p.moq < 0)) {
     erros.push({ code: 'moq_invalido', message: 'moq deve ser um número >= 0.' })
   }
+  if (
+    p.margem_versao_esperada !== undefined &&
+    (!Number.isFinite(p.margem_versao_esperada) ||
+      p.margem_versao_esperada < 0 ||
+      p.margem_versao_esperada !== Math.floor(p.margem_versao_esperada))
+  ) {
+    erros.push({
+      code: 'payload_invalido',
+      message: 'margem_versao_esperada deve ser um número inteiro >= 0.',
+    })
+  }
   return erros
 }
 
@@ -300,28 +331,93 @@ export function ofertaEstaVencida(validade: string | undefined, agora = new Date
 }
 
 /**
- * Venda da confirmação: margem VIGENTE do item/linha (nunca 7,5 fixo),
- * fórmula venda = compra / (1 - margem/100), arredondada na precisão 2/3 do item.
- * Margem ausente/inválida → pendência explícita (não inventa valor).
+ * Venda da confirmação (v0.0.266): usa EXCLUSIVAMENTE a margem PERSISTIDA em
+ * cotacoes_itens.margem_negociada — nunca margem_padrao da linha, nunca 7,5 fixo,
+ * nunca margem enviada no payload. Fórmula venda = compra / (1 - margem/100),
+ * arredondada na precisão persistida (precisao_negociada, 2 ou 3 — ausente →
+ * pendência, sem default silencioso).
+ *
+ * Concorrência otimista: margemVersaoPersistida deve bater com
+ * margemVersaoEsperada do payload; divergente → conflito_margem (nenhum valor).
+ * Margem persistida ausente/vazia → pendencia_margem (nada inventado).
+ * Margem inválida (< 0 ou >= 100) → margem_invalida.
+ *
+ * O incremento de margem_versao (+1) na gravação é responsabilidade da
+ * transação do hook — esta função é a espelho do cálculo puro.
  */
 export function calcularVendaConfirmacao(
   precoCompra: number,
-  margemVigente: number | null | undefined,
-  precisaoPreco: number | null | undefined,
-): { venda: number | undefined; precisao: 2 | 3; pendencia: Pendencia | null } {
-  const precisao: 2 | 3 = Number(precisaoPreco) === 3 ? 3 : 2
-  if (!isValidMargin(margemVigente ?? undefined)) {
+  margemPersistida: number | null | undefined,
+  precisaoPersistida: number | null | undefined,
+  margemVersaoPersistida: number | null | undefined,
+  margemVersaoEsperada: number,
+): {
+  venda: number | undefined
+  precisao: 2 | 3 | undefined
+  pendencia: Pendencia | null
+} {
+  // precisão: ausente/vazia → pendência explícita; fora de 2/3 → precisao_invalida
+  const precisaoInformada = Number(precisaoPersistida)
+  if (!Number.isFinite(precisaoInformada)) {
+    return {
+      venda: undefined,
+      precisao: undefined,
+      pendencia: {
+        code: 'precisao_ausente',
+        message:
+          'precisao_negociada não persistida (2 ou 3) — pendência explícita. Nada foi gravado.',
+      },
+    }
+  }
+  const precisao: 2 | 3 = precisaoInformada === 2 ? 2 : precisaoInformada === 3 ? 3 : (0 as 2)
+  if (precisao !== 2 && precisao !== 3) {
+    return {
+      venda: undefined,
+      precisao: undefined,
+      pendencia: {
+        code: 'precisao_invalida',
+        message: 'precisao_negociada deve ser 2 ou 3 — pendência explícita. Nada foi gravado.',
+      },
+    }
+  }
+  // margem: ausente/vazia → pendencia_margem (nunca fallback)
+  if (!Number.isFinite(Number(margemPersistida))) {
     return {
       venda: undefined,
       precisao,
       pendencia: {
         code: 'pendencia_margem',
         message:
-          'Margem vigente da linha ausente ou inválida (>= 100) — pendência explícita. Nada foi gravado.',
+          'Margem negociada não persistida em cotacoes_itens.margem_negociada — pendência explícita. Nada foi gravado.',
       },
     }
   }
-  const vendaBruta = computeVenda(precoCompra, margemVigente as number)
+  if (!isValidMargin(margemPersistida as number)) {
+    return {
+      venda: undefined,
+      precisao,
+      pendencia: {
+        code: 'margem_invalida',
+        message: 'Margem persistida deve ser >= 0 e < 100 — nada foi gravado.',
+      },
+    }
+  }
+  // versão: divergente → conflito_margem
+  if (
+    !Number.isFinite(Number(margemVersaoPersistida)) ||
+    Number(margemVersaoPersistida) !== margemVersaoEsperada
+  ) {
+    return {
+      venda: undefined,
+      precisao,
+      pendencia: {
+        code: 'conflito_margem',
+        message:
+          'A margem negociada mudou desde a leitura (margem_versao divergente). Recarregue a margem autorizada e confirme novamente.',
+      },
+    }
+  }
+  const vendaBruta = computeVenda(precoCompra, margemPersistida as number)
   if (vendaBruta === undefined) {
     return {
       venda: undefined,
