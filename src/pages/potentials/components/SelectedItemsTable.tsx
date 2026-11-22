@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Trash2, ChevronUp, ChevronDown, Calculator, Percent } from 'lucide-react'
+import { Trash2, ChevronUp, ChevronDown, Percent } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { FormattedInput } from '@/components/FormattedInput'
 import { Badge } from '@/components/ui/badge'
@@ -24,6 +24,13 @@ interface SelectedItemsTableProps {
   handleMoveDown: (index: number) => void
   setIsSelecting: (selecting: boolean) => void
   lastOfferedPrices: Record<string, number>
+}
+
+// Fórmula aprovada: venda = compra / (1 - margem/100). Sem markup invertido.
+const computeVendaFromMargem = (compra: number, margem: number): number => {
+  if (!isFinite(compra) || !isFinite(margem)) return compra
+  if (margem >= 100) return compra
+  return compra / (1 - margem / 100)
 }
 
 export function SelectedItemsTable({
@@ -81,60 +88,17 @@ export function SelectedItemsTable({
     }
   }
 
-  const handleApplyLineMargins = async () => {
-    setIsApplying(true)
-    const promises = []
-    const linhasCache: Record<string, number | null> = {}
-
-    for (const record of selectedItems) {
-      const custo = Number(record.data.referencia_preco) || 0
-      if (custo > 0) {
-        let margem = record.data.item.expand?.linha_id?.margem_padrao
-
-        if (margem === undefined && record.data.item.linha_id) {
-          const linhaId = record.data.item.linha_id
-          if (linhasCache[linhaId] !== undefined) {
-            margem = linhasCache[linhaId] ?? undefined
-          } else {
-            try {
-              const linha = await pb.collection('linhas').getOne(linhaId)
-              const m = typeof linha.margem_padrao === 'number' ? linha.margem_padrao : null
-              linhasCache[linhaId] = m
-              margem = m ?? undefined
-            } catch (err) {
-              console.error('Failed to fetch linha', err)
-              linhasCache[linhaId] = null
-            }
-          }
-        }
-
-        if (typeof margem !== 'number' || isNaN(margem)) {
-          margem = 7.5
-        }
-        const newVenda = margem < 100 ? custo / (1 - margem / 100) : custo
-        if (record.recordId && record.recordId.length === 15) {
-          promises.push(
-            pb
-              .collection('potencial_itens')
-              .update(record.recordId, { preco_unitario: Number(newVenda.toFixed(3)) }),
-          )
-        }
-        handleUpdateItem(record.id, 'preco_unitario', newVenda.toFixed(3))
-      }
-    }
-    await Promise.all(promises)
-    setIsApplying(false)
-  }
-
+  // Único comando de margem global: atualiza todas as linhas de uma vez.
+  // Editar o campo global NÃO altera linhas — só este botão.
   const handleApplyGlobalMargin = async () => {
-    const m = parseFloat(globalMargin)
+    const m = parseFloat(globalMargin.replace(',', '.'))
     if (isNaN(m) || m >= 100 || m < 0) return
     setIsApplying(true)
     const promises = []
     for (const record of selectedItems) {
       const custo = Number(record.data.referencia_preco) || 0
       if (custo > 0) {
-        const newVenda = custo / (1 - m / 100)
+        const newVenda = computeVendaFromMargem(custo, m)
         if (record.recordId && record.recordId.length === 15) {
           promises.push(
             pb
@@ -150,28 +114,21 @@ export function SelectedItemsTable({
     setGlobalMargin('')
   }
 
+  const hasAnyCompra = selectedItems.some(
+    (r) => typeof r.data.referencia_preco === 'number' && r.data.referencia_preco > 0,
+  )
+
   return (
     <div className="flex-1 flex flex-col bg-white overflow-hidden">
       <div className="flex items-center justify-between p-2 border-b bg-slate-50/50 shrink-0">
         <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleApplyLineMargins}
-            disabled={isApplying || selectedItems.length === 0}
-            className="h-8 text-xs font-medium"
-          >
-            <Calculator className="w-3.5 h-3.5 mr-2 text-blue-600" />
-            Aplicar Margens das Linhas
-          </Button>
-
           <div className="flex items-center h-8 bg-white border rounded-md overflow-hidden focus-within:ring-1 focus-within:ring-ring">
             <div className="flex items-center justify-center pl-2 pr-1 text-muted-foreground bg-slate-50 border-r">
               <Percent className="w-3 h-3" />
             </div>
             <FormattedInput
-              className="h-full w-20 border-0 focus-visible:ring-0 shadow-none text-xs text-right rounded-none"
-              placeholder="Global %"
+              className="h-full w-24 border-0 focus-visible:ring-0 shadow-none text-xs text-right rounded-none"
+              placeholder="Margem Global (%)"
               value={globalMargin}
               onValueChange={setGlobalMargin}
               disabled={isApplying}
@@ -179,8 +136,8 @@ export function SelectedItemsTable({
             <Button
               variant="secondary"
               onClick={handleApplyGlobalMargin}
-              disabled={isApplying || !globalMargin || selectedItems.length === 0}
-              className="h-full rounded-none px-3 text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border-l"
+              disabled={isApplying || !globalMargin || !hasAnyCompra || selectedItems.length === 0}
+              className="h-full rounded-none px-3 text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border-l whitespace-nowrap"
             >
               Aplicar Margem Global
             </Button>
@@ -214,21 +171,21 @@ export function SelectedItemsTable({
                   </TooltipContent>
                 </Tooltip>
               </TableHead>
-              <TableHead className="w-20 text-[11px] text-right text-amber-600">
+              <TableHead className="w-24 text-[11px] text-right text-amber-600">
                 <Tooltip>
                   <TooltipTrigger className="cursor-help underline decoration-dashed underline-offset-2">
-                    Custo Ref.
+                    Preço de Compra Selecionado
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p className="text-xs font-semibold">Custo de Referência</p>
-                    <p className="text-[10px] text-muted-foreground mt-1 max-w-[150px] leading-tight">
-                      Snapshot do último preço capturado no momento da adição.
+                    <p className="text-xs font-semibold">Preço de Compra Selecionado</p>
+                    <p className="text-[10px] text-muted-foreground mt-1 max-w-[170px] leading-tight">
+                      Preço da oferta escolhida para este item na cotação de fabricantes.
                     </p>
                   </TooltipContent>
                 </Tooltip>
               </TableHead>
-              <TableHead className="w-20 text-[11px] text-right">Margem %</TableHead>
-              <TableHead className="w-28 text-[11px] text-right">Preço Venda</TableHead>
+              <TableHead className="w-24 text-[11px] text-right">Margem de Venda (%)</TableHead>
+              <TableHead className="w-28 text-[11px] text-right">Preço de Venda</TableHead>
               <TableHead className="w-24 text-[11px] text-right">Total</TableHead>
               <TableHead className="w-10 text-center text-[11px]">Ação</TableHead>
             </TableRow>
@@ -365,7 +322,7 @@ export function SelectedItemsTable({
                           </TooltipTrigger>
                           <TooltipContent>
                             <p className="font-semibold text-xs">
-                              Custo de Referência: {formatCurrency(refPrice)}
+                              Preço de Compra Selecionado: {formatCurrency(refPrice)}
                             </p>
                             <p className="text-xs text-muted-foreground mt-0.5">
                               Fornecedor: {refSupplier || 'Não informado'}
@@ -385,22 +342,24 @@ export function SelectedItemsTable({
                   </TableCell>
                   <TableCell className="py-1 text-right">
                     <FormattedInput
-                      className="h-7 w-16 px-2 text-right text-xs bg-white ml-auto"
+                      className="h-7 w-20 px-2 text-right text-xs bg-white ml-auto"
                       value={(() => {
                         const hasSnapshot =
                           typeof data.referencia_preco === 'number' && data.referencia_preco > 0
                         const custo = hasSnapshot ? Number(data.referencia_preco) : 0
-                        return Number(data.preco_unitario) > 0 && custo > 0
-                          ? ((1 - custo / Number(data.preco_unitario)) * 100).toFixed(3)
-                          : '0.000'
+                        const venda = Number(data.preco_unitario)
+                        if (venda > 0 && custo > 0) {
+                          return ((1 - custo / venda) * 100).toFixed(2)
+                        }
+                        return ''
                       })()}
                       onValueChange={(val) => {
-                        const m = parseFloat(val) || 0
+                        const m = parseFloat(val.replace(',', '.'))
                         const hasSnapshot =
                           typeof data.referencia_preco === 'number' && data.referencia_preco > 0
                         const custo = hasSnapshot ? Number(data.referencia_preco) : 0
-                        if (custo === 0 || m >= 100) return
-                        const newVenda = custo / (1 - m / 100)
+                        if (custo === 0 || isNaN(m) || m < 0 || m >= 100) return
+                        const newVenda = computeVendaFromMargem(custo, m)
                         handleUpdateItem(id, 'preco_unitario', newVenda.toFixed(3))
                       }}
                       onBlur={() => {
