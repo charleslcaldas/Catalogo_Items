@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -12,16 +12,9 @@ import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
-import {
-  computeTotaisFinanceiros,
-  lineTotalCents,
-  parseToCents,
-  formatCents,
-  assertSingleCurrency,
-} from '@/lib/money'
+import { assertSingleCurrency } from '@/lib/money'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import SituacaoCotacaoSelect from './components/SituacaoCotacaoSelect'
-import EstagioZohoReadOnly from './components/EstagioZohoReadOnly'
+import type { TotaisCotacao } from './AddItemsToPotential'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,14 +31,16 @@ export default function PotentialDetailsWrapper() {
   const [tab, setTab] = useState('items')
   const addItemsRef = useRef<AddItemsToPotentialRef>(null)
   const [globalMargin, setGlobalMargin] = useState('7.5')
-  const [realMargin, setRealMargin] = useState<number | null>(null)
   const [isApplying, setIsApplying] = useState(false)
-  const [totais, setTotais] = useState<{
-    totalCompra: string
-    totalVenda: string
-    ganhoBruto: string
-    margemEfetiva: string
-  }>({ totalCompra: '0,00', totalVenda: '0,00', ganhoBruto: '0,00', margemEfetiva: '—' })
+  // Totais do painel: EXATAMENTE os mesmos números em memória da tabela de
+  // itens (AddItemsToPotential → calculateTotals), recebidos via callback —
+  // sem reparse de textos formatados e válidos também antes de salvar.
+  const [totais, setTotais] = useState<TotaisCotacao>({
+    totalCompra: 0,
+    totalVenda: 0,
+    ganhoBruto: 0,
+    margemEfetiva: null,
+  })
   const [moeda, setMoeda] = useState('USD')
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
   const { toast } = useToast()
@@ -60,56 +55,48 @@ export default function PotentialDetailsWrapper() {
     }
   }
 
-  const loadTotals = async () => {
+  // Moeda explicitamente detectada nos registros salvos (somente leitura);
+  // os VALORES não vêm daqui — vêm da tabela, via handleTotaisChange.
+  const loadMoeda = async () => {
     if (!potencialId) return
     try {
       const items = await pb.collection('potencial_itens').getFullList({
         filter: `potencial_id="${potencialId}"`,
-        expand: 'item_id',
+        fields: 'moeda_compra',
       })
-
       // Moeda explícita: nunca somar moedas distintas sem conversão registrada
-      const moedas = items.map((i) => i.moeda_compra)
       try {
-        setMoeda(assertSingleCurrency(moedas))
+        setMoeda(assertSingleCurrency(items.map((i) => i.moeda_compra)))
       } catch {
         setMoeda('MISTAS')
       }
-
-      const linhasCompra: number[] = []
-      const linhasVenda: number[] = []
-      items.forEach((item) => {
-        const q = item.quantidade || 0
-        // Precisão por linha (2 ou 3; fallback 2) — o unitário usado no total é
-        // exatamente o salvo, arredondado na precisão da própria linha.
-        const precisao = item.precisao_preco === 3 ? 3 : 2
-        const fator = precisao === 3 ? 1000 : 100
-        const compraLinha = Number((Number(item.referencia_preco ?? 0) || 0).toFixed(precisao))
-        const vendaLinha = Number((Number(item.preco_unitario ?? 0) || 0).toFixed(precisao))
-        const pCents = Math.round(compraLinha * fator) * (100 / fator)
-        const vCents = Math.round(vendaLinha * fator) * (100 / fator)
-        linhasCompra.push(lineTotalCents(q, pCents))
-        linhasVenda.push(lineTotalCents(q, vCents))
-      })
-      const t = computeTotaisFinanceiros(linhasCompra, linhasVenda)
-      setRealMargin(t.margemEfetiva ?? null)
-      setTotais({
-        totalCompra: formatCents(t.totalCompra, 2),
-        totalVenda: formatCents(t.totalVenda, 2),
-        ganhoBruto: formatCents(t.ganhoBrutoEstimado, 2),
-        margemEfetiva: t.margemEfetiva !== undefined ? `${t.margemEfetiva.toFixed(2)}%` : '—',
-      })
     } catch (err) {
-      console.error('Failed to load totals', err)
+      console.error('Failed to load currency', err)
     }
   }
 
   useEffect(() => {
-    loadTotals()
+    loadMoeda()
   }, [potencialId])
 
-  useRealtime('potencial_itens', loadTotals)
-  useRealtime('itens', loadTotals)
+  useRealtime('potencial_itens', loadMoeda)
+
+  const handleTotaisChange = useCallback((t: TotaisCotacao) => {
+    setTotais((prev) =>
+      prev.totalCompra === t.totalCompra &&
+      prev.totalVenda === t.totalVenda &&
+      prev.ganhoBruto === t.ganhoBruto &&
+      prev.margemEfetiva === t.margemEfetiva
+        ? prev
+        : t,
+    )
+  }, [])
+
+  // Mesma formatação do rodapé da tabela (en-US, 2 casas) — cabeçalho e
+  // rodapé coincidem caractere a caractere, calculados a partir de números.
+  const fmtValor = (v: number) =>
+    v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const fmtMargem = (m: number | null) => (m !== null ? `${m.toFixed(2)}%` : '—')
 
   const applyGlobalMargin = async () => {
     if (!potencialId) return
@@ -138,7 +125,6 @@ export default function PotentialDetailsWrapper() {
       if (addItemsRef.current) {
         await addItemsRef.current.reloadItemsPrices()
       }
-      loadTotals()
       toast({ title: `Margem de ${margin}% aplicada a ${items.length} itens.` })
     } catch (err: any) {
       toast({ title: 'Erro ao aplicar margem', description: err.message, variant: 'destructive' })
@@ -187,9 +173,6 @@ export default function PotentialDetailsWrapper() {
 
         {tab === 'items' && (
           <div className="flex items-center gap-3 mb-2 bg-muted/20 p-1.5 px-3 rounded-md border shadow-sm flex-wrap">
-            <SituacaoCotacaoSelect potencialId={potencialId} />
-            <EstagioZohoReadOnly potencialId={potencialId} />
-            <div className="w-px h-6 bg-border" />
             <Label className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
               Margem Global (%)
             </Label>
@@ -225,7 +208,7 @@ export default function PotentialDetailsWrapper() {
             </Label>
             <div className="flex items-center gap-1">
               <div className="h-7 px-3 flex items-center justify-end bg-background border rounded-md text-xs font-mono text-muted-foreground min-w-[4rem]">
-                {totais.margemEfetiva}
+                {fmtMargem(totais.margemEfetiva)}
               </div>
             </div>
             <div className="w-px h-6 bg-border mx-1" />
@@ -235,8 +218,8 @@ export default function PotentialDetailsWrapper() {
               </Label>
               <div className="h-7 px-3 flex items-center justify-end bg-background border rounded-md text-xs font-mono min-w-[6rem]">
                 {moeda === 'MISTAS'
-                  ? `${totais.totalCompra} (?)`
-                  : `${moeda} ${totais.totalCompra}`}
+                  ? `${fmtValor(totais.totalCompra)} (?)`
+                  : `${moeda} ${fmtValor(totais.totalCompra)}`}
               </div>
             </div>
             <div className="flex items-center gap-1">
@@ -244,7 +227,9 @@ export default function PotentialDetailsWrapper() {
                 Total de Venda
               </Label>
               <div className="h-7 px-3 flex items-center justify-end bg-background border rounded-md text-xs font-mono min-w-[6rem]">
-                {moeda === 'MISTAS' ? `${totais.totalVenda} (?)` : `${moeda} ${totais.totalVenda}`}
+                {moeda === 'MISTAS'
+                  ? `${fmtValor(totais.totalVenda)} (?)`
+                  : `${moeda} ${fmtValor(totais.totalVenda)}`}
               </div>
             </div>
             <div className="flex items-center gap-1">
@@ -262,7 +247,9 @@ export default function PotentialDetailsWrapper() {
                 </TooltipContent>
               </Tooltip>
               <div className="h-7 px-3 flex items-center justify-end bg-background border rounded-md text-xs font-mono min-w-[6rem]">
-                {moeda === 'MISTAS' ? `${totais.ganhoBruto} (?)` : `${moeda} ${totais.ganhoBruto}`}
+                {moeda === 'MISTAS'
+                  ? `${fmtValor(totais.ganhoBruto)} (?)`
+                  : `${moeda} ${fmtValor(totais.ganhoBruto)}`}
               </div>
             </div>
           </div>
@@ -275,7 +262,7 @@ export default function PotentialDetailsWrapper() {
               <PendenciasCliente potencialId={potencialId} />
             </div>
           )}
-          <AddItemsToPotential ref={addItemsRef} />
+          <AddItemsToPotential ref={addItemsRef} onTotaisChange={handleTotaisChange} />
         </div>
         <div
           className={cn(
@@ -291,7 +278,7 @@ export default function PotentialDetailsWrapper() {
                   await addItemsRef.current.reloadQuotationConditions()
                 }
               }
-              loadTotals()
+              loadMoeda()
             }}
           />
         </div>

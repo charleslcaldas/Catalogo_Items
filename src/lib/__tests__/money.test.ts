@@ -95,6 +95,30 @@ describe('totais agregados (nunca média das margens)', () => {
   })
 })
 
+describe('caso 7455 — bug ×10 nos totais do painel', () => {
+  it('conversão de inteiro escalado não multiplica por 10 na precisão 2', () => {
+    // 441,60 em centavos = 44160 — antes retornava 4416,00 (×10)
+    expect(centsToNumber(44160, 2)).toBe(441.6)
+    expect(formatCents(44160, 2)).toBe('441,60')
+    expect(centsToNumber(47700, 2)).toBe(477)
+    expect(centsToNumber(3540, 2)).toBe(35.4)
+  })
+
+  it('totais do caso 7455: 441,60 / 477,00 / 35,40 / 7,42%', () => {
+    // Linhas em centavos: 2,24×120 e 2,88×60 (compra); 2,42×120 e 3,11×60 (venda)
+    const compra = [lineTotalCents(120, 224), lineTotalCents(60, 288)]
+    const venda = [lineTotalCents(120, 242), lineTotalCents(60, 311)]
+    const t = computeTotaisFinanceiros(compra, venda)
+    expect(t.totalCompra).toBe(44160)
+    expect(t.totalVenda).toBe(47700)
+    expect(t.ganhoBrutoEstimado).toBe(3540)
+    expect(formatCents(t.totalCompra, 2)).toBe('441,60')
+    expect(formatCents(t.totalVenda, 2)).toBe('477,00')
+    expect(formatCents(t.ganhoBrutoEstimado, 2)).toBe('35,40')
+    expect(t.margemEfetiva).toBeCloseTo(7.4214, 3)
+  })
+})
+
 describe('moeda explícita', () => {
   it('moeda única ok; moedas distintas lançam erro', () => {
     expect(assertSingleCurrency(['USD', 'USD'])).toBe('USD')

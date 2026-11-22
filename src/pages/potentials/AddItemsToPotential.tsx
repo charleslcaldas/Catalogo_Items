@@ -47,7 +47,7 @@ import { PotentialAttachments } from './components/PotentialAttachments'
 import { StatusManagementModal } from './components/StatusManagementModal'
 import { savePotencialFull, getPotencialItens, duplicatePotencial } from '@/services/potenciais'
 import { roundToCents } from '@/lib/money'
-import { getContrastColor, cn } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 import type { Potencial, Item, UnidadeMedida, StatusPotencial } from '@/types'
@@ -72,1510 +72,1497 @@ export type SelectedItemRecord = {
   data: SelectedItemData
 }
 
+// Totais calculados a partir dos NÚMEROS em memória das linhas (mesma fonte
+// da tabela) — valores ainda não arredondados para formatação, a cargo do receptor.
+export type TotaisCotacao = {
+  totalCompra: number
+  totalVenda: number
+  ganhoBruto: number
+  margemEfetiva: number | null
+}
+
 export type AddItemsToPotentialRef = {
   reloadItemsPrices: () => Promise<void>
   reloadQuotationConditions?: () => Promise<void>
   isDirty?: () => boolean
 }
 
-export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_props, ref) => {
-  const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const [currentPotential, setCurrentPotential] = useState<Potencial | null>(null)
+type AddItemsToPotentialProps = {
+  onTotaisChange?: (totais: TotaisCotacao) => void
+}
 
-  const [formData, setFormData] = useState({
-    numero_potencial: '',
-    cliente: '',
-    nome_potencial: '',
-    nome_comprador: '',
-    proprietario: '',
-    estagio_id: '',
-    observacoes: '',
-    status: 'Sem Itens',
-    incoterm_cliente: '',
-    condicao_pagamento_cliente: '',
-    tempo_fabricacao_cliente: '',
-  })
-  const [condicoesManuais, setCondicoesManuais] = useState({
-    incoterm: false,
-    condicao_pagamento: false,
-    tempo_fabricacao: false,
-  })
+export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, AddItemsToPotentialProps>(
+  ({ onTotaisChange }, ref) => {
+    const navigate = useNavigate()
+    const [searchParams] = useSearchParams()
+    const [currentPotential, setCurrentPotential] = useState<Potencial | null>(null)
 
-  const [selectedItems, setSelectedItems] = useState<any[]>([])
-  const [lastOfferedPrices, setLastOfferedPrices] = useState<Record<string, number>>({})
-
-  // Track initial state to detect unsaved changes
-  const initialSnapshotRef = useRef<string>('')
-  const isSavedRef = useRef<boolean>(false)
-  const isInitializedRef = useRef<boolean>(false)
-
-  const buildSnapshot = (data: typeof formData, items: typeof selectedItems) => {
-    return JSON.stringify({
-      formData: {
-        numero_potencial: (data.numero_potencial || '').trim(),
-        cliente: (data.cliente || '').trim(),
-        nome_potencial: (data.nome_potencial || '').trim(),
-        nome_comprador: (data.nome_comprador || '').trim(),
-        proprietario: (data.proprietario || '').trim(),
-        estagio_id: (data.estagio_id || '').trim(),
-        observacoes: (data.observacoes || '').trim(),
-        status: data.status || 'Sem Itens',
-        incoterm_cliente: (data.incoterm_cliente || '').trim(),
-        condicao_pagamento_cliente: (data.condicao_pagamento_cliente || '').trim(),
-        tempo_fabricacao_cliente: (data.tempo_fabricacao_cliente || '').trim(),
-      },
-      items: (items || []).map((si) => ({
-        item_id: si.id,
-        quantidade: Number(si.data?.quantidade) || 0,
-        unidade_medida: si.data?.unidade_medida || 'Pcs',
-        preco_unitario: Number(si.data?.preco_unitario) || 0,
-        observacoes: (si.data?.observacoes || '').trim(),
-        precisao_preco: si.data?.precisao_preco === 3 ? 3 : 2,
-      })),
+    const [formData, setFormData] = useState({
+      numero_potencial: '',
+      cliente: '',
+      nome_potencial: '',
+      nome_comprador: '',
+      proprietario: '',
+      estagio_id: '',
+      observacoes: '',
+      status: 'Sem Itens',
+      incoterm_cliente: '',
+      condicao_pagamento_cliente: '',
+      tempo_fabricacao_cliente: '',
     })
-  }
+    const [condicoesManuais, setCondicoesManuais] = useState({
+      incoterm: false,
+      condicao_pagamento: false,
+      tempo_fabricacao: false,
+    })
 
-  // Set default initial snapshot for new quotes on mount
-  useEffect(() => {
-    if (!searchParams.get('id') && !isInitializedRef.current) {
-      initialSnapshotRef.current = buildSnapshot(formData, [])
-      isInitializedRef.current = true
+    const [selectedItems, setSelectedItems] = useState<any[]>([])
+    const [lastOfferedPrices, setLastOfferedPrices] = useState<Record<string, number>>({})
+
+    // Track initial state to detect unsaved changes
+    const initialSnapshotRef = useRef<string>('')
+    const isSavedRef = useRef<boolean>(false)
+    const isInitializedRef = useRef<boolean>(false)
+
+    const buildSnapshot = (data: typeof formData, items: typeof selectedItems) => {
+      return JSON.stringify({
+        formData: {
+          numero_potencial: (data.numero_potencial || '').trim(),
+          cliente: (data.cliente || '').trim(),
+          nome_potencial: (data.nome_potencial || '').trim(),
+          nome_comprador: (data.nome_comprador || '').trim(),
+          proprietario: (data.proprietario || '').trim(),
+          estagio_id: (data.estagio_id || '').trim(),
+          observacoes: (data.observacoes || '').trim(),
+          status: data.status || 'Sem Itens',
+          incoterm_cliente: (data.incoterm_cliente || '').trim(),
+          condicao_pagamento_cliente: (data.condicao_pagamento_cliente || '').trim(),
+          tempo_fabricacao_cliente: (data.tempo_fabricacao_cliente || '').trim(),
+        },
+        items: (items || []).map((si) => ({
+          item_id: si.id,
+          quantidade: Number(si.data?.quantidade) || 0,
+          unidade_medida: si.data?.unidade_medida || 'Pcs',
+          preco_unitario: Number(si.data?.preco_unitario) || 0,
+          observacoes: (si.data?.observacoes || '').trim(),
+          precisao_preco: si.data?.precisao_preco === 3 ? 3 : 2,
+        })),
+      })
     }
-  }, [])
 
-  const [isSelecting, setIsSelecting] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [isSearchQuoteOpen, setIsSearchQuoteOpen] = useState(false)
-  const [isItemModalOpen, setIsItemModalOpen] = useState(false)
-  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
-  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
-  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false)
-  const [pendenciasConcluir, setPendenciasConcluir] = useState<string[] | null>(null)
-  const [itemToEdit, setItemToEdit] = useState<Partial<Item> | undefined>(undefined)
-  const [unidades, setUnidades] = useState<UnidadeMedida[]>([])
-  const [statuses, setStatuses] = useState<StatusPotencial[]>([])
-  const [fornecedorCotacoes, setFornecedorCotacoes] = useState<any[]>([])
-  const [cotacoesItens, setCotacoesItens] = useState<any[]>([])
-
-  const loadStatuses = () => {
-    pb.collection('status_potencial')
-      .getFullList<StatusPotencial>({ sort: 'created' })
-      .then(setStatuses)
-      .catch(console.error)
-  }
-
-  useEffect(() => {
-    pb.collection('unidades_medida')
-      .getFullList<UnidadeMedida>()
-      .then(setUnidades)
-      .catch(console.error)
-    loadStatuses()
-  }, [])
-
-  const loadQuotationConditionsData = useCallback(
-    async (potId?: string) => {
-      const targetId = potId || currentPotential?.id
-      if (!targetId) {
-        setFornecedorCotacoes([])
-        setCotacoesItens([])
-        return
+    // Set default initial snapshot for new quotes on mount
+    useEffect(() => {
+      if (!searchParams.get('id') && !isInitializedRef.current) {
+        initialSnapshotRef.current = buildSnapshot(formData, [])
+        isInitializedRef.current = true
       }
-      try {
-        const [cfs, cis] = await Promise.all([
-          pb.collection('cotacoes_fornecedor').getFullList({
-            filter: `potencial_id="${targetId}"`,
-            expand: 'fornecedor_id',
-            sort: 'created',
-          }),
-          pb.collection('cotacoes_itens').getFullList({
-            filter: `cotacao_fornecedor_id.potencial_id="${targetId}"`,
-            expand: 'cotacao_fornecedor_id,item_id',
-          }),
-        ])
-        setFornecedorCotacoes(cfs)
-        setCotacoesItens(cis)
-      } catch (err) {
-        console.error('Erro ao carregar cotações para condições comerciais:', err)
-      }
-    },
-    [currentPotential?.id],
-  )
+    }, [])
 
-  useEffect(() => {
-    loadQuotationConditionsData()
-  }, [loadQuotationConditionsData])
+    const [isSelecting, setIsSelecting] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
+    const [isSearchQuoteOpen, setIsSearchQuoteOpen] = useState(false)
+    const [isItemModalOpen, setIsItemModalOpen] = useState(false)
+    const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
+    const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
+    const [showDuplicateDialog, setShowDuplicateDialog] = useState(false)
+    const [pendenciasConcluir, setPendenciasConcluir] = useState<string[] | null>(null)
+    const [itemToEdit, setItemToEdit] = useState<Partial<Item> | undefined>(undefined)
+    const [unidades, setUnidades] = useState<UnidadeMedida[]>([])
+    const [statuses, setStatuses] = useState<StatusPotencial[]>([])
+    const [fornecedorCotacoes, setFornecedorCotacoes] = useState<any[]>([])
+    const [cotacoesItens, setCotacoesItens] = useState<any[]>([])
 
-  useRealtime('cotacoes_itens', () => {
-    loadQuotationConditionsData()
-  })
-  useRealtime('cotacoes_fornecedor', () => {
-    loadQuotationConditionsData()
-  })
-
-  useEffect(() => {
-    const id = searchParams.get('id')
-    // Apenas carrega da URL se ainda não carregamos este mesmo id
-    if (id && currentPotential?.id !== id) {
-      pb.collection('potenciais')
-        .getOne(id)
-        .then((quote) => handleQuoteSelected(quote as Potencial))
-        .catch(() => toast.error('Erro ao carregar a cotação a partir da URL.'))
+    const loadStatuses = () => {
+      pb.collection('status_potencial')
+        .getFullList<StatusPotencial>({ sort: 'created' })
+        .then(setStatuses)
+        .catch(console.error)
     }
-  }, [searchParams, currentPotential?.id])
 
-  useEffect(() => {
-    const loadLastOfferedPrices = async () => {
-      const itemIds = selectedItems.map((si) => si.id)
-      if (itemIds.length === 0 || !formData.cliente) {
-        setLastOfferedPrices({})
-        return
-      }
-      const result: Record<string, number> = {}
-      const chunkSize = 50
-      const currentPotId = currentPotential?.id || ''
-      const clienteEscaped = formData.cliente.replace(/"/g, '')
-      for (let i = 0; i < itemIds.length; i += chunkSize) {
-        const chunk = itemIds.slice(i, i + chunkSize)
-        const itemFilter = chunk.map((id) => `item_id="${id}"`).join(' || ')
-        let filter = `(${itemFilter}) && tipo="venda" && cliente="${clienteEscaped}"`
-        if (currentPotId) {
-          filter += ` && potencial_id!="${currentPotId}"`
+    useEffect(() => {
+      pb.collection('unidades_medida')
+        .getFullList<UnidadeMedida>()
+        .then(setUnidades)
+        .catch(console.error)
+      loadStatuses()
+    }, [])
+
+    const loadQuotationConditionsData = useCallback(
+      async (potId?: string) => {
+        const targetId = potId || currentPotential?.id
+        if (!targetId) {
+          setFornecedorCotacoes([])
+          setCotacoesItens([])
+          return
         }
         try {
-          const records = await pb.collection('historico_precos').getFullList({
-            filter,
-            sort: '-data_cotacao,-created',
-            fields: 'item_id,preco',
-          })
-          for (const r of records) {
-            if (!result[r.item_id]) {
-              result[r.item_id] = r.preco
-            }
-          }
+          const [cfs, cis] = await Promise.all([
+            pb.collection('cotacoes_fornecedor').getFullList({
+              filter: `potencial_id="${targetId}"`,
+              expand: 'fornecedor_id',
+              sort: 'created',
+            }),
+            pb.collection('cotacoes_itens').getFullList({
+              filter: `cotacao_fornecedor_id.potencial_id="${targetId}"`,
+              expand: 'cotacao_fornecedor_id,item_id',
+            }),
+          ])
+          setFornecedorCotacoes(cfs)
+          setCotacoesItens(cis)
         } catch (err) {
-          console.error('Failed to load last offered prices', err)
+          console.error('Erro ao carregar cotações para condições comerciais:', err)
+        }
+      },
+      [currentPotential?.id],
+    )
+
+    useEffect(() => {
+      loadQuotationConditionsData()
+    }, [loadQuotationConditionsData])
+
+    useRealtime('cotacoes_itens', () => {
+      loadQuotationConditionsData()
+    })
+    useRealtime('cotacoes_fornecedor', () => {
+      loadQuotationConditionsData()
+    })
+
+    useEffect(() => {
+      const id = searchParams.get('id')
+      // Apenas carrega da URL se ainda não carregamos este mesmo id
+      if (id && currentPotential?.id !== id) {
+        pb.collection('potenciais')
+          .getOne(id)
+          .then((quote) => handleQuoteSelected(quote as Potencial))
+          .catch(() => toast.error('Erro ao carregar a cotação a partir da URL.'))
+      }
+    }, [searchParams, currentPotential?.id])
+
+    useEffect(() => {
+      const loadLastOfferedPrices = async () => {
+        const itemIds = selectedItems.map((si) => si.id)
+        if (itemIds.length === 0 || !formData.cliente) {
+          setLastOfferedPrices({})
+          return
+        }
+        const result: Record<string, number> = {}
+        const chunkSize = 50
+        const currentPotId = currentPotential?.id || ''
+        const clienteEscaped = formData.cliente.replace(/"/g, '')
+        for (let i = 0; i < itemIds.length; i += chunkSize) {
+          const chunk = itemIds.slice(i, i + chunkSize)
+          const itemFilter = chunk.map((id) => `item_id="${id}"`).join(' || ')
+          let filter = `(${itemFilter}) && tipo="venda" && cliente="${clienteEscaped}"`
+          if (currentPotId) {
+            filter += ` && potencial_id!="${currentPotId}"`
+          }
+          try {
+            const records = await pb.collection('historico_precos').getFullList({
+              filter,
+              sort: '-data_cotacao,-created',
+              fields: 'item_id,preco',
+            })
+            for (const r of records) {
+              if (!result[r.item_id]) {
+                result[r.item_id] = r.preco
+              }
+            }
+          } catch (err) {
+            console.error('Failed to load last offered prices', err)
+          }
+        }
+        setLastOfferedPrices(result)
+      }
+      loadLastOfferedPrices()
+    }, [selectedItems, currentPotential, formData.cliente])
+
+    const handleToggleItem = (item: Item) => {
+      setSelectedItems((prev) => {
+        const idx = prev.findIndex((si) => si.id === item.id)
+        if (idx >= 0) {
+          return prev.filter((si) => si.id !== item.id)
+        } else {
+          const unidadeObj = unidades.find((u) => u.id === item.unidade_id)
+          const unidadeNome = unidadeObj ? unidadeObj.nome : item.unidade || 'Pcs'
+          const initialCost =
+            typeof item.preco_compra === 'number' && item.preco_compra > 0
+              ? item.preco_compra
+              : undefined
+          const initialSupplier = item.fornecedor_ultima_atualizacao || undefined
+
+          return [
+            ...prev,
+            {
+              id: item.id,
+              data: {
+                item,
+                quantidade: 1,
+                unidade_medida: unidadeNome,
+                preco_unitario: item.preco_venda !== undefined ? item.preco_venda : '',
+                observacoes: '',
+                ordem: prev.length + 1,
+                referencia_preco: initialCost,
+                referencia_fornecedor: initialSupplier,
+                referencia_data: initialCost ? new Date().toISOString() : undefined,
+              },
+            },
+          ]
+        }
+      })
+    }
+
+    const handleUpdateItem = (id: string, field: keyof SelectedItemData, value: string) => {
+      setSelectedItems((prev) =>
+        prev.map((si) => {
+          if (si.id === id) {
+            let parsedValue: any = value
+            if (field === 'quantidade' || field === 'preco_unitario') {
+              parsedValue = value === '' ? '' : Number(value)
+            }
+            return { ...si, data: { ...si.data, [field]: parsedValue } }
+          }
+          return si
+        }),
+      )
+    }
+
+    const handleRemoveItem = async (id: string) => {
+      const existing = selectedItems.find((si) => si.id === id)
+      setSelectedItems((prev) => prev.filter((si) => si.id !== id))
+
+      if (existing?.recordId) {
+        try {
+          await pb.collection('potencial_itens').delete(existing.recordId)
+        } catch (err) {
+          console.error('Failed to remove from DB', err)
         }
       }
-      setLastOfferedPrices(result)
     }
-    loadLastOfferedPrices()
-  }, [selectedItems, currentPotential, formData.cliente])
 
-  const handleToggleItem = (item: Item) => {
-    setSelectedItems((prev) => {
-      const idx = prev.findIndex((si) => si.id === item.id)
-      if (idx >= 0) {
-        return prev.filter((si) => si.id !== item.id)
-      } else {
-        const unidadeObj = unidades.find((u) => u.id === item.unidade_id)
-        const unidadeNome = unidadeObj ? unidadeObj.nome : item.unidade || 'Pcs'
+    const handleMoveUp = (index: number) => {
+      if (index === 0) return
+      setSelectedItems((prev) => {
+        const next = [...prev]
+        const temp = next[index - 1]
+        next[index - 1] = next[index]
+        next[index] = temp
+        return next
+      })
+    }
+
+    const handleMoveDown = (index: number) => {
+      if (index === selectedItems.length - 1) return
+      setSelectedItems((prev) => {
+        const next = [...prev]
+        const temp = next[index + 1]
+        next[index + 1] = next[index]
+        next[index] = temp
+        return next
+      })
+    }
+
+    // Validação para "Concluir Cotação": itens, quantidade, unidade, moeda,
+    // preço de venda e oferta selecionada por item. Pendências bloqueiam a
+    // conclusão, mas ainda permitem Salvar Rascunho.
+    const validarConcluirCotacao = (): string[] => {
+      const pendencias: string[] = []
+      if (selectedItems.length === 0) {
+        pendencias.push('Nenhum item adicionado à cotação.')
+      }
+      selectedItems.forEach((si, index) => {
+        const desc =
+          si.data.item?.descricao_curta ||
+          si.data.item?.descr_pt ||
+          si.data.item?.sku ||
+          `Item ${index + 1}`
+        if (!(Number(si.data.quantidade) > 0)) {
+          pendencias.push(`${desc}: quantidade deve ser maior que 0.`)
+        }
+        if (!si.data.unidade_medida) {
+          pendencias.push(`${desc}: unidade de medida não definida.`)
+        }
+        if (!(Number(si.data.preco_unitario) > 0)) {
+          pendencias.push(`${desc}: preço de venda deve ser maior que 0.`)
+        }
+        const ofertaVencedora = cotacoesItens.find((ci) => ci.item_id === si.id && ci.vencedor)
+        if (!ofertaVencedora) {
+          pendencias.push(`${desc}: nenhuma oferta de fabricante selecionada.`)
+        } else {
+          const cfOferta = fornecedorCotacoes.find(
+            (f) => f.id === ofertaVencedora.cotacao_fornecedor_id,
+          )
+          if (!(cfOferta?.oferta_moeda || '').trim()) {
+            pendencias.push(`${desc}: moeda da oferta não definida.`)
+          }
+        }
+      })
+      return pendencias
+    }
+
+    const handleSave = async (statusOverride: 'Incompleto' | 'Completo' | null = null) => {
+      if (!formData.numero_potencial) {
+        return toast.error('O número da cotação é obrigatório.')
+      }
+      if (statusOverride === 'Completo') {
+        const pendencias = validarConcluirCotacao()
+        if (pendencias.length > 0) {
+          setPendenciasConcluir(pendencias)
+          return
+        }
+      }
+
+      setIsSaving(true)
+      try {
+        // Prioridade absoluta: status escolhido pelo usuário no dropdown (formData.status).
+        // statusOverride ('Completo') só é aplicado se o usuário clicou expressamente em "Concluir Cotação"
+        // e não escolheu outro status no dropdown (ou seja, se estava o default ou se selecionou Completo).
+        let statusToSave = formData.status
+        if (statusOverride === 'Completo') {
+          // Se o usuário não definiu explicitamente um status diferente de Sem Itens / Rascunho / Completo,
+          // ou se o status atual era o inicial 'Sem Itens', 'Concluir Cotação' define como 'Completo'.
+          // Mas se o usuário escolheu outro status personalizado ou específico no dropdown, a escolha dele prevalece.
+          if (
+            !formData.status ||
+            formData.status === 'Sem Itens' ||
+            formData.status === 'Completo' ||
+            formData.status === 'Rascunho' ||
+            formData.status === 'Incompleto'
+          ) {
+            statusToSave = 'Completo'
+          }
+        } else if (!statusToSave) {
+          statusToSave = selectedItems.length === 0 ? 'Sem Itens' : 'Incompleto'
+        }
+
+        const itemsData = selectedItems
+          .filter((si) => Number(si.data.quantidade) > 0)
+          .map((si, index) => {
+            const vendaNumero = Number(si.data.preco_unitario) || 0
+            // Precisão escolhida na linha (2 ou 3), preservada ao salvar; padrão 2.
+            const decimais = si.data.precisao_preco === 3 ? 3 : 2
+            const ofertaVencedora = cotacoesItens.find((ci) => ci.item_id === si.id && ci.vencedor)
+            const cfOferta = ofertaVencedora
+              ? fornecedorCotacoes.find((f) => f.id === ofertaVencedora.cotacao_fornecedor_id)
+              : undefined
+            return {
+              item_id: si.id,
+              quantidade: Number(si.data.quantidade),
+              unidade_medida: si.data.unidade_medida,
+              preco_unitario: vendaNumero,
+              observacoes: si.data.observacoes,
+              ordem: index + 1,
+              referencia_preco: si.data.referencia_preco,
+              referencia_fornecedor: si.data.referencia_fornecedor,
+              referencia_data: si.data.referencia_data,
+              precisao_preco: decimais > 2 ? 3 : 2,
+              moeda_compra: cfOferta?.oferta_moeda || undefined,
+            }
+          })
+
+        const saved = await savePotencialFull(
+          currentPotential?.id || null,
+          { ...formData, status: statusToSave },
+          itemsData,
+        )
+
+        // Garantir que o objeto retornado reflete exatamente o status salvo
+        saved.status = statusToSave
+
+        setCurrentPotential(saved)
+        setFormData((prev) => ({
+          ...prev,
+          numero_potencial: saved.numero_potencial || prev.numero_potencial,
+          cliente: saved.cliente || prev.cliente,
+          nome_potencial: saved.nome_potencial || prev.nome_potencial,
+          nome_comprador: saved.nome_comprador || prev.nome_comprador,
+          proprietario: saved.proprietario || prev.proprietario,
+          estagio_id: saved.estagio_id || prev.estagio_id,
+          observacoes: saved.observacoes || prev.observacoes,
+          status: statusToSave,
+          incoterm_cliente: saved.incoterm_cliente || prev.incoterm_cliente,
+          condicao_pagamento_cliente:
+            saved.condicao_pagamento_cliente || prev.condicao_pagamento_cliente,
+          tempo_fabricacao_cliente: saved.tempo_fabricacao_cliente || prev.tempo_fabricacao_cliente,
+        }))
+
+        // Update snapshot of saved state immediately with the saved values
+        isSavedRef.current = true
+        initialSnapshotRef.current = buildSnapshot(
+          { ...formData, status: statusToSave },
+          selectedItems,
+        )
+
+        toast.success(`Cotação ${saved.numero_potencial} salva com sucesso!`, {
+          className: 'bg-green-500 text-white border-none',
+        })
+
+        // Atualiza URL se for novo potencial
+        if (!currentPotential) {
+          navigate(`/potenciais/adicionar?id=${saved.id}`, { replace: true })
+        }
+
+        // Recarrega itens persistidos mantendo o status salvo sem sobreposições
+        await handleQuoteSelected(saved, statusToSave)
+      } catch (error) {
+        toast.error('Erro ao salvar a cotação.')
+      } finally {
+        setIsSaving(false)
+      }
+    }
+
+    const executeDuplicate = async () => {
+      if (!currentPotential) return
+      setIsSaving(true)
+      try {
+        const newPotencial = await duplicatePotencial(currentPotential.id)
+        toast.success('Cotação duplicada com sucesso!')
+        navigate(`/potenciais/adicionar?id=${newPotencial.id}`, { replace: true })
+        handleQuoteSelected(newPotencial as unknown as Potencial)
+      } catch (err) {
+        toast.error('Erro ao duplicar cotação.')
+      } finally {
+        setIsSaving(false)
+      }
+    }
+
+    const handleDuplicate = () => {
+      if (!currentPotential) return
+      setShowDuplicateDialog(true)
+    }
+
+    const handleQuoteSelected = async (quote: Potencial, explicitStatus?: string) => {
+      const finalStatus = explicitStatus ?? (quote.status || 'Sem Itens')
+      const updatedQuote = { ...quote, status: finalStatus }
+      setCurrentPotential(updatedQuote)
+      const nextFormData = {
+        numero_potencial: quote.numero_potencial || '',
+        cliente: quote.cliente || '',
+        nome_potencial: quote.nome_potencial || '',
+        nome_comprador: quote.nome_comprador || '',
+        proprietario: quote.proprietario || '',
+        estagio_id: quote.estagio_id || '',
+        observacoes: quote.observacoes || '',
+        status: finalStatus,
+        incoterm_cliente: quote.incoterm_cliente || '',
+        condicao_pagamento_cliente: quote.condicao_pagamento_cliente || '',
+        tempo_fabricacao_cliente: quote.tempo_fabricacao_cliente || '',
+      }
+      setFormData(nextFormData)
+      setCondicoesManuais({
+        incoterm: !!quote.incoterm_cliente,
+        condicao_pagamento: !!quote.condicao_pagamento_cliente,
+        tempo_fabricacao: !!quote.tempo_fabricacao_cliente,
+      })
+      setIsSearchQuoteOpen(false)
+
+      try {
+        const items = await getPotencialItens(quote.id)
+        const formattedItems = items.map((pi) => {
+          const itemObj = pi.expand?.item_id || ({ id: pi.item_id } as any)
+          const fallbackUnidade = itemObj.unidade || 'Pcs'
+          return {
+            id: pi.item_id,
+            recordId: pi.id,
+            data: {
+              item: itemObj,
+              quantidade: pi.quantidade,
+              unidade_medida: pi.unidade_medida || fallbackUnidade,
+              preco_unitario: pi.preco_unitario !== undefined ? pi.preco_unitario : '',
+              observacoes: pi.observacoes || '',
+              ordem: pi.ordem || 0,
+              referencia_preco: pi.referencia_preco,
+              referencia_fornecedor: pi.referencia_fornecedor,
+              referencia_data: pi.referencia_data,
+              precisao_preco: pi.precisao_preco,
+            },
+          }
+        })
+
+        formattedItems.sort((a, b) => (a.data.ordem || 0) - (b.data.ordem || 0))
+        setSelectedItems(formattedItems)
+
+        // Set clean initial snapshot when loaded from search or URL or after save
+        initialSnapshotRef.current = buildSnapshot(nextFormData, formattedItems)
+        isSavedRef.current = false
+
+        if (!explicitStatus) {
+          toast.success('Cotação carregada com sucesso!')
+        }
+      } catch (error) {
+        toast.error('Erro ao carregar itens da cotação.')
+      }
+    }
+
+    useImperativeHandle(
+      ref,
+      () => ({
+        isDirty: () => isDirty(),
+        reloadQuotationConditions: async () => {
+          const targetPotencialId =
+            currentPotential?.id ||
+            searchParams.get('id') ||
+            searchParams.get('potencialId') ||
+            searchParams.get('potencial_id')
+          if (targetPotencialId) {
+            await loadQuotationConditionsData(targetPotencialId)
+          }
+        },
+        reloadItemsPrices: async () => {
+          const targetPotencialId =
+            currentPotential?.id ||
+            searchParams.get('id') ||
+            searchParams.get('potencialId') ||
+            searchParams.get('potencial_id')
+          if (!targetPotencialId) return
+          try {
+            const updatedItems = await pb.collection('potencial_itens').getFullList({
+              filter: `potencial_id="${targetPotencialId}"`,
+              expand: 'item_id,item_id.linha_id,item_id.acabamento_id',
+              sort: 'ordem',
+            })
+            const itemMapById = new Map<string, any>()
+            const itemMapByItemId = new Map<string, any>()
+            updatedItems.forEach((it) => {
+              itemMapById.set(it.id, it)
+              if (it.item_id) {
+                itemMapByItemId.set(it.item_id, it)
+              }
+            })
+            setSelectedItems((prev) => {
+              if (prev.length === 0 && updatedItems.length > 0) {
+                return updatedItems.map((pi) => {
+                  const itemObj = pi.expand?.item_id || ({ id: pi.item_id } as any)
+                  const fallbackUnidade = itemObj.unidade || 'Pcs'
+                  return {
+                    id: pi.item_id,
+                    recordId: pi.id,
+                    data: {
+                      item: itemObj,
+                      quantidade: pi.quantidade,
+                      unidade_medida: pi.unidade_medida || fallbackUnidade,
+                      preco_unitario: pi.preco_unitario !== undefined ? pi.preco_unitario : '',
+                      observacoes: pi.observacoes || '',
+                      ordem: pi.ordem || 0,
+                      referencia_preco: pi.referencia_preco,
+                      referencia_fornecedor: pi.referencia_fornecedor,
+                      referencia_data: pi.referencia_data,
+                    },
+                  }
+                })
+              }
+
+              return prev.map((si) => {
+                const it =
+                  (si.recordId && itemMapById.get(si.recordId)) || itemMapByItemId.get(si.id)
+                if (it) {
+                  return {
+                    ...si,
+                    recordId: it.id,
+                    data: {
+                      ...si.data,
+                      unidade_medida:
+                        si.data.unidade_medida ||
+                        it.unidade_medida ||
+                        si.data.item.unidade ||
+                        'Pcs',
+                      observacoes:
+                        si.data.observacoes !== undefined && si.data.observacoes !== ''
+                          ? si.data.observacoes
+                          : it.observacoes || '',
+                      quantidade: it.quantidade !== undefined ? it.quantidade : si.data.quantidade,
+                      preco_unitario:
+                        typeof it.preco_unitario === 'number'
+                          ? it.preco_unitario
+                          : si.data.preco_unitario,
+                      referencia_preco: it.referencia_preco,
+                      referencia_fornecedor: it.referencia_fornecedor,
+                      referencia_data: it.referencia_data,
+                      precisao_preco: it.precisao_preco,
+                    },
+                  }
+                }
+                return si
+              })
+            })
+          } catch (err) {
+            console.error('Failed to reload items prices', err)
+          }
+        },
+      }),
+      [currentPotential?.id, searchParams],
+    )
+
+    // Unsaved changes detection for beforeunload and navigation
+    const isDirty = () => {
+      // If snapshot has not been initialized yet, it is NEVER dirty
+      if (!initialSnapshotRef.current) return false
+
+      // If empty new quote with nothing filled, not dirty
+      const isEmptyNew =
+        !currentPotential &&
+        !formData.numero_potencial?.trim() &&
+        !formData.cliente?.trim() &&
+        !formData.nome_potencial?.trim() &&
+        !formData.nome_comprador?.trim() &&
+        !formData.proprietario?.trim() &&
+        !formData.estagio_id?.trim() &&
+        !formData.observacoes?.trim() &&
+        selectedItems.length === 0
+
+      if (isEmptyNew) return false
+
+      // Compare with snapshot using consistent builder
+      const currentSimplified = buildSnapshot(formData, selectedItems)
+
+      return currentSimplified !== initialSnapshotRef.current
+    }
+
+    // Ref to hold the latest isDirty status so beforeunload listener only triggers when genuinely dirty
+    const isDirtyRef = useRef(false)
+    useEffect(() => {
+      isDirtyRef.current = isDirty()
+    }, [formData, selectedItems, currentPotential])
+
+    useEffect(() => {
+      // O evento 'beforeunload' é acionado APENAS pelo navegador ao fechar/recarregar a aba do navegador.
+      // Navegações internas por rotas do React Router não passam por beforeunload,
+      // garantindo que NUNCA haja alerta nativo do navegador ao navegar entre telas no app.
+      const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+        if (isDirtyRef.current) {
+          e.preventDefault()
+          e.returnValue = ''
+          return ''
+        }
+      }
+      window.addEventListener('beforeunload', handleBeforeUnload)
+      return () => {
+        window.removeEventListener('beforeunload', handleBeforeUnload)
+      }
+    }, [])
+
+    const handleItemSaved = (newItem: Item) => {
+      setSelectedItems((prev) => {
+        const unidadeObj = unidades.find((u) => u.id === newItem.unidade_id)
+        const unidadeNome = unidadeObj ? unidadeObj.nome : newItem.unidade || 'Pcs'
         const initialCost =
-          typeof item.preco_compra === 'number' && item.preco_compra > 0
-            ? item.preco_compra
+          typeof newItem.preco_compra === 'number' && newItem.preco_compra > 0
+            ? newItem.preco_compra
             : undefined
-        const initialSupplier = item.fornecedor_ultima_atualizacao || undefined
+        const initialSupplier = newItem.fornecedor_ultima_atualizacao || undefined
 
         return [
           ...prev,
           {
-            id: item.id,
+            id: newItem.id,
             data: {
-              item,
+              item: newItem,
               quantidade: 1,
               unidade_medida: unidadeNome,
-              preco_unitario: item.preco_venda !== undefined ? item.preco_venda : '',
+              preco_unitario: newItem.preco_venda !== undefined ? newItem.preco_venda : '',
               observacoes: '',
               ordem: prev.length + 1,
               referencia_preco: initialCost,
               referencia_fornecedor: initialSupplier,
               referencia_data: initialCost ? new Date().toISOString() : undefined,
+              precisao_preco: 2,
             },
           },
         ]
-      }
-    })
-  }
-
-  const handleUpdateItem = (id: string, field: keyof SelectedItemData, value: string) => {
-    setSelectedItems((prev) =>
-      prev.map((si) => {
-        if (si.id === id) {
-          let parsedValue: any = value
-          if (field === 'quantidade' || field === 'preco_unitario') {
-            parsedValue = value === '' ? '' : Number(value)
-          }
-          return { ...si, data: { ...si.data, [field]: parsedValue } }
-        }
-        return si
-      }),
-    )
-  }
-
-  const handleRemoveItem = async (id: string) => {
-    const existing = selectedItems.find((si) => si.id === id)
-    setSelectedItems((prev) => prev.filter((si) => si.id !== id))
-
-    if (existing?.recordId) {
-      try {
-        await pb.collection('potencial_itens').delete(existing.recordId)
-      } catch (err) {
-        console.error('Failed to remove from DB', err)
-      }
-    }
-  }
-
-  const handleMoveUp = (index: number) => {
-    if (index === 0) return
-    setSelectedItems((prev) => {
-      const next = [...prev]
-      const temp = next[index - 1]
-      next[index - 1] = next[index]
-      next[index] = temp
-      return next
-    })
-  }
-
-  const handleMoveDown = (index: number) => {
-    if (index === selectedItems.length - 1) return
-    setSelectedItems((prev) => {
-      const next = [...prev]
-      const temp = next[index + 1]
-      next[index + 1] = next[index]
-      next[index] = temp
-      return next
-    })
-  }
-
-  // Validação para "Concluir Cotação": itens, quantidade, unidade, moeda,
-  // preço de venda e oferta selecionada por item. Pendências bloqueiam a
-  // conclusão, mas ainda permitem Salvar Rascunho.
-  const validarConcluirCotacao = (): string[] => {
-    const pendencias: string[] = []
-    if (selectedItems.length === 0) {
-      pendencias.push('Nenhum item adicionado à cotação.')
-    }
-    selectedItems.forEach((si, index) => {
-      const desc =
-        si.data.item?.descricao_curta ||
-        si.data.item?.descr_pt ||
-        si.data.item?.sku ||
-        `Item ${index + 1}`
-      if (!(Number(si.data.quantidade) > 0)) {
-        pendencias.push(`${desc}: quantidade deve ser maior que 0.`)
-      }
-      if (!si.data.unidade_medida) {
-        pendencias.push(`${desc}: unidade de medida não definida.`)
-      }
-      if (!(Number(si.data.preco_unitario) > 0)) {
-        pendencias.push(`${desc}: preço de venda deve ser maior que 0.`)
-      }
-      const ofertaVencedora = cotacoesItens.find((ci) => ci.item_id === si.id && ci.vencedor)
-      if (!ofertaVencedora) {
-        pendencias.push(`${desc}: nenhuma oferta de fabricante selecionada.`)
-      } else {
-        const cfOferta = fornecedorCotacoes.find(
-          (f) => f.id === ofertaVencedora.cotacao_fornecedor_id,
-        )
-        if (!(cfOferta?.oferta_moeda || '').trim()) {
-          pendencias.push(`${desc}: moeda da oferta não definida.`)
-        }
-      }
-    })
-    return pendencias
-  }
-
-  const handleSave = async (statusOverride: 'Incompleto' | 'Completo' | null = null) => {
-    if (!formData.numero_potencial) {
-      return toast.error('O número da cotação é obrigatório.')
-    }
-    if (statusOverride === 'Completo') {
-      const pendencias = validarConcluirCotacao()
-      if (pendencias.length > 0) {
-        setPendenciasConcluir(pendencias)
-        return
-      }
+      })
     }
 
-    setIsSaving(true)
-    try {
-      // Prioridade absoluta: status escolhido pelo usuário no dropdown (formData.status).
-      // statusOverride ('Completo') só é aplicado se o usuário clicou expressamente em "Concluir Cotação"
-      // e não escolheu outro status no dropdown (ou seja, se estava o default ou se selecionou Completo).
-      let statusToSave = formData.status
-      if (statusOverride === 'Completo') {
-        // Se o usuário não definiu explicitamente um status diferente de Sem Itens / Rascunho / Completo,
-        // ou se o status atual era o inicial 'Sem Itens', 'Concluir Cotação' define como 'Completo'.
-        // Mas se o usuário escolheu outro status personalizado ou específico no dropdown, a escolha dele prevalece.
-        if (
-          !formData.status ||
-          formData.status === 'Sem Itens' ||
-          formData.status === 'Completo' ||
-          formData.status === 'Rascunho' ||
-          formData.status === 'Incompleto'
-        ) {
-          statusToSave = 'Completo'
-        }
-      } else if (!statusToSave) {
-        statusToSave = selectedItems.length === 0 ? 'Sem Itens' : 'Incompleto'
-      }
+    // Selo/badge que apenas repetia o valor do select de Situação da Cotação
+    // (incl. "Completo") removido — o select já mostra o valor atual.
 
-      const itemsData = selectedItems
-        .filter((si) => Number(si.data.quantidade) > 0)
-        .map((si, index) => {
-          const vendaNumero = Number(si.data.preco_unitario) || 0
-          // Precisão escolhida na linha (2 ou 3), preservada ao salvar; padrão 2.
-          const decimais = si.data.precisao_preco === 3 ? 3 : 2
-          const ofertaVencedora = cotacoesItens.find((ci) => ci.item_id === si.id && ci.vencedor)
-          const cfOferta = ofertaVencedora
-            ? fornecedorCotacoes.find((f) => f.id === ofertaVencedora.cotacao_fornecedor_id)
-            : undefined
-          return {
-            item_id: si.id,
-            quantidade: Number(si.data.quantidade),
-            unidade_medida: si.data.unidade_medida,
-            preco_unitario: vendaNumero,
-            observacoes: si.data.observacoes,
-            ordem: index + 1,
-            referencia_preco: si.data.referencia_preco,
-            referencia_fornecedor: si.data.referencia_fornecedor,
-            referencia_data: si.data.referencia_data,
-            precisao_preco: decimais > 2 ? 3 : 2,
-            moeda_compra: cfOferta?.oferta_moeda || undefined,
-          }
-        })
-
-      const saved = await savePotencialFull(
-        currentPotential?.id || null,
-        { ...formData, status: statusToSave },
-        itemsData,
+    const calculateTotals = () => {
+      const totalSKUs = new Set(selectedItems.map((si) => si.id)).size
+      const totalQty = selectedItems.reduce((acc, si) => acc + (Number(si.data.quantidade) || 0), 0)
+      // Totais: somar as linhas (cada linha usa o unitário na sua própria precisão)
+      // e arredondar para 2 casas APÓS a soma.
+      const totalValue = roundToCents(
+        selectedItems.reduce((acc, si) => {
+          const qty = Number(si.data.quantidade) || 0
+          const precisaoLinha = si.data.precisao_preco === 3 ? 3 : 2
+          const unitLinha = Number((Number(si.data.preco_unitario) || 0).toFixed(precisaoLinha))
+          return acc + qty * unitLinha
+        }, 0),
       )
+      const totalCostRef = roundToCents(
+        selectedItems.reduce((acc, si) => {
+          const qty = Number(si.data.quantidade) || 0
+          const refPrice =
+            typeof si.data.referencia_preco === 'number' && !isNaN(si.data.referencia_preco)
+              ? si.data.referencia_preco
+              : 0
+          return acc + (refPrice > 0 ? qty * refPrice : 0)
+        }, 0),
+      )
+      // Margem efetiva aprovada: ganho / venda * 100 (nunca (venda-compra)/compra).
+      const profitValue = roundToCents(totalValue - totalCostRef)
+      const profitPercent = totalValue > 0 ? (profitValue / totalValue) * 100 : null
 
-      // Garantir que o objeto retornado reflete exatamente o status salvo
-      saved.status = statusToSave
+      return { totalSKUs, totalQty, totalValue, totalCostRef, profitValue, profitPercent }
+    }
 
-      setCurrentPotential(saved)
+    const { totalSKUs, totalQty, totalValue, totalCostRef, profitValue, profitPercent } =
+      calculateTotals()
+
+    // Painel superior recebe EXATAMENTE os mesmos números em memória da tabela:
+    // emitidos em um useEffect, reagindo a qualquer edição antes de salvar.
+    useEffect(() => {
+      onTotaisChange?.({
+        totalCompra: totalCostRef,
+        totalVenda: totalValue,
+        ganhoBruto: profitValue,
+        margemEfetiva: profitPercent,
+      })
+    }, [onTotaisChange, totalCostRef, totalValue, profitValue, profitPercent])
+
+    // Fornecedores efetivamente aceitos na Cotação de Fabricantes (somente com itens vencedores vigentes)
+    const fornecedoresAceitosComValor = useMemo(() => {
+      // Identificar fornecedores que têm itens vencedores vigentes para itens atualmente na cotação
+      const supplierWinningTotals = new Map<
+        string,
+        { cf: any; valorTotal: number; numItens: number }
+      >()
+
+      // Criar mapa de itens de potencial por item_id para pegar quantidades
+      const itemQtyMap = new Map<string, number>()
+      selectedItems.forEach((si) => {
+        itemQtyMap.set(si.id, Number(si.data.quantidade) || 0)
+      })
+
+      // Analisar cotacoesItens apenas dos itens vencedores vigentes da cotação atual
+      cotacoesItens.forEach((ci) => {
+        if (ci.vencedor && itemQtyMap.has(ci.item_id)) {
+          const cfId = ci.cotacao_fornecedor_id
+          const cf = fornecedorCotacoes.find((f) => f.id === cfId)
+          if (cf) {
+            const qty = itemQtyMap.get(ci.item_id) || 0
+            const preco =
+              typeof ci.preco_ofertado === 'number' ? ci.preco_ofertado : Number(ci.preco) || 0
+            const subtotal = qty * preco
+
+            const current = supplierWinningTotals.get(cf.id) || { cf, valorTotal: 0, numItens: 0 }
+            current.valorTotal += subtotal
+            current.numItens += 1
+            supplierWinningTotals.set(cf.id, current)
+          }
+        }
+      })
+
+      return Array.from(supplierWinningTotals.values())
+    }, [fornecedorCotacoes, cotacoesItens, selectedItems])
+
+    // Cálculo automático das condições comerciais para o cliente
+    const condicoesSugeridas = useMemo(() => {
+      if (fornecedoresAceitosComValor.length === 0) {
+        return {
+          incoterm: '',
+          condicao_pagamento: '',
+          tempo_fabricacao: '',
+        }
+      }
+
+      if (fornecedoresAceitosComValor.length === 1) {
+        const unico = fornecedoresAceitosComValor[0].cf
+        return {
+          incoterm: unico.incoterm || '',
+          condicao_pagamento: unico.condicao_pagamento || '',
+          tempo_fabricacao: unico.tempo_fabricacao || '',
+        }
+      }
+
+      // 2 ou mais fornecedores aceitos:
+      // 1. Incoterm do fornecedor com MAIOR pedido (maior valor total aceito)
+      const sortedByValor = [...fornecedoresAceitosComValor].sort(
+        (a, b) => b.valorTotal - a.valorTotal,
+      )
+      const fornecedorMaiorPedido = sortedByValor[0]?.cf
+      const incotermCalculado = fornecedorMaiorPedido?.incoterm || ''
+
+      // 2. Tempo de fabricação = MAIOR prazo entre os aceitos
+      // Extrai números de prazo (ex: "30 dias" -> 30) se possível, senão pega a string mais longa ou maior número
+      let maiorPrazoTexto = ''
+      let maiorPrazoNumero = -1
+      fornecedoresAceitosComValor.forEach(({ cf }) => {
+        const tf = (cf.tempo_fabricacao || '').trim()
+        if (!tf) return
+        const matches = tf.match(/\d+/)
+        const num = matches ? parseInt(matches[0], 10) : 0
+        if (num > maiorPrazoNumero) {
+          maiorPrazoNumero = num
+          maiorPrazoTexto = tf
+        } else if (maiorPrazoNumero <= 0 && tf.length > maiorPrazoTexto.length) {
+          maiorPrazoTexto = tf
+        }
+      })
+
+      return {
+        incoterm: incotermCalculado,
+        condicao_pagamento: '', // Condição própria para o cliente quando 2+ fornecedores
+        tempo_fabricacao: maiorPrazoTexto,
+      }
+    }, [fornecedoresAceitosComValor])
+
+    // Auto-preenchimento ou atualização automática das condições para o cliente quando não editado manualmente
+    useEffect(() => {
+      if (fornecedoresAceitosComValor.length === 0) return
+
+      setFormData((prev) => {
+        let changed = false
+        const updated = { ...prev }
+
+        // Se incoterm não foi editado manualmente pelo usuário, atualizar para a sugestão atual
+        if (
+          !condicoesManuais.incoterm &&
+          condicoesSugeridas.incoterm &&
+          prev.incoterm_cliente !== condicoesSugeridas.incoterm
+        ) {
+          updated.incoterm_cliente = condicoesSugeridas.incoterm
+          changed = true
+        }
+        if (
+          !condicoesManuais.condicao_pagamento &&
+          condicoesSugeridas.condicao_pagamento &&
+          prev.condicao_pagamento_cliente !== condicoesSugeridas.condicao_pagamento
+        ) {
+          updated.condicao_pagamento_cliente = condicoesSugeridas.condicao_pagamento
+          changed = true
+        }
+        if (
+          !condicoesManuais.tempo_fabricacao &&
+          condicoesSugeridas.tempo_fabricacao &&
+          prev.tempo_fabricacao_cliente !== condicoesSugeridas.tempo_fabricacao
+        ) {
+          updated.tempo_fabricacao_cliente = condicoesSugeridas.tempo_fabricacao
+          changed = true
+        }
+
+        return changed ? updated : prev
+      })
+    }, [condicoesSugeridas, fornecedoresAceitosComValor, condicoesManuais])
+
+    const handleRecalcularCondicoes = () => {
       setFormData((prev) => ({
         ...prev,
-        numero_potencial: saved.numero_potencial || prev.numero_potencial,
-        cliente: saved.cliente || prev.cliente,
-        nome_potencial: saved.nome_potencial || prev.nome_potencial,
-        nome_comprador: saved.nome_comprador || prev.nome_comprador,
-        proprietario: saved.proprietario || prev.proprietario,
-        estagio_id: saved.estagio_id || prev.estagio_id,
-        observacoes: saved.observacoes || prev.observacoes,
-        status: statusToSave,
-        incoterm_cliente: saved.incoterm_cliente || prev.incoterm_cliente,
+        incoterm_cliente: condicoesSugeridas.incoterm || prev.incoterm_cliente,
         condicao_pagamento_cliente:
-          saved.condicao_pagamento_cliente || prev.condicao_pagamento_cliente,
-        tempo_fabricacao_cliente: saved.tempo_fabricacao_cliente || prev.tempo_fabricacao_cliente,
+          fornecedoresAceitosComValor.length === 1
+            ? condicoesSugeridas.condicao_pagamento || prev.condicao_pagamento_cliente
+            : prev.condicao_pagamento_cliente,
+        tempo_fabricacao_cliente:
+          condicoesSugeridas.tempo_fabricacao || prev.tempo_fabricacao_cliente,
       }))
-
-      // Update snapshot of saved state immediately with the saved values
-      isSavedRef.current = true
-      initialSnapshotRef.current = buildSnapshot(
-        { ...formData, status: statusToSave },
-        selectedItems,
-      )
-
-      toast.success(`Cotação ${saved.numero_potencial} salva com sucesso!`, {
-        className: 'bg-green-500 text-white border-none',
+      setCondicoesManuais({
+        incoterm: false,
+        condicao_pagamento: false,
+        tempo_fabricacao: false,
       })
-
-      // Atualiza URL se for novo potencial
-      if (!currentPotential) {
-        navigate(`/potenciais/adicionar?id=${saved.id}`, { replace: true })
-      }
-
-      // Recarrega itens persistidos mantendo o status salvo sem sobreposições
-      await handleQuoteSelected(saved, statusToSave)
-    } catch (error) {
-      toast.error('Erro ao salvar a cotação.')
-    } finally {
-      setIsSaving(false)
+      toast.success('Condições comerciais recalculadas a partir dos fornecedores aceitos!')
     }
-  }
 
-  const executeDuplicate = async () => {
-    if (!currentPotential) return
-    setIsSaving(true)
-    try {
-      const newPotencial = await duplicatePotencial(currentPotential.id)
-      toast.success('Cotação duplicada com sucesso!')
-      navigate(`/potenciais/adicionar?id=${newPotencial.id}`, { replace: true })
-      handleQuoteSelected(newPotencial as unknown as Potencial)
-    } catch (err) {
-      toast.error('Erro ao duplicar cotação.')
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const handleDuplicate = () => {
-    if (!currentPotential) return
-    setShowDuplicateDialog(true)
-  }
-
-  const handleQuoteSelected = async (quote: Potencial, explicitStatus?: string) => {
-    const finalStatus = explicitStatus ?? (quote.status || 'Sem Itens')
-    const updatedQuote = { ...quote, status: finalStatus }
-    setCurrentPotential(updatedQuote)
-    const nextFormData = {
-      numero_potencial: quote.numero_potencial || '',
-      cliente: quote.cliente || '',
-      nome_potencial: quote.nome_potencial || '',
-      nome_comprador: quote.nome_comprador || '',
-      proprietario: quote.proprietario || '',
-      estagio_id: quote.estagio_id || '',
-      observacoes: quote.observacoes || '',
-      status: finalStatus,
-      incoterm_cliente: quote.incoterm_cliente || '',
-      condicao_pagamento_cliente: quote.condicao_pagamento_cliente || '',
-      tempo_fabricacao_cliente: quote.tempo_fabricacao_cliente || '',
-    }
-    setFormData(nextFormData)
-    setCondicoesManuais({
-      incoterm: !!quote.incoterm_cliente,
-      condicao_pagamento: !!quote.condicao_pagamento_cliente,
-      tempo_fabricacao: !!quote.tempo_fabricacao_cliente,
-    })
-    setIsSearchQuoteOpen(false)
-
-    try {
-      const items = await getPotencialItens(quote.id)
-      const formattedItems = items.map((pi) => {
-        const itemObj = pi.expand?.item_id || ({ id: pi.item_id } as any)
-        const fallbackUnidade = itemObj.unidade || 'Pcs'
-        return {
-          id: pi.item_id,
-          recordId: pi.id,
-          data: {
-            item: itemObj,
-            quantidade: pi.quantidade,
-            unidade_medida: pi.unidade_medida || fallbackUnidade,
-            preco_unitario: pi.preco_unitario !== undefined ? pi.preco_unitario : '',
-            observacoes: pi.observacoes || '',
-            ordem: pi.ordem || 0,
-            referencia_preco: pi.referencia_preco,
-            referencia_fornecedor: pi.referencia_fornecedor,
-            referencia_data: pi.referencia_data,
-            precisao_preco: pi.precisao_preco,
-          },
-        }
-      })
-
-      formattedItems.sort((a, b) => (a.data.ordem || 0) - (b.data.ordem || 0))
-      setSelectedItems(formattedItems)
-
-      // Set clean initial snapshot when loaded from search or URL or after save
-      initialSnapshotRef.current = buildSnapshot(nextFormData, formattedItems)
-      isSavedRef.current = false
-
-      if (!explicitStatus) {
-        toast.success('Cotação carregada com sucesso!')
-      }
-    } catch (error) {
-      toast.error('Erro ao carregar itens da cotação.')
-    }
-  }
-
-  useImperativeHandle(
-    ref,
-    () => ({
-      isDirty: () => isDirty(),
-      reloadQuotationConditions: async () => {
-        const targetPotencialId =
-          currentPotential?.id ||
-          searchParams.get('id') ||
-          searchParams.get('potencialId') ||
-          searchParams.get('potencial_id')
-        if (targetPotencialId) {
-          await loadQuotationConditionsData(targetPotencialId)
-        }
-      },
-      reloadItemsPrices: async () => {
-        const targetPotencialId =
-          currentPotential?.id ||
-          searchParams.get('id') ||
-          searchParams.get('potencialId') ||
-          searchParams.get('potencial_id')
-        if (!targetPotencialId) return
+    // Se as condições mudarem automaticamente sem interação do usuário (ex: cálculo ao carregar tanto para cotação nova quanto existente),
+    // e o formulário ainda estiver com o snapshot original, sincronizar o snapshot inicial
+    // para NÃO marcar dirty falsamente logo ao carregar a página sem edição explícita do usuário
+    useEffect(() => {
+      if (initialSnapshotRef.current) {
         try {
-          const updatedItems = await pb.collection('potencial_itens').getFullList({
-            filter: `potencial_id="${targetPotencialId}"`,
-            expand: 'item_id,item_id.linha_id,item_id.acabamento_id',
-            sort: 'ordem',
-          })
-          const itemMapById = new Map<string, any>()
-          const itemMapByItemId = new Map<string, any>()
-          updatedItems.forEach((it) => {
-            itemMapById.set(it.id, it)
-            if (it.item_id) {
-              itemMapByItemId.set(it.item_id, it)
-            }
-          })
-          setSelectedItems((prev) => {
-            if (prev.length === 0 && updatedItems.length > 0) {
-              return updatedItems.map((pi) => {
-                const itemObj = pi.expand?.item_id || ({ id: pi.item_id } as any)
-                const fallbackUnidade = itemObj.unidade || 'Pcs'
-                return {
-                  id: pi.item_id,
-                  recordId: pi.id,
-                  data: {
-                    item: itemObj,
-                    quantidade: pi.quantidade,
-                    unidade_medida: pi.unidade_medida || fallbackUnidade,
-                    preco_unitario: pi.preco_unitario !== undefined ? pi.preco_unitario : '',
-                    observacoes: pi.observacoes || '',
-                    ordem: pi.ordem || 0,
-                    referencia_preco: pi.referencia_preco,
-                    referencia_fornecedor: pi.referencia_fornecedor,
-                    referencia_data: pi.referencia_data,
-                  },
-                }
-              })
-            }
+          const parsedInitial = JSON.parse(initialSnapshotRef.current)
+          const parsedCurrent = JSON.parse(buildSnapshot(formData, selectedItems))
 
-            return prev.map((si) => {
-              const it = (si.recordId && itemMapById.get(si.recordId)) || itemMapByItemId.get(si.id)
-              if (it) {
-                return {
-                  ...si,
-                  recordId: it.id,
-                  data: {
-                    ...si.data,
-                    unidade_medida:
-                      si.data.unidade_medida || it.unidade_medida || si.data.item.unidade || 'Pcs',
-                    observacoes:
-                      si.data.observacoes !== undefined && si.data.observacoes !== ''
-                        ? si.data.observacoes
-                        : it.observacoes || '',
-                    quantidade: it.quantidade !== undefined ? it.quantidade : si.data.quantidade,
-                    preco_unitario:
-                      typeof it.preco_unitario === 'number'
-                        ? it.preco_unitario
-                        : si.data.preco_unitario,
-                    referencia_preco: it.referencia_preco,
-                    referencia_fornecedor: it.referencia_fornecedor,
-                    referencia_data: it.referencia_data,
-                    precisao_preco: it.precisao_preco,
-                  },
-                }
-              }
-              return si
-            })
-          })
-        } catch (err) {
-          console.error('Failed to reload items prices', err)
-        }
-      },
-    }),
-    [currentPotential?.id, searchParams],
-  )
+          // Se as únicas diferenças forem as condições sugeridas automáticas:
+          const diffKeys = Object.keys(parsedCurrent.formData).filter(
+            (k) => (parsedCurrent.formData as any)[k] !== (parsedInitial.formData as any)[k],
+          )
+          const conditionKeys = [
+            'incoterm_cliente',
+            'condicao_pagamento_cliente',
+            'tempo_fabricacao_cliente',
+          ]
+          const onlyConditionDiffs =
+            diffKeys.length > 0 && diffKeys.every((k) => conditionKeys.includes(k))
 
-  // Unsaved changes detection for beforeunload and navigation
-  const isDirty = () => {
-    // If snapshot has not been initialized yet, it is NEVER dirty
-    if (!initialSnapshotRef.current) return false
-
-    // If empty new quote with nothing filled, not dirty
-    const isEmptyNew =
-      !currentPotential &&
-      !formData.numero_potencial?.trim() &&
-      !formData.cliente?.trim() &&
-      !formData.nome_potencial?.trim() &&
-      !formData.nome_comprador?.trim() &&
-      !formData.proprietario?.trim() &&
-      !formData.estagio_id?.trim() &&
-      !formData.observacoes?.trim() &&
-      selectedItems.length === 0
-
-    if (isEmptyNew) return false
-
-    // Compare with snapshot using consistent builder
-    const currentSimplified = buildSnapshot(formData, selectedItems)
-
-    return currentSimplified !== initialSnapshotRef.current
-  }
-
-  // Ref to hold the latest isDirty status so beforeunload listener only triggers when genuinely dirty
-  const isDirtyRef = useRef(false)
-  useEffect(() => {
-    isDirtyRef.current = isDirty()
-  }, [formData, selectedItems, currentPotential])
-
-  useEffect(() => {
-    // O evento 'beforeunload' é acionado APENAS pelo navegador ao fechar/recarregar a aba do navegador.
-    // Navegações internas por rotas do React Router não passam por beforeunload,
-    // garantindo que NUNCA haja alerta nativo do navegador ao navegar entre telas no app.
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isDirtyRef.current) {
-        e.preventDefault()
-        e.returnValue = ''
-        return ''
-      }
-    }
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload)
-    }
-  }, [])
-
-  const handleItemSaved = (newItem: Item) => {
-    setSelectedItems((prev) => {
-      const unidadeObj = unidades.find((u) => u.id === newItem.unidade_id)
-      const unidadeNome = unidadeObj ? unidadeObj.nome : newItem.unidade || 'Pcs'
-      const initialCost =
-        typeof newItem.preco_compra === 'number' && newItem.preco_compra > 0
-          ? newItem.preco_compra
-          : undefined
-      const initialSupplier = newItem.fornecedor_ultima_atualizacao || undefined
-
-      return [
-        ...prev,
-        {
-          id: newItem.id,
-          data: {
-            item: newItem,
-            quantidade: 1,
-            unidade_medida: unidadeNome,
-            preco_unitario: newItem.preco_venda !== undefined ? newItem.preco_venda : '',
-            observacoes: '',
-            ordem: prev.length + 1,
-            referencia_preco: initialCost,
-            referencia_fornecedor: initialSupplier,
-            referencia_data: initialCost ? new Date().toISOString() : undefined,
-            precisao_preco: 2,
-          },
-        },
-      ]
-    })
-  }
-
-  const getStatusBadge = () => {
-    const statusName = formData.status || 'Sem Itens'
-
-    const dynamicStatus = statuses.find((s) => s.nome.toLowerCase() === statusName.toLowerCase())
-    if (dynamicStatus && dynamicStatus.cor_hex) {
-      return (
-        <Badge
-          style={{
-            backgroundColor: dynamicStatus.cor_hex,
-            color: getContrastColor(dynamicStatus.cor_hex),
-          }}
-          className="border-0 font-normal rounded-full px-2 h-5 text-[10px] shadow-none whitespace-nowrap"
-        >
-          {statusName}
-        </Badge>
-      )
-    }
-
-    const lowered = statusName.toLowerCase()
-    if (lowered === 'completo') {
-      return (
-        <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-emerald-200 font-normal rounded-full px-2 h-5 text-[10px]">
-          Completo
-        </Badge>
-      )
-    }
-    if (lowered === 'sem itens') {
-      return (
-        <Badge
-          variant="secondary"
-          className="border-0 font-normal rounded-full px-2 h-5 text-[10px]"
-        >
-          Sem Itens
-        </Badge>
-      )
-    }
-    if (lowered === 'incompleto') {
-      return (
-        <Badge className="bg-amber-50 text-amber-700 hover:bg-amber-50 border-amber-200 font-normal rounded-full px-2 h-5 text-[10px]">
-          Incompleto
-        </Badge>
-      )
-    }
-    return (
-      <Badge variant="secondary" className="border-0 font-normal rounded-full px-2 h-5 text-[10px]">
-        {statusName}
-      </Badge>
-    )
-  }
-
-  const calculateTotals = () => {
-    const totalSKUs = new Set(selectedItems.map((si) => si.id)).size
-    const totalQty = selectedItems.reduce((acc, si) => acc + (Number(si.data.quantidade) || 0), 0)
-    // Totais: somar as linhas (cada linha usa o unitário na sua própria precisão)
-    // e arredondar para 2 casas APÓS a soma.
-    const totalValue = roundToCents(
-      selectedItems.reduce((acc, si) => {
-        const qty = Number(si.data.quantidade) || 0
-        const precisaoLinha = si.data.precisao_preco === 3 ? 3 : 2
-        const unitLinha = Number((Number(si.data.preco_unitario) || 0).toFixed(precisaoLinha))
-        return acc + qty * unitLinha
-      }, 0),
-    )
-    const totalCostRef = roundToCents(
-      selectedItems.reduce((acc, si) => {
-        const qty = Number(si.data.quantidade) || 0
-        const refPrice =
-          typeof si.data.referencia_preco === 'number' && !isNaN(si.data.referencia_preco)
-            ? si.data.referencia_preco
-            : 0
-        return acc + (refPrice > 0 ? qty * refPrice : 0)
-      }, 0),
-    )
-    // Margem efetiva aprovada: ganho / venda * 100 (nunca (venda-compra)/compra).
-    const profitValue = roundToCents(totalValue - totalCostRef)
-    const profitPercent = totalValue > 0 ? (profitValue / totalValue) * 100 : null
-
-    return { totalSKUs, totalQty, totalValue, totalCostRef, profitValue, profitPercent }
-  }
-
-  const { totalSKUs, totalQty, totalValue, totalCostRef, profitValue, profitPercent } =
-    calculateTotals()
-
-  // Fornecedores efetivamente aceitos na Cotação de Fabricantes (somente com itens vencedores vigentes)
-  const fornecedoresAceitosComValor = useMemo(() => {
-    // Identificar fornecedores que têm itens vencedores vigentes para itens atualmente na cotação
-    const supplierWinningTotals = new Map<
-      string,
-      { cf: any; valorTotal: number; numItens: number }
-    >()
-
-    // Criar mapa de itens de potencial por item_id para pegar quantidades
-    const itemQtyMap = new Map<string, number>()
-    selectedItems.forEach((si) => {
-      itemQtyMap.set(si.id, Number(si.data.quantidade) || 0)
-    })
-
-    // Analisar cotacoesItens apenas dos itens vencedores vigentes da cotação atual
-    cotacoesItens.forEach((ci) => {
-      if (ci.vencedor && itemQtyMap.has(ci.item_id)) {
-        const cfId = ci.cotacao_fornecedor_id
-        const cf = fornecedorCotacoes.find((f) => f.id === cfId)
-        if (cf) {
-          const qty = itemQtyMap.get(ci.item_id) || 0
-          const preco =
-            typeof ci.preco_ofertado === 'number' ? ci.preco_ofertado : Number(ci.preco) || 0
-          const subtotal = qty * preco
-
-          const current = supplierWinningTotals.get(cf.id) || { cf, valorTotal: 0, numItens: 0 }
-          current.valorTotal += subtotal
-          current.numItens += 1
-          supplierWinningTotals.set(cf.id, current)
+          if (
+            onlyConditionDiffs &&
+            !condicoesManuais.incoterm &&
+            !condicoesManuais.condicao_pagamento &&
+            !condicoesManuais.tempo_fabricacao
+          ) {
+            initialSnapshotRef.current = buildSnapshot(formData, selectedItems)
+          }
+        } catch (e) {
+          // ignore json parse error
         }
       }
-    })
-
-    return Array.from(supplierWinningTotals.values())
-  }, [fornecedorCotacoes, cotacoesItens, selectedItems])
-
-  // Cálculo automático das condições comerciais para o cliente
-  const condicoesSugeridas = useMemo(() => {
-    if (fornecedoresAceitosComValor.length === 0) {
-      return {
-        incoterm: '',
-        condicao_pagamento: '',
-        tempo_fabricacao: '',
-      }
-    }
-
-    if (fornecedoresAceitosComValor.length === 1) {
-      const unico = fornecedoresAceitosComValor[0].cf
-      return {
-        incoterm: unico.incoterm || '',
-        condicao_pagamento: unico.condicao_pagamento || '',
-        tempo_fabricacao: unico.tempo_fabricacao || '',
-      }
-    }
-
-    // 2 ou mais fornecedores aceitos:
-    // 1. Incoterm do fornecedor com MAIOR pedido (maior valor total aceito)
-    const sortedByValor = [...fornecedoresAceitosComValor].sort(
-      (a, b) => b.valorTotal - a.valorTotal,
-    )
-    const fornecedorMaiorPedido = sortedByValor[0]?.cf
-    const incotermCalculado = fornecedorMaiorPedido?.incoterm || ''
-
-    // 2. Tempo de fabricação = MAIOR prazo entre os aceitos
-    // Extrai números de prazo (ex: "30 dias" -> 30) se possível, senão pega a string mais longa ou maior número
-    let maiorPrazoTexto = ''
-    let maiorPrazoNumero = -1
-    fornecedoresAceitosComValor.forEach(({ cf }) => {
-      const tf = (cf.tempo_fabricacao || '').trim()
-      if (!tf) return
-      const matches = tf.match(/\d+/)
-      const num = matches ? parseInt(matches[0], 10) : 0
-      if (num > maiorPrazoNumero) {
-        maiorPrazoNumero = num
-        maiorPrazoTexto = tf
-      } else if (maiorPrazoNumero <= 0 && tf.length > maiorPrazoTexto.length) {
-        maiorPrazoTexto = tf
-      }
-    })
-
-    return {
-      incoterm: incotermCalculado,
-      condicao_pagamento: '', // Condição própria para o cliente quando 2+ fornecedores
-      tempo_fabricacao: maiorPrazoTexto,
-    }
-  }, [fornecedoresAceitosComValor])
-
-  // Auto-preenchimento ou atualização automática das condições para o cliente quando não editado manualmente
-  useEffect(() => {
-    if (fornecedoresAceitosComValor.length === 0) return
-
-    setFormData((prev) => {
-      let changed = false
-      const updated = { ...prev }
-
-      // Se incoterm não foi editado manualmente pelo usuário, atualizar para a sugestão atual
-      if (
-        !condicoesManuais.incoterm &&
-        condicoesSugeridas.incoterm &&
-        prev.incoterm_cliente !== condicoesSugeridas.incoterm
-      ) {
-        updated.incoterm_cliente = condicoesSugeridas.incoterm
-        changed = true
-      }
-      if (
-        !condicoesManuais.condicao_pagamento &&
-        condicoesSugeridas.condicao_pagamento &&
-        prev.condicao_pagamento_cliente !== condicoesSugeridas.condicao_pagamento
-      ) {
-        updated.condicao_pagamento_cliente = condicoesSugeridas.condicao_pagamento
-        changed = true
-      }
-      if (
-        !condicoesManuais.tempo_fabricacao &&
-        condicoesSugeridas.tempo_fabricacao &&
-        prev.tempo_fabricacao_cliente !== condicoesSugeridas.tempo_fabricacao
-      ) {
-        updated.tempo_fabricacao_cliente = condicoesSugeridas.tempo_fabricacao
-        changed = true
-      }
-
-      return changed ? updated : prev
-    })
-  }, [condicoesSugeridas, fornecedoresAceitosComValor, condicoesManuais])
-
-  const handleRecalcularCondicoes = () => {
-    setFormData((prev) => ({
-      ...prev,
-      incoterm_cliente: condicoesSugeridas.incoterm || prev.incoterm_cliente,
-      condicao_pagamento_cliente:
-        fornecedoresAceitosComValor.length === 1
-          ? condicoesSugeridas.condicao_pagamento || prev.condicao_pagamento_cliente
-          : prev.condicao_pagamento_cliente,
-      tempo_fabricacao_cliente:
-        condicoesSugeridas.tempo_fabricacao || prev.tempo_fabricacao_cliente,
-    }))
-    setCondicoesManuais({
-      incoterm: false,
-      condicao_pagamento: false,
-      tempo_fabricacao: false,
-    })
-    toast.success('Condições comerciais recalculadas a partir dos fornecedores aceitos!')
-  }
-
-  // Se as condições mudarem automaticamente sem interação do usuário (ex: cálculo ao carregar tanto para cotação nova quanto existente),
-  // e o formulário ainda estiver com o snapshot original, sincronizar o snapshot inicial
-  // para NÃO marcar dirty falsamente logo ao carregar a página sem edição explícita do usuário
-  useEffect(() => {
-    if (initialSnapshotRef.current) {
-      try {
-        const parsedInitial = JSON.parse(initialSnapshotRef.current)
-        const parsedCurrent = JSON.parse(buildSnapshot(formData, selectedItems))
-
-        // Se as únicas diferenças forem as condições sugeridas automáticas:
-        const diffKeys = Object.keys(parsedCurrent.formData).filter(
-          (k) => (parsedCurrent.formData as any)[k] !== (parsedInitial.formData as any)[k],
-        )
-        const conditionKeys = [
-          'incoterm_cliente',
-          'condicao_pagamento_cliente',
-          'tempo_fabricacao_cliente',
-        ]
-        const onlyConditionDiffs =
-          diffKeys.length > 0 && diffKeys.every((k) => conditionKeys.includes(k))
-
-        if (
-          onlyConditionDiffs &&
-          !condicoesManuais.incoterm &&
-          !condicoesManuais.condicao_pagamento &&
-          !condicoesManuais.tempo_fabricacao
-        ) {
-          initialSnapshotRef.current = buildSnapshot(formData, selectedItems)
-        }
-      } catch (e) {
-        // ignore json parse error
-      }
-    }
-  }, [
-    formData.incoterm_cliente,
-    formData.condicao_pagamento_cliente,
-    formData.tempo_fabricacao_cliente,
-    condicoesManuais,
-  ])
-  if (isSelecting) {
-    return (
-      <div className="h-[calc(100vh-4rem)] flex flex-col p-4 md:p-6 max-w-[1600px] mx-auto w-full bg-slate-50/50">
-        <div className="flex items-center justify-between mb-4 shrink-0 bg-white p-3 rounded-lg border shadow-sm">
-          <div className="flex items-center gap-3">
+    }, [
+      formData.incoterm_cliente,
+      formData.condicao_pagamento_cliente,
+      formData.tempo_fabricacao_cliente,
+      condicoesManuais,
+    ])
+    if (isSelecting) {
+      return (
+        <div className="h-[calc(100vh-4rem)] flex flex-col p-4 md:p-6 max-w-[1600px] mx-auto w-full bg-slate-50/50">
+          <div className="flex items-center justify-between mb-4 shrink-0 bg-white p-3 rounded-lg border shadow-sm">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setIsSelecting(false)}
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <div>
+                <h1 className="text-lg font-bold tracking-tight">Catálogo de Produtos</h1>
+                <p className="text-xs text-muted-foreground">
+                  Selecione os itens para a cotação {formData.numero_potencial || 'Nova Cotação'}
+                </p>
+              </div>
+            </div>
             <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
+              size="sm"
+              className="rounded-full h-8 px-4"
               onClick={() => setIsSelecting(false)}
             >
-              <ArrowLeft className="h-4 w-4" />
+              Concluir ({selectedItems.length})
             </Button>
-            <div>
-              <h1 className="text-lg font-bold tracking-tight">Catálogo de Produtos</h1>
-              <p className="text-xs text-muted-foreground">
-                Selecione os itens para a cotação {formData.numero_potencial || 'Nova Cotação'}
-              </p>
-            </div>
           </div>
-          <Button size="sm" className="rounded-full h-8 px-4" onClick={() => setIsSelecting(false)}>
-            Concluir ({selectedItems.length})
-          </Button>
-        </div>
-        <div className="flex-1 min-h-0">
-          <ProductCatalog
-            selectedItems={selectedItems}
-            onToggle={handleToggleItem}
-            onUpdateItem={handleUpdateItem}
-            onAddNew={() => {
-              setItemToEdit(undefined)
-              setIsItemModalOpen(true)
-            }}
-            onDuplicate={(item) => {
-              setItemToEdit(item)
-              setIsItemModalOpen(true)
-            }}
+          <div className="flex-1 min-h-0">
+            <ProductCatalog
+              selectedItems={selectedItems}
+              onToggle={handleToggleItem}
+              onUpdateItem={handleUpdateItem}
+              onAddNew={() => {
+                setItemToEdit(undefined)
+                setIsItemModalOpen(true)
+              }}
+              onDuplicate={(item) => {
+                setItemToEdit(item)
+                setIsItemModalOpen(true)
+              }}
+            />
+          </div>
+          <QuickItemModal
+            open={isItemModalOpen}
+            onOpenChange={setIsItemModalOpen}
+            initialData={itemToEdit}
+            onSaved={handleItemSaved}
           />
         </div>
-        <QuickItemModal
-          open={isItemModalOpen}
-          onOpenChange={setIsItemModalOpen}
-          initialData={itemToEdit}
-          onSaved={handleItemSaved}
-        />
-      </div>
-    )
-  }
+      )
+    }
 
-  return (
-    <div className="flex flex-col p-4 md:p-6 max-w-[1600px] mx-auto w-full min-h-[calc(100vh-4rem)] space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 px-3 text-xs gap-1.5 font-medium shadow-xs"
-            onClick={() => {
-              if (isDirty()) {
-                setShowUnsavedDialog(true)
-                return
-              }
-              navigate('/potenciais')
-            }}
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Voltar
-          </Button>
-          <h1 className="text-xl font-bold tracking-tight">
-            {currentPotential
-              ? `Cotação: ${currentPotential.cliente || 'Desconhecido'}`
-              : 'Nova Cotação'}
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          {currentPotential && (
+    return (
+      <div className="flex flex-col p-4 md:p-6 max-w-[1600px] mx-auto w-full min-h-[calc(100vh-4rem)] space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 px-3 text-xs gap-1.5 font-medium shadow-xs"
+              onClick={() => {
+                if (isDirty()) {
+                  setShowUnsavedDialog(true)
+                  return
+                }
+                navigate('/potenciais')
+              }}
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Voltar
+            </Button>
+            <h1 className="text-xl font-bold tracking-tight">
+              {currentPotential
+                ? `Cotação: ${currentPotential.cliente || 'Desconhecido'}`
+                : 'Nova Cotação'}
+            </h1>
+          </div>
+          <div className="flex items-center gap-2">
+            {currentPotential && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={handleDuplicate}
+                disabled={isSaving}
+              >
+                <Copy className="h-3 w-3 mr-1.5" /> Duplicar
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
               className="h-8 text-xs"
-              onClick={handleDuplicate}
-              disabled={isSaving}
+              onClick={() => setIsSearchQuoteOpen(true)}
             >
-              <Copy className="h-3 w-3 mr-1.5" /> Duplicar
+              <Search className="h-3 w-3 mr-1.5" /> Buscar
             </Button>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 text-xs"
-            onClick={() => setIsSearchQuoteOpen(true)}
-          >
-            <Search className="h-3 w-3 mr-1.5" /> Buscar
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 text-xs"
-            onClick={() => {
-              if (isDirty()) {
-                setShowUnsavedDialog(true)
-                return
-              }
-              navigate('/potenciais')
-            }}
-          >
-            Cancelar
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            className="h-8 rounded-full text-xs"
-            disabled={isSaving}
-            onClick={() => handleSave(null)}
-          >
-            <Save className="h-3.5 w-3.5 mr-1.5" /> Salvar Rascunho
-          </Button>
-          <Button
-            disabled={isSaving}
-            size="sm"
-            className="h-8 rounded-full text-xs"
-            onClick={() => handleSave('Completo')}
-          >
-            <CheckCircle className="h-3.5 w-3.5 mr-1.5" /> Concluir Cotação
-          </Button>
-        </div>
-      </div>
-
-      <PotencialForm
-        formData={formData}
-        setFormData={setFormData}
-        currentPotential={currentPotential}
-        statusBadge={getStatusBadge()}
-        statuses={statuses}
-        onManageStatuses={() => setIsStatusModalOpen(true)}
-      />
-
-      <div className="bg-white rounded-lg border shadow-sm flex flex-col flex-1 min-h-0">
-        <div className="p-3 border-b flex items-center justify-end bg-slate-50/50 rounded-t-lg shrink-0">
-          <Button
-            size="sm"
-            className="rounded-full h-8 px-4 text-xs font-medium shadow-sm"
-            onClick={() => setIsSelecting(true)}
-          >
-            <Plus className="h-3.5 w-3.5 mr-1.5" /> Abrir Catálogo Completo
-          </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => {
+                if (isDirty()) {
+                  setShowUnsavedDialog(true)
+                  return
+                }
+                navigate('/potenciais')
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-8 rounded-full text-xs"
+              disabled={isSaving}
+              onClick={() => handleSave(null)}
+            >
+              <Save className="h-3.5 w-3.5 mr-1.5" /> Salvar Rascunho
+            </Button>
+            <Button
+              disabled={isSaving}
+              size="sm"
+              className="h-8 rounded-full text-xs"
+              onClick={() => handleSave('Completo')}
+            >
+              <CheckCircle className="h-3.5 w-3.5 mr-1.5" /> Concluir Cotação
+            </Button>
+          </div>
         </div>
 
-        <SelectedItemsTable
-          selectedItems={selectedItems}
-          handleUpdateItem={handleUpdateItem}
-          handleRemoveItem={handleRemoveItem}
-          handleMoveUp={handleMoveUp}
-          handleMoveDown={handleMoveDown}
-          setIsSelecting={setIsSelecting}
-          lastOfferedPrices={lastOfferedPrices}
+        <PotencialForm
+          formData={formData}
+          setFormData={setFormData}
+          currentPotential={currentPotential}
+          statuses={statuses}
+          onManageStatuses={() => setIsStatusModalOpen(true)}
         />
 
-        {/* Totals Summary Widget */}
-        <div className="p-4 border-t bg-slate-50 flex flex-wrap items-center justify-between gap-4 sm:gap-6 shrink-0 rounded-b-lg">
-          {/* Lado Esquerdo: Total de Compra e Ganho Bruto Estimado */}
-          <div className="flex items-center gap-6">
-            <div className="flex flex-col items-start">
-              <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
-                Total de Compra
-              </span>
-              <span className="text-sm font-semibold font-mono text-amber-700">
-                ${' '}
-                {totalCostRef.toLocaleString('en-US', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </span>
-            </div>
-            <div className="w-px h-8 bg-border"></div>
-            <div className="flex flex-col items-start">
-              <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
-                Ganho Bruto Estimado
-              </span>
-              <div className="flex items-baseline gap-1.5 font-mono">
-                <span
-                  className={cn(
-                    'text-sm font-semibold',
-                    profitValue > 0
-                      ? 'text-emerald-600'
-                      : profitValue < 0
-                        ? 'text-red-600'
-                        : 'text-foreground',
-                  )}
-                >
-                  {profitValue < 0 ? '-' : ''}$
-                  {Math.abs(profitValue).toLocaleString('en-US', {
+        <div className="bg-white rounded-lg border shadow-sm flex flex-col flex-1 min-h-0">
+          <div className="p-3 border-b flex items-center justify-end bg-slate-50/50 rounded-t-lg shrink-0">
+            <Button
+              size="sm"
+              className="rounded-full h-8 px-4 text-xs font-medium shadow-sm"
+              onClick={() => setIsSelecting(true)}
+            >
+              <Plus className="h-3.5 w-3.5 mr-1.5" /> Abrir Catálogo Completo
+            </Button>
+          </div>
+
+          <SelectedItemsTable
+            selectedItems={selectedItems}
+            handleUpdateItem={handleUpdateItem}
+            handleRemoveItem={handleRemoveItem}
+            handleMoveUp={handleMoveUp}
+            handleMoveDown={handleMoveDown}
+            setIsSelecting={setIsSelecting}
+            lastOfferedPrices={lastOfferedPrices}
+          />
+
+          {/* Totals Summary Widget */}
+          <div className="p-4 border-t bg-slate-50 flex flex-wrap items-center justify-between gap-4 sm:gap-6 shrink-0 rounded-b-lg">
+            {/* Lado Esquerdo: Total de Compra e Ganho Bruto Estimado */}
+            <div className="flex items-center gap-6">
+              <div className="flex flex-col items-start">
+                <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                  Total de Compra
+                </span>
+                <span className="text-sm font-semibold font-mono text-amber-700">
+                  ${' '}
+                  {totalCostRef.toLocaleString('en-US', {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}
                 </span>
-                <span
-                  className={cn(
-                    'text-xs font-medium',
-                    profitValue > 0
-                      ? 'text-emerald-600/90'
-                      : profitValue < 0
-                        ? 'text-red-600/90'
-                        : 'text-muted-foreground',
-                  )}
-                >
-                  (
-                  {profitPercent !== null
-                    ? `${profitPercent >= 0 ? '+' : ''}${profitPercent.toLocaleString('pt-BR', {
-                        minimumFractionDigits: 1,
-                        maximumFractionDigits: 1,
-                      })}%`
-                    : '—'}
-                  )
+              </div>
+              <div className="w-px h-8 bg-border"></div>
+              <div className="flex flex-col items-start">
+                <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                  Ganho Bruto Estimado
+                </span>
+                <div className="flex items-baseline gap-1.5 font-mono">
+                  <span
+                    className={cn(
+                      'text-sm font-semibold',
+                      profitValue > 0
+                        ? 'text-emerald-600'
+                        : profitValue < 0
+                          ? 'text-red-600'
+                          : 'text-foreground',
+                    )}
+                  >
+                    {profitValue < 0 ? '-' : ''}$
+                    {Math.abs(profitValue).toLocaleString('en-US', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
+                  <span
+                    className={cn(
+                      'text-xs font-medium',
+                      profitValue > 0
+                        ? 'text-emerald-600/90'
+                        : profitValue < 0
+                          ? 'text-red-600/90'
+                          : 'text-muted-foreground',
+                    )}
+                  >
+                    (
+                    {profitPercent !== null
+                      ? `${profitPercent >= 0 ? '+' : ''}${profitPercent.toLocaleString('pt-BR', {
+                          minimumFractionDigits: 1,
+                          maximumFractionDigits: 1,
+                        })}%`
+                      : '—'}
+                    )
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Lado Direito: Total SKUs, Quantidade Total e Total de Venda */}
+            <div className="flex items-center gap-6 ml-auto">
+              <div className="flex flex-col items-end">
+                <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                  Total SKUs
+                </span>
+                <span className="text-sm font-semibold">{totalSKUs}</span>
+              </div>
+              <div className="w-px h-8 bg-border"></div>
+              <div className="flex flex-col items-end">
+                <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                  Quantidade Total
+                </span>
+                <span className="text-sm font-semibold">{totalQty.toLocaleString('en-US')}</span>
+              </div>
+              <div className="w-px h-8 bg-border"></div>
+              <div className="flex flex-col items-end">
+                <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                  Total de Venda
+                </span>
+                <span className="text-lg font-bold text-primary">
+                  ${' '}
+                  {totalValue.toLocaleString('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
                 </span>
               </div>
             </div>
           </div>
-
-          {/* Lado Direito: Total SKUs, Quantidade Total e Total de Venda */}
-          <div className="flex items-center gap-6 ml-auto">
-            <div className="flex flex-col items-end">
-              <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
-                Total SKUs
-              </span>
-              <span className="text-sm font-semibold">{totalSKUs}</span>
-            </div>
-            <div className="w-px h-8 bg-border"></div>
-            <div className="flex flex-col items-end">
-              <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
-                Quantidade Total
-              </span>
-              <span className="text-sm font-semibold">{totalQty.toLocaleString('en-US')}</span>
-            </div>
-            <div className="w-px h-8 bg-border"></div>
-            <div className="flex flex-col items-end">
-              <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
-                Total de Venda
-              </span>
-              <span className="text-lg font-bold text-primary">
-                ${' '}
-                {totalValue.toLocaleString('en-US', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </span>
-            </div>
-          </div>
         </div>
-      </div>
 
-      {/* 1. Condições Comerciais dos Fabricantes Selecionados */}
-      {fornecedoresAceitosComValor.length > 0 && (
-        <Card className="p-4 shadow-sm border-blue-200/80 bg-blue-50/20">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+        {/* 1. Condições Comerciais dos Fabricantes Selecionados */}
+        {fornecedoresAceitosComValor.length > 0 && (
+          <Card className="p-4 shadow-sm border-blue-200/80 bg-blue-50/20">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    Condições Comerciais dos Fabricantes
+                  </h3>
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] bg-blue-50 text-blue-700 border-blue-300"
+                  >
+                    {fornecedoresAceitosComValor.length} selecionado
+                    {fornecedoresAceitosComValor.length > 1 ? 's' : ''}
+                  </Badge>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Exibindo apenas os fabricantes selecionados/aceitos para formar o preço na
+                  cotação.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              {fornecedoresAceitosComValor.map(({ cf, valorTotal, numItens }) => {
+                const nome = cf.expand?.fornecedor_id?.nome || 'Fabricante'
+                return (
+                  <div
+                    key={cf.id}
+                    className="flex flex-col gap-2 border border-blue-200 rounded-lg p-3 min-w-[240px] bg-white shadow-xs"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-xs text-foreground truncate">{nome}</span>
+                      <Badge
+                        variant="outline"
+                        className="text-[9px] h-4 px-1.5 bg-blue-50 text-blue-700 border-blue-300 font-medium"
+                      >
+                        Selecionado
+                      </Badge>
+                    </div>
+                    {valorTotal > 0 && (
+                      <div className="text-[10px] text-muted-foreground bg-slate-50 px-2 py-1 rounded border border-slate-100 flex justify-between items-center">
+                        <span>Total aceito:</span>
+                        <span className="font-semibold text-foreground">
+                          ${' '}
+                          {valorTotal.toLocaleString('en-US', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}{' '}
+                          ({numItens} {numItens === 1 ? 'item' : 'itens'})
+                        </span>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 gap-1.5 text-[11px] pt-1">
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <Truck className="w-3 h-3 shrink-0 text-blue-600" />
+                        <span className="font-medium text-foreground">Incoterm:</span>
+                        <span className="truncate">{cf.incoterm || '—'}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <CreditCard className="w-3 h-3 shrink-0 text-blue-600" />
+                        <span className="font-medium text-foreground">Pagamento:</span>
+                        <span className="truncate">{cf.condicao_pagamento || '—'}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <Clock className="w-3 h-3 shrink-0 text-blue-600" />
+                        <span className="font-medium text-foreground">Fabricação:</span>
+                        <span className="truncate">{cf.tempo_fabricacao || '—'}</span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </Card>
+        )}
+
+        {/* 2. Nova seção: Condições Comerciais para o Cliente */}
+        <Card className="p-4 shadow-sm border-slate-200">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3 pb-3 border-b border-slate-100">
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-semibold text-foreground">
-                  Condições Comerciais dos Fabricantes
+                  Condições Comerciais para o Cliente
                 </h3>
                 <Badge
                   variant="outline"
-                  className="text-[10px] bg-blue-50 text-blue-700 border-blue-300"
+                  className="text-[10px] bg-slate-50 text-slate-700 border-slate-200"
                 >
-                  {fornecedoresAceitosComValor.length} selecionado
-                  {fornecedoresAceitosComValor.length > 1 ? 's' : ''}
+                  Proposta ao Cliente
                 </Badge>
               </div>
               <p className="text-[11px] text-muted-foreground mt-0.5">
-                Exibindo apenas os fabricantes selecionados/aceitos para formar o preço na cotação.
+                Condições comerciais que serão enviadas na proposta para o cliente. Preenchidas
+                automaticamente a partir dos fabricantes aceitos ou personalizadas.
               </p>
             </div>
+            {fornecedoresAceitosComValor.length > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleRecalcularCondicoes}
+                className="h-7 text-xs px-2.5 self-start sm:self-auto gap-1.5 text-muted-foreground hover:text-foreground"
+                title="Recalcula as condições comerciais a partir dos fornecedores aceitos"
+              >
+                <RotateCcw className="w-3 h-3" />
+                Recalcular automático
+              </Button>
+            )}
           </div>
-          <div className="flex flex-wrap gap-3">
-            {fornecedoresAceitosComValor.map(({ cf, valorTotal, numItens }) => {
-              const nome = cf.expand?.fornecedor_id?.nome || 'Fabricante'
-              return (
-                <div
-                  key={cf.id}
-                  className="flex flex-col gap-2 border border-blue-200 rounded-lg p-3 min-w-[240px] bg-white shadow-xs"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold text-xs text-foreground truncate">{nome}</span>
-                    <Badge
-                      variant="outline"
-                      className="text-[9px] h-4 px-1.5 bg-blue-50 text-blue-700 border-blue-300 font-medium"
-                    >
-                      Selecionado
-                    </Badge>
-                  </div>
-                  {valorTotal > 0 && (
-                    <div className="text-[10px] text-muted-foreground bg-slate-50 px-2 py-1 rounded border border-slate-100 flex justify-between items-center">
-                      <span>Total aceito:</span>
-                      <span className="font-semibold text-foreground">
-                        ${' '}
-                        {valorTotal.toLocaleString('en-US', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}{' '}
-                        ({numItens} {numItens === 1 ? 'item' : 'itens'})
-                      </span>
-                    </div>
-                  )}
-                  <div className="grid grid-cols-1 gap-1.5 text-[11px] pt-1">
-                    <div className="flex items-center gap-1.5 text-muted-foreground">
-                      <Truck className="w-3 h-3 shrink-0 text-blue-600" />
-                      <span className="font-medium text-foreground">Incoterm:</span>
-                      <span className="truncate">{cf.incoterm || '—'}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-muted-foreground">
-                      <CreditCard className="w-3 h-3 shrink-0 text-blue-600" />
-                      <span className="font-medium text-foreground">Pagamento:</span>
-                      <span className="truncate">{cf.condicao_pagamento || '—'}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-muted-foreground">
-                      <Clock className="w-3 h-3 shrink-0 text-blue-600" />
-                      <span className="font-medium text-foreground">Fabricação:</span>
-                      <span className="truncate">{cf.tempo_fabricacao || '—'}</span>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
+
+          {fornecedoresAceitosComValor.length > 0 && (
+            <div className="mb-3 px-3 py-2 bg-blue-50/60 border border-blue-100 rounded-md text-[11px] text-blue-800 flex items-start gap-2">
+              <Info className="w-4 h-4 shrink-0 mt-0.5 text-blue-600" />
+              <div className="flex-1 leading-relaxed">
+                {fornecedoresAceitosComValor.length === 1 ? (
+                  <span>
+                    <strong>1 fornecedor aceito:</strong> Incoterm, condição de pagamento e prazo
+                    herdados automaticamente do fabricante selecionado.
+                  </span>
+                ) : (
+                  <span>
+                    <strong>{fornecedoresAceitosComValor.length} fornecedores aceitos:</strong>{' '}
+                    Incoterm obtido do fabricante com maior volume de pedido (
+                    {condicoesSugeridas.incoterm || '—'}), prazo definido como o maior entre os
+                    aceitos ({condicoesSugeridas.tempo_fabricacao || '—'}) e condição de pagamento
+                    definida especialmente para o cliente.
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="incoterm_cliente"
+                className="text-xs font-medium flex items-center gap-1.5"
+              >
+                <Truck className="w-3.5 h-3.5 text-muted-foreground" />
+                Incoterm
+                {condicoesManuais.incoterm && (
+                  <span className="text-[10px] text-amber-600 font-normal">
+                    (editado manualmente)
+                  </span>
+                )}
+              </Label>
+              <Input
+                id="incoterm_cliente"
+                placeholder="Ex: FOB, CIF, EXW..."
+                value={formData.incoterm_cliente || ''}
+                onChange={(e) => {
+                  setFormData((prev) => ({ ...prev, incoterm_cliente: e.target.value }))
+                  setCondicoesManuais((prev) => ({ ...prev, incoterm: true }))
+                }}
+                className="h-8 text-xs bg-white"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="condicao_pagamento_cliente"
+                className="text-xs font-medium flex items-center gap-1.5"
+              >
+                <CreditCard className="w-3.5 h-3.5 text-muted-foreground" />
+                Condição de Pagamento
+                {condicoesManuais.condicao_pagamento && (
+                  <span className="text-[10px] text-amber-600 font-normal">
+                    (editado manualmente)
+                  </span>
+                )}
+              </Label>
+              <Input
+                id="condicao_pagamento_cliente"
+                placeholder="Ex: 30% sinal + 70% embarque..."
+                value={formData.condicao_pagamento_cliente || ''}
+                onChange={(e) => {
+                  setFormData((prev) => ({ ...prev, condicao_pagamento_cliente: e.target.value }))
+                  setCondicoesManuais((prev) => ({ ...prev, condicao_pagamento: true }))
+                }}
+                className="h-8 text-xs bg-white"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="tempo_fabricacao_cliente"
+                className="text-xs font-medium flex items-center gap-1.5"
+              >
+                <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                Tempo de Fabricação
+                {condicoesManuais.tempo_fabricacao && (
+                  <span className="text-[10px] text-amber-600 font-normal">
+                    (editado manualmente)
+                  </span>
+                )}
+              </Label>
+              <Input
+                id="tempo_fabricacao_cliente"
+                placeholder="Ex: 30 a 45 dias..."
+                value={formData.tempo_fabricacao_cliente || ''}
+                onChange={(e) => {
+                  setFormData((prev) => ({ ...prev, tempo_fabricacao_cliente: e.target.value }))
+                  setCondicoesManuais((prev) => ({ ...prev, tempo_fabricacao: true }))
+                }}
+                className="h-8 text-xs bg-white"
+              />
+            </div>
           </div>
         </Card>
-      )}
 
-      {/* 2. Nova seção: Condições Comerciais para o Cliente */}
-      <Card className="p-4 shadow-sm border-slate-200">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3 pb-3 border-b border-slate-100">
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold text-foreground">
-                Condições Comerciais para o Cliente
-              </h3>
-              <Badge
-                variant="outline"
-                className="text-[10px] bg-slate-50 text-slate-700 border-slate-200"
+        <PotentialNotes potencialId={currentPotential?.id || ''} />
+        <PotentialAttachments potencial={currentPotential} onUpdate={setCurrentPotential} />
+
+        <SearchQuoteModal
+          open={isSearchQuoteOpen}
+          onOpenChange={setIsSearchQuoteOpen}
+          onSelect={handleQuoteSelected}
+        />
+        <StatusManagementModal
+          open={isStatusModalOpen}
+          onOpenChange={setIsStatusModalOpen}
+          onSaved={loadStatuses}
+        />
+
+        <AlertDialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Duplicar Cotação</AlertDialogTitle>
+              <AlertDialogDescription>
+                Deseja duplicar esta cotação? Uma cópia idêntica será criada no sistema.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  setShowDuplicateDialog(false)
+                  executeDuplicate()
+                }}
               >
-                Proposta ao Cliente
-              </Badge>
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              Condições comerciais que serão enviadas na proposta para o cliente. Preenchidas
-              automaticamente a partir dos fabricantes aceitos ou personalizadas.
-            </p>
-          </div>
-          {fornecedoresAceitosComValor.length > 0 && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleRecalcularCondicoes}
-              className="h-7 text-xs px-2.5 self-start sm:self-auto gap-1.5 text-muted-foreground hover:text-foreground"
-              title="Recalcula as condições comerciais a partir dos fornecedores aceitos"
-            >
-              <RotateCcw className="w-3 h-3" />
-              Recalcular automático
-            </Button>
-          )}
-        </div>
+                Duplicar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
-        {fornecedoresAceitosComValor.length > 0 && (
-          <div className="mb-3 px-3 py-2 bg-blue-50/60 border border-blue-100 rounded-md text-[11px] text-blue-800 flex items-start gap-2">
-            <Info className="w-4 h-4 shrink-0 mt-0.5 text-blue-600" />
-            <div className="flex-1 leading-relaxed">
-              {fornecedoresAceitosComValor.length === 1 ? (
-                <span>
-                  <strong>1 fornecedor aceito:</strong> Incoterm, condição de pagamento e prazo
-                  herdados automaticamente do fabricante selecionado.
-                </span>
-              ) : (
-                <span>
-                  <strong>{fornecedoresAceitosComValor.length} fornecedores aceitos:</strong>{' '}
-                  Incoterm obtido do fabricante com maior volume de pedido (
-                  {condicoesSugeridas.incoterm || '—'}), prazo definido como o maior entre os
-                  aceitos ({condicoesSugeridas.tempo_fabricacao || '—'}) e condição de pagamento
-                  definida especialmente para o cliente.
-                </span>
-              )}
-            </div>
-          </div>
-        )}
+        <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Você tem alterações não salvas</AlertDialogTitle>
+              <AlertDialogDescription>
+                Deseja realmente sair e descartar as alterações feitas nesta cotação? Todas as
+                modificações não salvas serão perdidas.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Continuar editando</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => {
+                  setShowUnsavedDialog(false)
+                  navigate('/potenciais')
+                }}
+              >
+                Descartar alterações
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-1.5">
-            <Label
-              htmlFor="incoterm_cliente"
-              className="text-xs font-medium flex items-center gap-1.5"
-            >
-              <Truck className="w-3.5 h-3.5 text-muted-foreground" />
-              Incoterm
-              {condicoesManuais.incoterm && (
-                <span className="text-[10px] text-amber-600 font-normal">
-                  (editado manualmente)
-                </span>
-              )}
-            </Label>
-            <Input
-              id="incoterm_cliente"
-              placeholder="Ex: FOB, CIF, EXW..."
-              value={formData.incoterm_cliente || ''}
-              onChange={(e) => {
-                setFormData((prev) => ({ ...prev, incoterm_cliente: e.target.value }))
-                setCondicoesManuais((prev) => ({ ...prev, incoterm: true }))
-              }}
-              className="h-8 text-xs bg-white"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label
-              htmlFor="condicao_pagamento_cliente"
-              className="text-xs font-medium flex items-center gap-1.5"
-            >
-              <CreditCard className="w-3.5 h-3.5 text-muted-foreground" />
-              Condição de Pagamento
-              {condicoesManuais.condicao_pagamento && (
-                <span className="text-[10px] text-amber-600 font-normal">
-                  (editado manualmente)
-                </span>
-              )}
-            </Label>
-            <Input
-              id="condicao_pagamento_cliente"
-              placeholder="Ex: 30% sinal + 70% embarque..."
-              value={formData.condicao_pagamento_cliente || ''}
-              onChange={(e) => {
-                setFormData((prev) => ({ ...prev, condicao_pagamento_cliente: e.target.value }))
-                setCondicoesManuais((prev) => ({ ...prev, condicao_pagamento: true }))
-              }}
-              className="h-8 text-xs bg-white"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label
-              htmlFor="tempo_fabricacao_cliente"
-              className="text-xs font-medium flex items-center gap-1.5"
-            >
-              <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-              Tempo de Fabricação
-              {condicoesManuais.tempo_fabricacao && (
-                <span className="text-[10px] text-amber-600 font-normal">
-                  (editado manualmente)
-                </span>
-              )}
-            </Label>
-            <Input
-              id="tempo_fabricacao_cliente"
-              placeholder="Ex: 30 a 45 dias..."
-              value={formData.tempo_fabricacao_cliente || ''}
-              onChange={(e) => {
-                setFormData((prev) => ({ ...prev, tempo_fabricacao_cliente: e.target.value }))
-                setCondicoesManuais((prev) => ({ ...prev, tempo_fabricacao: true }))
-              }}
-              className="h-8 text-xs bg-white"
-            />
-          </div>
-        </div>
-      </Card>
-
-      <PotentialNotes potencialId={currentPotential?.id || ''} />
-      <PotentialAttachments potencial={currentPotential} onUpdate={setCurrentPotential} />
-
-      <SearchQuoteModal
-        open={isSearchQuoteOpen}
-        onOpenChange={setIsSearchQuoteOpen}
-        onSelect={handleQuoteSelected}
-      />
-      <StatusManagementModal
-        open={isStatusModalOpen}
-        onOpenChange={setIsStatusModalOpen}
-        onSaved={loadStatuses}
-      />
-
-      <AlertDialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Duplicar Cotação</AlertDialogTitle>
-            <AlertDialogDescription>
-              Deseja duplicar esta cotação? Uma cópia idêntica será criada no sistema.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setShowDuplicateDialog(false)
-                executeDuplicate()
-              }}
-            >
-              Duplicar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Você tem alterações não salvas</AlertDialogTitle>
-            <AlertDialogDescription>
-              Deseja realmente sair e descartar as alterações feitas nesta cotação? Todas as
-              modificações não salvas serão perdidas.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Continuar editando</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => {
-                setShowUnsavedDialog(false)
-                navigate('/potenciais')
-              }}
-            >
-              Descartar alterações
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog
-        open={pendenciasConcluir !== null}
-        onOpenChange={(open) => {
-          if (!open) setPendenciasConcluir(null)
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Não foi possível concluir a cotação</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div>
-                <p>Resolva as pendências abaixo ou salve como Rascunho:</p>
-                <ul className="mt-2 list-disc pl-4 space-y-1 text-xs">
-                  {(pendenciasConcluir || []).map((p, i) => (
-                    <li key={i}>{p}</li>
-                  ))}
-                </ul>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Voltar para edição</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setPendenciasConcluir(null)
-                handleSave(null)
-              }}
-            >
-              Salvar Rascunho
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-  )
-})
+        <AlertDialog
+          open={pendenciasConcluir !== null}
+          onOpenChange={(open) => {
+            if (!open) setPendenciasConcluir(null)
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Não foi possível concluir a cotação</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div>
+                  <p>Resolva as pendências abaixo ou salve como Rascunho:</p>
+                  <ul className="mt-2 list-disc pl-4 space-y-1 text-xs">
+                    {(pendenciasConcluir || []).map((p, i) => (
+                      <li key={i}>{p}</li>
+                    ))}
+                  </ul>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Voltar para edição</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  setPendenciasConcluir(null)
+                  handleSave(null)
+                }}
+              >
+                Salvar Rascunho
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    )
+  },
+)
 
 export default AddItemsToPotential

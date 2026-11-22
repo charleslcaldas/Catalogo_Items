@@ -11,7 +11,6 @@ interface PotencialFormProps {
   formData: any
   setFormData: any
   currentPotential: Potencial | null
-  statusBadge: React.ReactNode
   statuses: StatusPotencial[]
   onManageStatuses: () => void
 }
@@ -19,7 +18,6 @@ interface PotencialFormProps {
 export function PotencialForm({
   formData,
   setFormData,
-  statusBadge,
   statuses,
   onManageStatuses,
 }: PotencialFormProps) {
@@ -79,7 +77,9 @@ export function PotencialForm({
         />
       </div>
       <div className="flex items-center gap-2">
-        <Label className="w-20 text-right shrink-0 text-xs text-muted-foreground">Estágio:</Label>
+        <Label className="w-20 text-right shrink-0 text-xs text-muted-foreground">
+          Estágio Zoho:
+        </Label>
         <div className="flex items-center gap-2 flex-1">
           <select
             className="flex-1 h-7 rounded-md border border-input bg-white px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
@@ -111,7 +111,9 @@ export function PotencialForm({
         />
       </div>
       <div className="flex items-center gap-2">
-        <Label className="w-20 text-right shrink-0 text-xs text-muted-foreground">Status:</Label>
+        <Label className="w-20 text-right shrink-0 text-xs text-muted-foreground">
+          Situação da Cotação:
+        </Label>
         <div className="flex items-center gap-2 flex-1">
           <select
             className="flex-1 h-7 rounded-md border border-input bg-white px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
@@ -134,7 +136,6 @@ export function PotencialForm({
           >
             <Settings className="h-3.5 w-3.5" />
           </Button>
-          {statusBadge}
         </div>
       </div>
     </div>

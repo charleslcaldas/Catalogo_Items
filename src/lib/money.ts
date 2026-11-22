@@ -27,13 +27,17 @@ export function parseToCents(value: string | number | null | undefined): number 
   return Math.round(n * 100)
 }
 
-/** Converte centavos em número com precisão (2 ou 3 casas decimais). */
+/**
+ * Converte o inteiro escalado de volta em número decimal, na precisão dada.
+ * Convenção de escala: precisão 2 → inteiro = valor × 100 (centavos);
+ * precisão 3 → inteiro = valor × 1000 (milésimos).
+ * Correção do bug ×10: antes dividia sempre por 1000, mas com um ×10 extra
+ * aplicado ao inteiro (44160 → 4416,00 em vez de 441,60).
+ */
 export function centsToNumber(cents: number, precision: 2 | 3 = 2): number {
   if (!Number.isFinite(cents)) return 0
-  const factor = precision === 3 ? 1000 : 100
-  // Para 3 casas mantemos sub-centavos como inteiro de milésimos
-  const thousandths = Math.round(cents * 10)
-  return Number((thousandths / factor).toFixed(precision))
+  const fator = precision === 3 ? 1000 : 100
+  return Number((Math.round(cents) / fator).toFixed(precision))
 }
 
 /** Formata centavos para exibição com precisão configurável. */
