@@ -46,7 +46,7 @@ export async function autenticarAtores(baseUrl, usuarios) {
 
 /** Chamada autenticada à rota de confirmação no efêmero. */
 export async function postConfirmacao(baseUrl, token, payload) {
-  return fetch(new URL('/backend/v1/confirmar-compra', baseUrl), {
+  return fetch(new URL('/backend/v1/cotacoes/confirmar-compra', baseUrl), {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: token },
     body: JSON.stringify(payload),

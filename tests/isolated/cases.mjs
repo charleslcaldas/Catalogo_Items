@@ -424,4 +424,33 @@ export async function executarMatriz(baseUrl) {
   return { casos, usuarios, team, mei };
 }
 
+// ---------- definições estáticas da matriz (sem execução) ----------
+// Usadas pelo run.mjs quando NÃO há runtime PocketBase: cada caso é registrado
+// como NAO EXECUTADO. Espelham os casos construídos em executarMatriz acima.
+export const DEFINICOES_CASOS = [
+  { id: 'AUTH-001', titulo: 'Sem credenciais → 401 na rota de confirmação' },
+  { id: 'AUTH-002', titulo: 'Usuário do time autenticado → autorizado a confirmar cadeia própria' },
+  { id: 'AUTH-003', titulo: 'Usuário Mei → autorizado apenas em potencial Rascunho/proprietário Mei' },
+  { id: 'AUTH-004', titulo: 'Coleção errada no payload (ids de outra cadeia) → negado' },
+  { id: 'AUTH-005', titulo: 'Relações adulteradas (cotacao_item de outro potencial) → negado' },
+  { id: 'MARG-001', titulo: 'Margem persistida 12 em cotacoes_itens vence sobre padrão 7,5, com margem_versao' },
+  { id: 'MARG-002', titulo: 'Sem margem persistida → padrão 7,5 da linha aplicado' },
+  { id: 'MARG-003', titulo: 'margem_versao incrementada (+1) após consumir a margem' },
+  { id: 'PREC-002', titulo: 'Precisão 2 (válida) → confirmada, sem pendência de precisão' },
+  { id: 'PREC-003', titulo: 'Precisão 3 (válida) → confirmada, sem pendência de precisão' },
+  { id: 'ALVO-001', titulo: 'Alvo (rodada) sem resposta do fabricante → negado' },
+  { id: 'ALVO-002', titulo: 'Resposta confirmada igual ao alvo → permitida' },
+  { id: 'ROLL-001', titulo: 'Rollback forçado após cada escrita → zero resíduos em todas as coleções' },
+  { id: 'IDEM-001', titulo: 'Retry sequencial com mesma chave → mesmo recibo, sem segunda venda' },
+  { id: 'IDEM-002', titulo: 'Requisições SIMULTÂNEAS com mesma chave → uma única venda (anti-confirmação-dupla)' },
+  { id: 'IDEM-003', titulo: 'Mesma chave com payload DIVERGENTE → recusado (payload_hash)' },
+  { id: 'IDEM-004', titulo: 'Recibo de idempotência por ator/escopo: mesmo escopo+chave, ator diferente → recusado' },
+  { id: 'HIST-001', titulo: 'Eventos de histórico únicos e intencionais: 1 compra + 1 venda por confirmação' },
+  { id: 'MEST-001', titulo: 'Catálogo mestre (categorias/linhas/unidades/fornecedores/itens) intocado pela confirmação' },
+  { id: 'PEND-001', titulo: 'Oferta sem moeda/unidade/MOQ/validade → pendência declarada no recibo' },
+  { id: 'PEND-002', titulo: 'Cadeia legado sem dados (sem margem/precisão/oferta) → pendência, não erro 500' },
+  { id: 'SUPP-001', titulo: 'Isolamento do store c2_suppress_venda sob concorrência (set/remove em try/finally)' },
+  { id: 'SUPP-002', titulo: 'ID Mei literal da regra (meiqw9s6c4r2t8a) como ator' },
+];
+
 export { SENHA_SINTETICA, USUARIOS_SINTETICOS, ID_MEI_REGRA };
