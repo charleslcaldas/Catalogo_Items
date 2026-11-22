@@ -53,6 +53,7 @@ import { CounterProposalModal } from './CounterProposalModal'
 import { QuotationNotes } from './QuotationNotes'
 import { PriceCell } from './PriceCell'
 import { ImportMappingModal } from './ImportMappingModal'
+import { computeVenda } from '@/lib/money'
 
 interface QuotationMatrixProps {
   onAccepted?: () => void
@@ -597,16 +598,12 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
 
         promises.push(pb.collection('itens').update(w.item_id, { preco_compra: priceToUse }))
 
-        const oldRefPrice = typeof pi.referencia_preco === 'number' ? pi.referencia_preco : 0
-        const oldVendaPrice = typeof pi.preco_unitario === 'number' ? pi.preco_unitario : 0
-
-        let marginToUse = pi.expand?.item_id?.expand?.linha_id?.margem_padrao ?? 7.5
-        if (oldRefPrice > 0 && oldVendaPrice > 0) {
-          marginToUse = (1 - oldRefPrice / oldVendaPrice) * 100
-        }
-
-        let newSellingPrice = marginToUse < 100 ? priceToUse / (1 - marginToUse / 100) : priceToUse
-        newSellingPrice = Number(newSellingPrice.toFixed(3))
+        // Venda = compra / (1 - margem/100), usando a margem vigente (padrão da linha).
+        // Margem >= 100 ou venda não finita: o campo de venda permanece como está.
+        const marginToUse = pi.expand?.item_id?.expand?.linha_id?.margem_padrao ?? 7.5
+        const computedVenda = computeVenda(priceToUse, marginToUse)
+        const newSellingPrice =
+          computedVenda !== undefined ? Number(computedVenda.toFixed(3)) : undefined
 
         let qtdeToUpdate = pi.quantidade
         if (adjustMoq && moqToUse > 0 && pi.quantidade < moqToUse) {
@@ -618,13 +615,23 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
         if (cf) fornecedoresNomes.add(fornecedorNome)
 
         promises.push(
-          pb.collection('potencial_itens').update(pi.id, {
-            quantidade: qtdeToUpdate,
-            referencia_preco: priceToUse,
-            referencia_fornecedor: fornecedorNome,
-            referencia_data: new Date().toISOString(),
-            preco_unitario: newSellingPrice,
-          }),
+          pb.collection('potencial_itens').update(
+            pi.id,
+            newSellingPrice !== undefined
+              ? {
+                  quantidade: qtdeToUpdate,
+                  referencia_preco: priceToUse,
+                  referencia_fornecedor: fornecedorNome,
+                  referencia_data: new Date().toISOString(),
+                  preco_unitario: newSellingPrice,
+                }
+              : {
+                  quantidade: qtdeToUpdate,
+                  referencia_preco: priceToUse,
+                  referencia_fornecedor: fornecedorNome,
+                  referencia_data: new Date().toISOString(),
+                },
+          ),
         )
 
         promises.push(
@@ -735,16 +742,12 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
         // Atualiza preco_compra no cadastro de itens
         promises.push(pb.collection('itens').update(ci.item_id, { preco_compra: finalPrice }))
 
-        const oldRefPrice = typeof pi.referencia_preco === 'number' ? pi.referencia_preco : 0
-        const oldVendaPrice = typeof pi.preco_unitario === 'number' ? pi.preco_unitario : 0
-
-        let marginToUse = pi.expand?.item_id?.expand?.linha_id?.margem_padrao ?? 7.5
-        if (oldRefPrice > 0 && oldVendaPrice > 0) {
-          marginToUse = (1 - oldRefPrice / oldVendaPrice) * 100
-        }
-
-        let newSellingPrice = marginToUse < 100 ? finalPrice / (1 - marginToUse / 100) : finalPrice
-        newSellingPrice = Number(newSellingPrice.toFixed(3))
+        // Venda = compra / (1 - margem/100), usando a margem vigente (padrão da linha).
+        // Margem >= 100 ou venda não finita: o campo de venda permanece como está.
+        const marginToUse = pi.expand?.item_id?.expand?.linha_id?.margem_padrao ?? 7.5
+        const computedVenda = computeVenda(finalPrice, marginToUse)
+        const newSellingPrice =
+          computedVenda !== undefined ? Number(computedVenda.toFixed(3)) : undefined
 
         const moqToUse = ci.quantidade_minima || 0
         let qtdeToUpdate = pi.quantidade
@@ -753,13 +756,23 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
         }
 
         promises.push(
-          pb.collection('potencial_itens').update(pi.id, {
-            quantidade: qtdeToUpdate,
-            referencia_preco: finalPrice,
-            referencia_fornecedor: supplierName,
-            referencia_data: new Date().toISOString(),
-            preco_unitario: newSellingPrice,
-          }),
+          pb.collection('potencial_itens').update(
+            pi.id,
+            newSellingPrice !== undefined
+              ? {
+                  quantidade: qtdeToUpdate,
+                  referencia_preco: finalPrice,
+                  referencia_fornecedor: supplierName,
+                  referencia_data: new Date().toISOString(),
+                  preco_unitario: newSellingPrice,
+                }
+              : {
+                  quantidade: qtdeToUpdate,
+                  referencia_preco: finalPrice,
+                  referencia_fornecedor: supplierName,
+                  referencia_data: new Date().toISOString(),
+                },
+          ),
         )
 
         promises.push(

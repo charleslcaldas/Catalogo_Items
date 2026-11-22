@@ -46,6 +46,7 @@ import { PotentialNotes } from './components/PotentialNotes'
 import { PotentialAttachments } from './components/PotentialAttachments'
 import { StatusManagementModal } from './components/StatusManagementModal'
 import { savePotencialFull, getPotencialItens, duplicatePotencial } from '@/services/potenciais'
+import { roundToCents } from '@/lib/money'
 import { getContrastColor, cn } from '@/lib/utils'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
@@ -147,6 +148,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false)
+  const [pendenciasConcluir, setPendenciasConcluir] = useState<string[] | null>(null)
   const [itemToEdit, setItemToEdit] = useState<Partial<Item> | undefined>(undefined)
   const [unidades, setUnidades] = useState<UnidadeMedida[]>([])
   const [statuses, setStatuses] = useState<StatusPotencial[]>([])
@@ -342,26 +344,65 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
     })
   }
 
+  // Validação para "Concluir Cotação": itens, quantidade, unidade, moeda,
+  // preço de venda e oferta selecionada por item. Pendências bloqueiam a
+  // conclusão, mas ainda permitem Salvar Rascunho.
+  const validarConcluirCotacao = (): string[] => {
+    const pendencias: string[] = []
+    if (selectedItems.length === 0) {
+      pendencias.push('Nenhum item adicionado à cotação.')
+    }
+    selectedItems.forEach((si, index) => {
+      const desc =
+        si.data.item?.descricao_curta ||
+        si.data.item?.descr_pt ||
+        si.data.item?.sku ||
+        `Item ${index + 1}`
+      if (!(Number(si.data.quantidade) > 0)) {
+        pendencias.push(`${desc}: quantidade deve ser maior que 0.`)
+      }
+      if (!si.data.unidade_medida) {
+        pendencias.push(`${desc}: unidade de medida não definida.`)
+      }
+      if (!(Number(si.data.preco_unitario) > 0)) {
+        pendencias.push(`${desc}: preço de venda deve ser maior que 0.`)
+      }
+      const ofertaVencedora = cotacoesItens.find((ci) => ci.item_id === si.id && ci.vencedor)
+      if (!ofertaVencedora) {
+        pendencias.push(`${desc}: nenhuma oferta de fabricante selecionada.`)
+      } else {
+        const cfOferta = fornecedorCotacoes.find(
+          (f) => f.id === ofertaVencedora.cotacao_fornecedor_id,
+        )
+        if (!(cfOferta?.oferta_moeda || '').trim()) {
+          pendencias.push(`${desc}: moeda da oferta não definida.`)
+        }
+      }
+    })
+    return pendencias
+  }
+
   const handleSave = async (statusOverride: 'Incompleto' | 'Completo' | null = null) => {
     if (!formData.numero_potencial) {
       return toast.error('O número da cotação é obrigatório.')
     }
     if (statusOverride === 'Completo') {
-      const hasIncomplete = selectedItems.some((si) => !si.data.quantidade)
-      if (hasIncomplete) {
-        return toast.error('Preencha a quantidade para todos os itens antes de concluir.')
+      const pendencias = validarConcluirCotacao()
+      if (pendencias.length > 0) {
+        setPendenciasConcluir(pendencias)
+        return
       }
     }
 
     setIsSaving(true)
     try {
       // Prioridade absoluta: status escolhido pelo usuário no dropdown (formData.status).
-      // statusOverride ('Completo') só é aplicado se o usuário clicou expressamente em "Salvar e Concluir"
+      // statusOverride ('Completo') só é aplicado se o usuário clicou expressamente em "Concluir Cotação"
       // e não escolheu outro status no dropdown (ou seja, se estava o default ou se selecionou Completo).
       let statusToSave = formData.status
       if (statusOverride === 'Completo') {
         // Se o usuário não definiu explicitamente um status diferente de Sem Itens / Rascunho / Completo,
-        // ou se o status atual era o inicial 'Sem Itens', 'Salvar e Concluir' define como 'Completo'.
+        // ou se o status atual era o inicial 'Sem Itens', 'Concluir Cotação' define como 'Completo'.
         // Mas se o usuário escolheu outro status personalizado ou específico no dropdown, a escolha dele prevalece.
         if (
           !formData.status ||
@@ -378,17 +419,27 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
 
       const itemsData = selectedItems
         .filter((si) => Number(si.data.quantidade) > 0)
-        .map((si, index) => ({
-          item_id: si.id,
-          quantidade: Number(si.data.quantidade),
-          unidade_medida: si.data.unidade_medida,
-          preco_unitario: Number(si.data.preco_unitario) || 0,
-          observacoes: si.data.observacoes,
-          ordem: index + 1,
-          referencia_preco: si.data.referencia_preco,
-          referencia_fornecedor: si.data.referencia_fornecedor,
-          referencia_data: si.data.referencia_data,
-        }))
+        .map((si, index) => {
+          const vendaNumero = Number(si.data.preco_unitario) || 0
+          const decimais = vendaNumero > 0 ? (String(vendaNumero).split('.')[1]?.length ?? 0) : 0
+          const ofertaVencedora = cotacoesItens.find((ci) => ci.item_id === si.id && ci.vencedor)
+          const cfOferta = ofertaVencedora
+            ? fornecedorCotacoes.find((f) => f.id === ofertaVencedora.cotacao_fornecedor_id)
+            : undefined
+          return {
+            item_id: si.id,
+            quantidade: Number(si.data.quantidade),
+            unidade_medida: si.data.unidade_medida,
+            preco_unitario: vendaNumero,
+            observacoes: si.data.observacoes,
+            ordem: index + 1,
+            referencia_preco: si.data.referencia_preco,
+            referencia_fornecedor: si.data.referencia_fornecedor,
+            referencia_data: si.data.referencia_data,
+            precisao_preco: decimais > 2 ? 3 : 2,
+            moeda_compra: cfOferta?.oferta_moeda || undefined,
+          }
+        })
 
       const saved = await savePotencialFull(
         currentPotential?.id || null,
@@ -748,19 +799,26 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
   const calculateTotals = () => {
     const totalSKUs = new Set(selectedItems.map((si) => si.id)).size
     const totalQty = selectedItems.reduce((acc, si) => acc + (Number(si.data.quantidade) || 0), 0)
-    const totalValue = selectedItems.reduce(
-      (acc, si) => acc + (Number(si.data.quantidade) || 0) * (Number(si.data.preco_unitario) || 0),
-      0,
+    // Totais: somar as linhas e arredondar para 2 casas APÓS a soma.
+    const totalValue = roundToCents(
+      selectedItems.reduce(
+        (acc, si) =>
+          acc + (Number(si.data.quantidade) || 0) * (Number(si.data.preco_unitario) || 0),
+        0,
+      ),
     )
-    const totalCostRef = selectedItems.reduce((acc, si) => {
-      const qty = Number(si.data.quantidade) || 0
-      const refPrice =
-        typeof si.data.referencia_preco === 'number' && !isNaN(si.data.referencia_preco)
-          ? si.data.referencia_preco
-          : 0
-      return acc + (refPrice > 0 ? qty * refPrice : 0)
-    }, 0)
-    const profitValue = totalValue - totalCostRef
+    const totalCostRef = roundToCents(
+      selectedItems.reduce((acc, si) => {
+        const qty = Number(si.data.quantidade) || 0
+        const refPrice =
+          typeof si.data.referencia_preco === 'number' && !isNaN(si.data.referencia_preco)
+            ? si.data.referencia_preco
+            : 0
+        return acc + (refPrice > 0 ? qty * refPrice : 0)
+      }, 0),
+    )
+    // Margem efetiva aprovada: ganho / venda * 100 (nunca (venda-compra)/compra).
+    const profitValue = roundToCents(totalValue - totalCostRef)
     const profitPercent = totalValue > 0 ? (profitValue / totalValue) * 100 : null
 
     return { totalSKUs, totalQty, totalValue, totalCostRef, profitValue, profitPercent }
@@ -1075,7 +1133,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
             className="h-8 rounded-full text-xs"
             onClick={() => handleSave('Completo')}
           >
-            <CheckCircle className="h-3.5 w-3.5 mr-1.5" /> Salvar e Concluir
+            <CheckCircle className="h-3.5 w-3.5 mr-1.5" /> Concluir Cotação
           </Button>
         </div>
       </div>
@@ -1112,11 +1170,11 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
 
         {/* Totals Summary Widget */}
         <div className="p-4 border-t bg-slate-50 flex flex-wrap items-center justify-between gap-4 sm:gap-6 shrink-0 rounded-b-lg">
-          {/* Lado Esquerdo: Custo Ref. Total e Lucro Estimado */}
+          {/* Lado Esquerdo: Total de Compra e Ganho Bruto Estimado */}
           <div className="flex items-center gap-6">
             <div className="flex flex-col items-start">
               <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
-                Custo Ref. Total
+                Total de Compra
               </span>
               <span className="text-sm font-semibold font-mono text-amber-700">
                 ${' '}
@@ -1129,7 +1187,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
             <div className="w-px h-8 bg-border"></div>
             <div className="flex flex-col items-start">
               <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
-                Lucro Estimado
+                Ganho Bruto Estimado
               </span>
               <div className="flex items-baseline gap-1.5 font-mono">
                 <span
@@ -1171,7 +1229,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
             </div>
           </div>
 
-          {/* Lado Direito: Total SKUs, Quantidade Total e Valor Total Estimado */}
+          {/* Lado Direito: Total SKUs, Quantidade Total e Total de Venda */}
           <div className="flex items-center gap-6 ml-auto">
             <div className="flex flex-col items-end">
               <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
@@ -1189,7 +1247,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
             <div className="w-px h-8 bg-border"></div>
             <div className="flex flex-col items-end">
               <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
-                Valor Total Estimado
+                Total de Venda
               </span>
               <span className="text-lg font-bold text-primary">
                 ${' '}
@@ -1469,6 +1527,40 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
               }}
             >
               Descartar alterações
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={pendenciasConcluir !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendenciasConcluir(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Não foi possível concluir a cotação</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                <p>Resolva as pendências abaixo ou salve como Rascunho:</p>
+                <ul className="mt-2 list-disc pl-4 space-y-1 text-xs">
+                  {(pendenciasConcluir || []).map((p, i) => (
+                    <li key={i}>{p}</li>
+                  ))}
+                </ul>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Voltar para edição</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setPendenciasConcluir(null)
+                handleSave(null)
+              }}
+            >
+              Salvar Rascunho
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

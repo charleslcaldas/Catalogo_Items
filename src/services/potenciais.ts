@@ -81,6 +81,11 @@ export const savePotencialFull = async (
       if (item.referencia_fornecedor !== undefined)
         payload.referencia_fornecedor = item.referencia_fornecedor
       if (item.referencia_data !== undefined) payload.referencia_data = item.referencia_data
+      // Campos de precisão (2/3 casas) e moeda criados pela migration 0063
+      if ((item as any).precisao_preco !== undefined)
+        payload.precisao_preco = (item as any).precisao_preco
+      if ((item as any).moeda_compra !== undefined)
+        payload.moeda_compra = (item as any).moeda_compra
 
       return pb.collection('potencial_itens').create(payload)
     }),
