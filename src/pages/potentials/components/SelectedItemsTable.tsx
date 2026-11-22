@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { Trash2, ChevronUp, ChevronDown, Percent } from 'lucide-react'
+import { Trash2, ChevronUp, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { FormattedInput } from '@/components/FormattedInput'
 import { Badge } from '@/components/ui/badge'
@@ -42,9 +41,6 @@ export function SelectedItemsTable({
   setIsSelecting,
   lastOfferedPrices,
 }: SelectedItemsTableProps) {
-  const [globalMargin, setGlobalMargin] = useState('')
-  const [isApplying, setIsApplying] = useState(false)
-
   if (selectedItems.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-32 text-muted-foreground bg-white">
@@ -56,12 +52,35 @@ export function SelectedItemsTable({
     )
   }
 
-  const formatCurrency = (value: number | '') => {
+  // minDec/maxDec: exibição exata — o total da linha usa a mesma precisão do
+  // unitário exibido/salvo, sem casas ocultas.
+  const formatCurrency = (value: number | '', minDec = 2, maxDec = 3) => {
     if (value === '') return '-'
     const num = Number(value)
     return isNaN(num)
       ? '-'
-      : `$ ${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}`
+      : `$ ${num.toLocaleString('en-US', { minimumFractionDigits: minDec, maximumFractionDigits: maxDec })}`
+  }
+
+  // Precisão por linha (2 ou 3 casas). Reduzir para 2 arredonda o preço para
+  // que o valor exibido continue sendo exatamente o salvo.
+  const handlePrecisionChange = async (record: SelectedItemRecord, value: string) => {
+    const p = value === '3' ? 3 : 2
+    const unitRaw = Number(record.data.preco_unitario)
+    const rounded = p === 2 && Number.isFinite(unitRaw) ? Number(unitRaw.toFixed(2)) : unitRaw
+    handleUpdateItem(record.id, 'precisao_preco', String(p))
+    if (p === 2 && Number.isFinite(unitRaw)) {
+      handleUpdateItem(record.id, 'preco_unitario', String(rounded))
+    }
+    if (record.recordId && record.recordId.length === 15) {
+      const payload: Record<string, number> = { precisao_preco: p }
+      if (p === 2 && Number.isFinite(unitRaw)) payload.preco_unitario = rounded
+      try {
+        await pb.collection('potencial_itens').update(record.recordId, payload)
+      } catch (err) {
+        console.error('Auto-save precision failed', err)
+      }
+    }
   }
 
   const handleQuantityBlur = async (recordId: string | undefined, quantidade: string | number) => {
@@ -88,61 +107,12 @@ export function SelectedItemsTable({
     }
   }
 
-  // Único comando de margem global: atualiza todas as linhas de uma vez.
-  // Editar o campo global NÃO altera linhas — só este botão.
-  const handleApplyGlobalMargin = async () => {
-    const m = parseFloat(globalMargin.replace(',', '.'))
-    if (isNaN(m) || m >= 100 || m < 0) return
-    setIsApplying(true)
-    const promises = []
-    for (const record of selectedItems) {
-      const custo = Number(record.data.referencia_preco) || 0
-      if (custo > 0) {
-        const newVenda = computeVendaFromMargem(custo, m)
-        if (record.recordId && record.recordId.length === 15) {
-          promises.push(
-            pb
-              .collection('potencial_itens')
-              .update(record.recordId, { preco_unitario: Number(newVenda.toFixed(3)) }),
-          )
-        }
-        handleUpdateItem(record.id, 'preco_unitario', newVenda.toFixed(3))
-      }
-    }
-    await Promise.all(promises)
-    setIsApplying(false)
-    setGlobalMargin('')
-  }
-
-  const hasAnyCompra = selectedItems.some(
-    (r) => typeof r.data.referencia_preco === 'number' && r.data.referencia_preco > 0,
-  )
+  // A margem global é controlada SOMENTE pelo comando único no cabeçalho da
+  // tela (PotentialDetailsWrapper) — não há controle duplicado aqui.
 
   return (
     <div className="flex-1 flex flex-col bg-white overflow-hidden">
-      <div className="flex items-center justify-between p-2 border-b bg-slate-50/50 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center h-8 bg-white border rounded-md overflow-hidden focus-within:ring-1 focus-within:ring-ring">
-            <div className="flex items-center justify-center pl-2 pr-1 text-muted-foreground bg-slate-50 border-r">
-              <Percent className="w-3 h-3" />
-            </div>
-            <FormattedInput
-              className="h-full w-24 border-0 focus-visible:ring-0 shadow-none text-xs text-right rounded-none"
-              placeholder="Margem Global (%)"
-              value={globalMargin}
-              onValueChange={setGlobalMargin}
-              disabled={isApplying}
-            />
-            <Button
-              variant="secondary"
-              onClick={handleApplyGlobalMargin}
-              disabled={isApplying || !globalMargin || !hasAnyCompra || selectedItems.length === 0}
-              className="h-full rounded-none px-3 text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border-l whitespace-nowrap"
-            >
-              Aplicar Margem Global
-            </Button>
-          </div>
-        </div>
+      <div className="flex items-center justify-end p-2 border-b bg-slate-50/50 shrink-0">
         <div className="text-xs text-muted-foreground font-medium pr-2">
           {selectedItems.length} {selectedItems.length === 1 ? 'item' : 'itens'}
         </div>
@@ -186,6 +156,20 @@ export function SelectedItemsTable({
               </TableHead>
               <TableHead className="w-24 text-[11px] text-right">Margem de Venda (%)</TableHead>
               <TableHead className="w-28 text-[11px] text-right">Preço de Venda</TableHead>
+              <TableHead className="w-14 text-[11px] text-center">
+                <Tooltip>
+                  <TooltipTrigger className="cursor-help underline decoration-dashed underline-offset-2">
+                    Prec.
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs font-semibold">Precisão do preço</p>
+                    <p className="text-[10px] text-muted-foreground mt-1 max-w-[160px] leading-tight">
+                      Casas decimais (2 ou 3) usadas para exibir e salvar o preço de venda desta
+                      linha.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TableHead>
               <TableHead className="w-24 text-[11px] text-right">Total</TableHead>
               <TableHead className="w-10 text-center text-[11px]">Ação</TableHead>
             </TableRow>
@@ -193,10 +177,15 @@ export function SelectedItemsTable({
           <TableBody>
             {selectedItems.map((record, index) => {
               const { id, data } = record
-              const total =
-                typeof data.quantidade === 'number' && typeof data.preco_unitario === 'number'
-                  ? data.quantidade * data.preco_unitario
+              // Precisão por linha (2 ou 3 casas); fallback 2 quando ausente/vazia.
+              const precisao = data.precisao_preco === 3 ? 3 : 2
+              // O total usa EXATAMENTE o unitário exibido/salvo, na mesma precisão.
+              const unitario =
+                typeof data.preco_unitario === 'number'
+                  ? Number(data.preco_unitario.toFixed(precisao))
                   : 0
+              const total =
+                Math.round((Number(data.quantidade) || 0) * Math.round(unitario * 1000)) / 1000
 
               const acabamento = data.item.expand?.acabamento_id
               const descricao = data.item.descricao_curta || data.item.descr_pt || '-'
@@ -360,7 +349,7 @@ export function SelectedItemsTable({
                         const custo = hasSnapshot ? Number(data.referencia_preco) : 0
                         if (custo === 0 || isNaN(m) || m < 0 || m >= 100) return
                         const newVenda = computeVendaFromMargem(custo, m)
-                        handleUpdateItem(id, 'preco_unitario', newVenda.toFixed(3))
+                        handleUpdateItem(id, 'preco_unitario', newVenda.toFixed(precisao))
                       }}
                       onBlur={() => {
                         let parsed = parseFloat(String(data.preco_unitario))
@@ -376,20 +365,32 @@ export function SelectedItemsTable({
                       className="h-7 w-24 px-2 text-right text-xs bg-white font-bold ml-auto"
                       value={
                         typeof data.preco_unitario === 'number'
-                          ? data.preco_unitario.toFixed(3)
+                          ? unitario.toFixed(precisao)
                           : data.preco_unitario
                       }
                       onValueChange={(val) => handleUpdateItem(id, 'preco_unitario', val)}
                       onBlur={() => {
                         let parsed = parseFloat(String(data.preco_unitario))
                         if (isNaN(parsed)) parsed = 0
-                        handleUpdateItem(id, 'preco_unitario', parsed.toFixed(3))
-                        handlePriceBlur(record.recordId, parsed)
+                        const normalizado = Number(parsed.toFixed(precisao))
+                        handleUpdateItem(id, 'preco_unitario', String(normalizado))
+                        handlePriceBlur(record.recordId, normalizado)
                       }}
                     />
                   </TableCell>
+                  <TableCell className="py-1 text-center">
+                    <select
+                      className="h-7 w-12 rounded-md border bg-white text-xs text-center"
+                      title="Precisão do preço (casas decimais)"
+                      value={precisao}
+                      onChange={(e) => handlePrecisionChange(record, e.target.value)}
+                    >
+                      <option value={2}>2</option>
+                      <option value={3}>3</option>
+                    </select>
+                  </TableCell>
                   <TableCell className="py-1 text-xs font-semibold text-right whitespace-nowrap">
-                    {formatCurrency(total)}
+                    {formatCurrency(total, 2, precisao)}
                   </TableCell>
                   <TableCell className="py-1 text-center">
                     <Button

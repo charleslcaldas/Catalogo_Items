@@ -231,6 +231,9 @@ export type PotencialItem = {
   referencia_preco?: number
   referencia_fornecedor?: string
   referencia_data?: string
+  // Precisão do preço de venda da linha (2 ou 3 casas); ausente/vazia → 2.
+  precisao_preco?: number
+  moeda_compra?: string
   created: string
   updated: string
   expand?: {

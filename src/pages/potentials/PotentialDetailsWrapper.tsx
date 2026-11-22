@@ -80,8 +80,14 @@ export default function PotentialDetailsWrapper() {
       const linhasVenda: number[] = []
       items.forEach((item) => {
         const q = item.quantidade || 0
-        const pCents = parseToCents(item.referencia_preco ?? 0)
-        const vCents = parseToCents(item.preco_unitario ?? 0)
+        // Precisão por linha (2 ou 3; fallback 2) — o unitário usado no total é
+        // exatamente o salvo, arredondado na precisão da própria linha.
+        const precisao = item.precisao_preco === 3 ? 3 : 2
+        const fator = precisao === 3 ? 1000 : 100
+        const compraLinha = Number((Number(item.referencia_preco ?? 0) || 0).toFixed(precisao))
+        const vendaLinha = Number((Number(item.preco_unitario ?? 0) || 0).toFixed(precisao))
+        const pCents = Math.round(compraLinha * fator) * (100 / fator)
+        const vCents = Math.round(vendaLinha * fator) * (100 / fator)
         linhasCompra.push(lineTotalCents(q, pCents))
         linhasVenda.push(lineTotalCents(q, vCents))
       })
@@ -120,7 +126,12 @@ export default function PotentialDetailsWrapper() {
       })
       const promises = items.map((item) => {
         const cost = typeof item.referencia_preco === 'number' ? item.referencia_preco : 0
-        const salePrice = cost > 0 ? cost / (1 - margin / 100) : item.preco_unitario
+        if (cost <= 0) return Promise.resolve(null)
+        // Venda = compra / (1 - margem/100), arredondada na precisão da linha
+        // (2 ou 3 casas) — o valor salvo é exatamente o exibido.
+        const precisao = item.precisao_preco === 3 ? 3 : 2
+        const salePrice = Number((cost / (1 - margin / 100)).toFixed(precisao))
+        if (!Number.isFinite(salePrice)) return Promise.resolve(null)
         return pb.collection('potencial_itens').update(item.id, { preco_unitario: salePrice })
       })
       await Promise.all(promises)

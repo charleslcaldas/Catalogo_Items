@@ -62,6 +62,8 @@ export type SelectedItemData = {
   referencia_preco?: number
   referencia_fornecedor?: string
   referencia_data?: string
+  // Precisão do preço de venda desta linha (2 ou 3 casas). Ausente/vazia → 2.
+  precisao_preco?: number
 }
 
 export type SelectedItemRecord = {
@@ -129,6 +131,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
         unidade_medida: si.data?.unidade_medida || 'Pcs',
         preco_unitario: Number(si.data?.preco_unitario) || 0,
         observacoes: (si.data?.observacoes || '').trim(),
+        precisao_preco: si.data?.precisao_preco === 3 ? 3 : 2,
       })),
     })
   }
@@ -421,7 +424,8 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
         .filter((si) => Number(si.data.quantidade) > 0)
         .map((si, index) => {
           const vendaNumero = Number(si.data.preco_unitario) || 0
-          const decimais = vendaNumero > 0 ? (String(vendaNumero).split('.')[1]?.length ?? 0) : 0
+          // Precisão escolhida na linha (2 ou 3), preservada ao salvar; padrão 2.
+          const decimais = si.data.precisao_preco === 3 ? 3 : 2
           const ofertaVencedora = cotacoesItens.find((ci) => ci.item_id === si.id && ci.vencedor)
           const cfOferta = ofertaVencedora
             ? fornecedorCotacoes.find((f) => f.id === ofertaVencedora.cotacao_fornecedor_id)
@@ -555,6 +559,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
             referencia_preco: pi.referencia_preco,
             referencia_fornecedor: pi.referencia_fornecedor,
             referencia_data: pi.referencia_data,
+            precisao_preco: pi.precisao_preco,
           },
         }
       })
@@ -654,6 +659,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
                     referencia_preco: it.referencia_preco,
                     referencia_fornecedor: it.referencia_fornecedor,
                     referencia_data: it.referencia_data,
+                    precisao_preco: it.precisao_preco,
                   },
                 }
               }
@@ -740,6 +746,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
             referencia_preco: initialCost,
             referencia_fornecedor: initialSupplier,
             referencia_data: initialCost ? new Date().toISOString() : undefined,
+            precisao_preco: 2,
           },
         },
       ]
@@ -799,13 +806,15 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, {}>((_prop
   const calculateTotals = () => {
     const totalSKUs = new Set(selectedItems.map((si) => si.id)).size
     const totalQty = selectedItems.reduce((acc, si) => acc + (Number(si.data.quantidade) || 0), 0)
-    // Totais: somar as linhas e arredondar para 2 casas APÓS a soma.
+    // Totais: somar as linhas (cada linha usa o unitário na sua própria precisão)
+    // e arredondar para 2 casas APÓS a soma.
     const totalValue = roundToCents(
-      selectedItems.reduce(
-        (acc, si) =>
-          acc + (Number(si.data.quantidade) || 0) * (Number(si.data.preco_unitario) || 0),
-        0,
-      ),
+      selectedItems.reduce((acc, si) => {
+        const qty = Number(si.data.quantidade) || 0
+        const precisaoLinha = si.data.precisao_preco === 3 ? 3 : 2
+        const unitLinha = Number((Number(si.data.preco_unitario) || 0).toFixed(precisaoLinha))
+        return acc + qty * unitLinha
+      }, 0),
     )
     const totalCostRef = roundToCents(
       selectedItems.reduce((acc, si) => {

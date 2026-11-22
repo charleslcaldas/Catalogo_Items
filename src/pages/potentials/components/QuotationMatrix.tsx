@@ -602,8 +602,10 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
         // Margem >= 100 ou venda não finita: o campo de venda permanece como está.
         const marginToUse = pi.expand?.item_id?.expand?.linha_id?.margem_padrao ?? 7.5
         const computedVenda = computeVenda(priceToUse, marginToUse)
+        // Precisão da linha do potencial (2 ou 3; fallback 2).
+        const precisaoLinha = pi.precisao_preco === 3 ? 3 : 2
         const newSellingPrice =
-          computedVenda !== undefined ? Number(computedVenda.toFixed(3)) : undefined
+          computedVenda !== undefined ? Number(computedVenda.toFixed(precisaoLinha)) : undefined
 
         let qtdeToUpdate = pi.quantidade
         if (adjustMoq && moqToUse > 0 && pi.quantidade < moqToUse) {
@@ -746,8 +748,10 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
         // Margem >= 100 ou venda não finita: o campo de venda permanece como está.
         const marginToUse = pi.expand?.item_id?.expand?.linha_id?.margem_padrao ?? 7.5
         const computedVenda = computeVenda(finalPrice, marginToUse)
+        // Precisão da linha do potencial (2 ou 3; fallback 2).
+        const precisaoLinha = pi.precisao_preco === 3 ? 3 : 2
         const newSellingPrice =
-          computedVenda !== undefined ? Number(computedVenda.toFixed(3)) : undefined
+          computedVenda !== undefined ? Number(computedVenda.toFixed(precisaoLinha)) : undefined
 
         const moqToUse = ci.quantidade_minima || 0
         let qtdeToUpdate = pi.quantidade
