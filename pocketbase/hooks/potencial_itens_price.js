@@ -1,4 +1,8 @@
 onRecordAfterUpdateSuccess((e) => {
+  // Save do serviço de confirmação (confirmar_compra.js) grava o 'venda' por conta própria.
+  if ($app.store().get('c2_suppress_venda:' + e.record.id)) {
+    return e.next()
+  }
   const preco = e.record.get('preco_unitario')
   const fornecedor = e.record.get('observacoes')
 
