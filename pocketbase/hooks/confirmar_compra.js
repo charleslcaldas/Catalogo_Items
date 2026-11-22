@@ -437,9 +437,10 @@ routerAdd(
           tx.save(ov)
         }
         ofertaTx.set('vencedor', true)
+        // preco_original é gravado uma única vez; preservado quando já existir
         if (ofertaTx.getFloat('preco_original') === 0) {
           ofertaTx.set('preco_original', precoOferta)
-        } // preco_original preservado quando já existir
+        }
         tx.save(ofertaTx)
 
         // 2. potencial_itens (referências + venda calculada com margem vigente)
