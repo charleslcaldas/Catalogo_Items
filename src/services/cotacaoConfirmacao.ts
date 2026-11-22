@@ -7,6 +7,23 @@
  *
  * NESTA RODADA: apenas contrato + função cliente. NENHUMA chamada de UI.
  * O frontend continua usando os caminhos atuais até o frontend ser migrado.
+ *
+ * AUTORIZAÇÃO (v0.0.264): servidor, dentro da transação, nunca booleano do
+ * cliente. Espelho EXATO das API rules auditadas das coleções envolvidas —
+ * regras puras em src/lib/confirmacaoCompra.ts (resolverIdentidade,
+ * podeAcessar, cadeiaCoerente), testadas em
+ * src/lib/__tests__/confirmacaoCompra.test.ts. LACUNAS documentadas lá:
+ * JSVM sem API para avaliar filter rules declarativas; users sem campo de
+ * bloqueio (só `verified` do sistema); leituras/escritas via API de servidor
+ * não passam pelas API rules — a checagem espelhada é o controle de acesso.
+ *
+ * MATRIZ PERMITIDO/NEGADO (negar por padrão; reavaliada dentro da transação):
+ *  - anônimo              → NEGADO (401 nao_autenticado; middleware requireAuth + checagem defensiva)
+ *  - usuário Mei (meiqw9s6c4r2t8a) → NEGADO (403 acesso_negado; integração excluída do serviço)
+ *  - autenticado do time  → PERMITIDO (regra espelhada; sem ownership por registro)
+ *  - cadeia entre escopos → NEGADO (409 relacoes_incoerentes: oferta → cotação
+ *                           do fornecedor → potencial ≠ potencial do potencial_iten / item divergente)
+ *  - identidade não-resolvida ou indeterminado → NEGADO (403 acesso_negado)
  */
 
 import pb from '../lib/pocketbase/client'
@@ -116,6 +133,11 @@ export type ConfirmarCompraErrorCode =
   | 'conflito_idempotencia'
   | 'falha_transacao'
   | 'nao_autenticado'
+  | 'acesso_negado'
+  | 'identidade_nao_resolvida'
+  | 'pendencia_dados'
+  | 'precisao_ausente'
+  | 'margem_invalida'
 
 /** Erro tipado do endpoint (código estável + mensagem em português). */
 export class ConfirmarCompraError extends Error {

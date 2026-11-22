@@ -2,7 +2,7 @@
 // Espelham as validações server-side do hook (JSVM não importa módulos TS;
 // as regras são mantidas em paralelo e testadas AQUI como evidência executável).
 //
-// Execução: pnpm -s vitest run (vitest 5.1.1 já em dependencies).
+// Execução: pnpm -s vitest run (vitest já em dependencies).
 // NÃO EXECUTADOS nesta rodada: a suíte não roda no pipeline automático — a
 // plataforma não tem etapa de testes no run_qa (apenas setup/lint/typecheck/build).
 // Rodar localmente antes do merge para evidência completa.
@@ -13,6 +13,10 @@ import {
   avaliarMoq,
   calcularVendaConfirmacao,
   canonicalize,
+  cadeiaCoerente,
+  podeAcessar,
+  resolverIdentidade,
+  MEI_INTEGRATION_USER_ID,
   ofertaEstaVencida,
   payloadCanonico,
   validarPayload,
@@ -72,6 +76,114 @@ describe('validarPayload (borda do cliente; servidor revalida)', () => {
     expect(validarPayload({ ...payloadBase, moq: -1 }).map((e) => e.code)).toContain('moq_invalido')
     expect(validarPayload({ ...payloadBase, moq: Number.NaN }).map((e) => e.code)).toContain(
       'moq_invalido',
+    )
+  })
+})
+
+describe('autorização — matriz PERMITIDO/NEGADO (espelho das API rules auditadas)', () => {
+  it('anônimo → NEGADO (sem auth; 401 já coberto pelo middleware requireAuth)', () => {
+    expect(resolverIdentidade(null).status).toBe('anonimo')
+    expect(resolverIdentidade(undefined).status).toBe('anonimo')
+    expect(podeAcessar(resolverIdentidade(null), 'cotacoes_itens', 'update')).toBe(false)
+    expect(podeAcessar(resolverIdentidade(undefined), 'potenciais', 'view')).toBe(false)
+  })
+
+  it('usuário Mei → NEGADO em qualquer coleção/operação (integração excluída do serviço)', () => {
+    const mei = resolverIdentidade({ id: MEI_INTEGRATION_USER_ID })
+    expect(mei.status).toBe('mei')
+    expect(podeAcessar(mei, 'cotacoes_itens', 'view')).toBe(false)
+    expect(podeAcessar(mei, 'cotacoes_itens', 'update')).toBe(false)
+    expect(podeAcessar(mei, 'potenciais', 'create')).toBe(false)
+    expect(podeAcessar(mei, 'potencial_itens', 'update')).toBe(false)
+    expect(podeAcessar(mei, 'historico_precos', 'create')).toBe(false)
+    expect(podeAcessar(mei, 'c2_idempotency_keys', 'list')).toBe(false)
+  })
+
+  it('autenticado do time → PERMITIDO conforme a regra espelhada (coleção/oper equivalentes)', () => {
+    const time = resolverIdentidade({ id: 'usuario_time_1' })
+    expect(time.status).toBe('time')
+    expect(podeAcessar(time, 'cotacoes_itens', 'view')).toBe(true)
+    expect(podeAcessar(time, 'cotacoes_itens', 'update')).toBe(true)
+    expect(podeAcessar(time, 'cotacoes_fornecedor', 'view')).toBe(true)
+    expect(podeAcessar(time, 'cotacoes_rodadas', 'list')).toBe(true)
+    expect(podeAcessar(time, 'cotacoes_rodadas', 'create')).toBe(true)
+    expect(podeAcessar(time, 'c2_idempotency_keys', 'list')).toBe(true)
+    expect(podeAcessar(time, 'c2_idempotency_keys', 'create')).toBe(true)
+    expect(podeAcessar(time, 'potenciais', 'view')).toBe(true)
+    expect(podeAcessar(time, 'potencial_itens', 'list')).toBe(true)
+    expect(podeAcessar(time, 'potencial_itens', 'view')).toBe(true)
+    expect(podeAcessar(time, 'potencial_itens', 'update')).toBe(true)
+    expect(podeAcessar(time, 'historico_precos', 'create')).toBe(true)
+    expect(podeAcessar(time, 'itens', 'view')).toBe(true)
+    expect(podeAcessar(time, 'fornecedores', 'view')).toBe(true)
+  })
+
+  it('identidade não-resolvida / indeterminado → NEGADO (negar por padrão)', () => {
+    const indet = resolverIdentidade({ id: 42 })
+    expect(indet.status).toBe('indeterminado')
+    expect(podeAcessar(indet, 'cotacoes_itens', 'update')).toBe(false)
+    expect(podeAcessar(resolverIdentidade({ id: '' }), 'potenciais', 'view')).toBe(false)
+    // caso qualquer fora da matriz: negado por omissão
+    const time = resolverIdentidade({ id: 'usuario_time_1' })
+    expect(podeAcessar(time, 'users', 'view')).toBe(false)
+    expect(podeAcessar(time, 'cotacoes_itens', 'delete')).toBe(false)
+  })
+
+  it('sem papel novo: "time" é exatamente autenticado ≠ Mei', () => {
+    expect(resolverIdentidade({ id: MEI_INTEGRATION_USER_ID }).status).toBe('mei')
+    expect(resolverIdentidade({ id: 'qq_usuario_autenticado' }).status).toBe('time')
+  })
+})
+
+describe('autorização — checagem anti-escopo (cadeia de relações coerente)', () => {
+  const base = {
+    oferta: { id: 'of1', cotacao_fornecedor_id: 'cf1', item_id: 'it1' },
+    cotacaoFornecedor: { id: 'cf1', potencial_id: 'pot1' },
+    potencial: { id: 'pot1' },
+    potencialIten: { potencial_id: 'pot1', item_id: 'it1' },
+  }
+
+  it('cadeia coerente → PERMITIDO prosseguir', () => {
+    expect(cadeiaCoerente(base)).toBe(true)
+    expect(cadeiaCoerente({ ...base, potencialIten: null })).toBe(true)
+  })
+
+  it('cotacao_fornecedor.potencial_id aponta para OUTRO potencial → NEGADO', () => {
+    expect(
+      cadeiaCoerente({ ...base, cotacaoFornecedor: { id: 'cf1', potencial_id: 'pot2' } }),
+    ).toBe(false)
+  })
+
+  it('potencial_iten de outro potencial (escopo cruzado) → NEGADO', () => {
+    expect(
+      cadeiaCoerente({ ...base, potencialIten: { potencial_id: 'pot9', item_id: 'it1' } }),
+    ).toBe(false)
+  })
+
+  it('potencial_iten de outro item (escopo cruzado) → NEGADO', () => {
+    expect(
+      cadeiaCoerente({ ...base, potencialIten: { potencial_id: 'pot1', item_id: 'it2' } }),
+    ).toBe(false)
+  })
+
+  it('oferta não pertence à cotação do fornecedor informada → NEGADO', () => {
+    expect(
+      cadeiaCoerente({ ...base, cotacaoFornecedor: { id: 'cf99', potencial_id: 'pot1' } }),
+    ).toBe(false)
+  })
+
+  it('indeterminado (registro ausente ou id vazio em elo obrigatório) → NEGADO', () => {
+    expect(cadeiaCoerente({ ...base, oferta: null })).toBe(false)
+    expect(cadeiaCoerente({ ...base, cotacaoFornecedor: null })).toBe(false)
+    expect(cadeiaCoerente({ ...base, potencial: null })).toBe(false)
+    expect(cadeiaCoerente({ ...base, oferta: { ...base.oferta, cotacao_fornecedor_id: '' } })).toBe(
+      false,
+    )
+    expect(cadeiaCoerente({ ...base, cotacaoFornecedor: { id: 'cf1', potencial_id: '' } })).toBe(
+      false,
+    )
+    expect(cadeiaCoerente({ ...base, potencialIten: { potencial_id: '', item_id: 'it1' } })).toBe(
+      false,
     )
   })
 })
@@ -167,6 +279,7 @@ describe('hook — invariantes que não são executáveis aqui (NÃO EXECUTADO)'
     //  - idempotência durável (mesma chave → mesmo recibo; chave+payload diff → 409)
     //  - conflito de versão (conflito_versao 409 em re-leitura divergente)
     //  - gravação efetiva em cotacoes_rodadas/potencial_itens/historico_precos
+    //  - reavaliação da autorização DENTRO da transação (rollback em negativa)
     //  - não-duplicação de histórico com price_history_logger/on_cotacao_finalizada
     expect(true).toBe(true)
   })

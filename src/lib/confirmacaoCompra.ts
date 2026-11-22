@@ -8,6 +8,11 @@
  * (c) validação de payload ANTES de chamar o endpoint (economiza ida e volta).
  *
  * Qualquer mudança de regra DEVE ser aplicada nos dois lugares.
+ *
+ * AUTORIZAÇÃO (v0.0.264): espelho EXATO das API rules auditadas das coleções
+ * envolvidas — negar por padrão, reavaliada dentro da transação (hook). A
+ * matriz completa PERMITIDO/NEGADO está em AUTORIZACAO_CONFIRMACAO (abaixo) e
+ * é testada em src/lib/__tests__/confirmacaoCompra.test.ts.
  */
 
 import { computeVenda, isValidMargin } from './money'
@@ -18,6 +23,9 @@ export type ConfirmarCompraErrorCode =
   | 'payload_invalido'
   | 'preco_invalido'
   | 'moq_invalido'
+  | 'acesso_negado'
+  | 'nao_autenticado'
+  | 'identidade_nao_resolvida'
   | 'preco_eh_alvo'
   | 'oferta_vencida'
   | 'relacoes_incoerentes'
@@ -28,6 +36,9 @@ export type ConfirmarCompraErrorCode =
   | 'unidade_ausente'
   | 'venda_invalida'
   | 'pendencia_margem'
+  | 'pendencia_dados'
+  | 'precisao_ausente'
+  | 'margem_invalida'
   | 'conflito_versao'
   | 'conflito_idempotencia'
   | 'falha_transacao'
@@ -73,6 +84,123 @@ export function payloadCanonico(p: ConfirmarCompraPayload) {
     moq: typeof p.moq === 'number' && Number.isFinite(p.moq) ? p.moq : null,
     oferta_validade: p.oferta_validade ?? '',
   }
+}
+
+// ---------- AUTORIZAÇÃO: matriz PERMITIDO/NEGADO (espelho das API rules) ----------
+
+/**
+ * REGRA REAL AUDITADA (v0.0.264), nas coleções cotacoes_itens,
+ * cotacoes_fornecedor, cotacoes_rodadas e c2_idempotency_keys (list/view/
+ * create/update/delete), e — para o time — em potenciais, potencial_itens e
+ * historico_precos:
+ *
+ *   ((@request.auth.id != '') && @request.auth.id != "meiqw9s6c4r2t8a")
+ *
+ * potenciais/potencial_itens/historico_precos têm cláusulas "||" EXCLUSIVAS do
+ * usuário Mei (potenciais create: status="Rascunho" e proprietario="Mei";
+ * potencial_itens create: potencial proprietario="Mei", status="Rascunho",
+ * item ativo, quantidade 1..1000000, preco_unitario 0..1000000, observacoes="",
+ * unidade KPC/MPC/Pcs). Como a integração Mei é EXCLUÍDA da confirmação de
+ * compra, a regra EFETIVA para este serviço é a do time, acima.
+ *
+ * LACUNAS documentadas (não implementáveis no estado atual):
+ *  - o JSVM do PocketBase não expõe API para avaliar as filter rules
+ *    declarativas das coleções — o espelhamento explícito é a abordagem;
+ *  - a coleção users não tem campo de bloqueio além de `verified` (sistema):
+ *    "conta bloqueada" não tem representação no schema atual; identidade
+ *    existente e ≠ Mei → autorizada conforme a regra espelhada;
+ *  - o serviço lê/grava via API de servidor, que NÃO passa pelas API rules —
+ *    a checagem espelhada é o que sustenta o controle de acesso.
+ */
+export const MEI_INTEGRATION_USER_ID = 'meiqw9s6c4r2t8a'
+
+/** Status de identidade para a matriz de autorização (negar por padrão). */
+export type IdentidadeStatus = 'anonimo' | 'mei' | 'time' | 'indeterminado'
+
+export interface IdentidadeConfirmacao {
+  status: IdentidadeStatus
+  id: string
+}
+
+/** Operação equivalente exigida por coleção envolvida na confirmação. */
+export const OPERACOES_CONFIRMACAO: ReadonlyArray<{
+  colecao: string
+  operacoes: readonly ('list' | 'view' | 'create' | 'update' | 'delete')[]
+}> = [
+  { colecao: 'cotacoes_itens', operacoes: ['view', 'update'] },
+  { colecao: 'cotacoes_fornecedor', operacoes: ['view'] },
+  { colecao: 'cotacoes_rodadas', operacoes: ['list', 'create'] },
+  { colecao: 'c2_idempotency_keys', operacoes: ['list', 'create'] },
+  { colecao: 'potenciais', operacoes: ['view'] },
+  { colecao: 'potencial_itens', operacoes: ['list', 'view', 'update'] },
+  { colecao: 'historico_precos', operacoes: ['create'] },
+  { colecao: 'itens', operacoes: ['view'] },
+  { colecao: 'fornecedores', operacoes: ['view'] },
+]
+
+/**
+ * Matriz PERMITIDO/NEGADO (negar por padrão):
+ *  - anonimo       → NEGADO (401 no middleware requireAuth; defensivo aqui)
+ *  - mei           → NEGADO (excluído pela regra efetiva do serviço)
+ *  - time          → PERMITIDO conforme OPERACOES_CONFIRMACAO (coleção/operação)
+ *  - indeterminado → NEGADO (identidade não-resolvida, caso qualquer)
+ *
+ * O time não tem papel novo: "time" é exatamente o conjunto da regra espelhada
+ * (autenticado ≠ Mei). Nenhum caso é tratado como permitido por omissão.
+ */
+export function resolverIdentidade(
+  authUser: { id?: unknown } | null | undefined,
+): IdentidadeConfirmacao {
+  if (authUser === null || authUser === undefined) {
+    return { status: 'anonimo', id: '' }
+  }
+  if (typeof authUser.id !== 'string' || authUser.id === '') {
+    return { status: 'indeterminado', id: '' }
+  }
+  if (authUser.id === MEI_INTEGRATION_USER_ID) {
+    return { status: 'mei', id: authUser.id }
+  }
+  return { status: 'time', id: authUser.id }
+}
+
+/** Matriz: time → permitido para coleção/oper do escopo; qualquer outra combinação → NEGADO. */
+export function podeAcessar(
+  identidade: IdentidadeConfirmacao,
+  colecao: string,
+  operacao: 'list' | 'view' | 'create' | 'update' | 'delete',
+): boolean {
+  if (identidade.status !== 'time') return false
+  for (const o of OPERACOES_CONFIRMACAO) {
+    if (o.colecao === colecao && o.operacoes.includes(operacao)) return true
+  }
+  return false
+}
+
+/**
+ * Checagem anti-escopo: a cadeia oferta → cotação do fornecedor → potencial →
+ * potencial_iten deve apontar para o MESMO potencial e o MESMO item.
+ * Divergência em qualquer elo → NEGADO (tentativa entre escopos).
+ * Indeterminado (registro ausente ou id vazio em elo obrigatório) → NEGADO.
+ */
+export function cadeiaCoerente(input: {
+  oferta: { id: string; cotacao_fornecedor_id: string; item_id: string } | null
+  cotacaoFornecedor: { id: string; potencial_id: string } | null
+  potencial: { id: string } | null
+  potencialIten: { potencial_id: string; item_id: string } | null
+}): boolean {
+  const { oferta, cotacaoFornecedor, potencial, potencialIten } = input
+  if (!oferta || !cotacaoFornecedor || !potencial) return false
+  if (!oferta.id || !oferta.cotacao_fornecedor_id || !oferta.item_id) return false
+  if (!cotacaoFornecedor.id || !cotacaoFornecedor.potencial_id) return false
+  if (!potencial.id) return false
+  if (oferta.cotacao_fornecedor_id !== cotacaoFornecedor.id) return false
+  if (cotacaoFornecedor.potencial_id !== potencial.id) return false
+  if (potencialIten) {
+    if (!potencialIten.potencial_id || !potencialIten.item_id) return false
+    if (potencialIten.potencial_id !== potencial.id) return false
+    if (potencialIten.item_id !== oferta.item_id) return false
+  }
+  return true
 }
 
 // ---------- validações server-side (espelho) ----------

@@ -29,6 +29,10 @@
 // ATENÇÃO (validador de deploy da Skip Cloud): TODOS os helpers são declarados
 // DENTRO do callback — nenhuma declaração top-level além da chamada de routerAdd.
 // Nenhum hook existente foi alterado.
+//
+// AUTORIZAÇÃO (v0.0.264): espelho EXATO das API rules auditadas — negar por
+// padrão, reavaliada DENTRO da transação. Ver seção "AUTORIZAÇÃO" no corpo
+// (código candidato, inalcançável enquanto o return 503 acima estiver ativo).
 
 routerAdd(
   'POST',
@@ -101,6 +105,154 @@ routerAdd(
         return String(v)
       } catch (err2) {}
       return ''
+    }
+
+    // =====================================================================
+    // AUTORIZAÇÃO — espelho EXATO das API rules auditadas (v0.0.264)
+    // =====================================================================
+    // Regra efetiva auditada do time (list/view/create/update/delete) nas
+    // coleções cotacoes_itens, cotacoes_fornecedor, cotacoes_rodadas e
+    // c2_idempotency_keys:
+    //   ((@request.auth.id != '') && @request.auth.id != "meiqw9s6c4r2t8a")
+    // potenciais, potencial_itens e historico_precos têm a MESMA regra para o
+    // time, COM cláusulas "||" exclusivas do usuário Mei (potenciais create:
+    // status="Rascunho" e proprietario="Mei"; potencial_itens create: potencial
+    // proprietario="Mei", status="Rascunho", item ativo, quantidade 1..1000000,
+    // preco_unitario 0..1000000, observacoes="", unidade KPC/MPC/Pcs). Como a
+    // integração Mei é EXCLUÍDA da confirmação de compra, a regra efetiva para
+    // ESTE serviço é a do time.
+    //
+    // LACUNAS documentadas (sem implementação aqui):
+    //  - o JSVM do PocketBase não expõe API para avaliar as filter rules
+    //    declarativas das coleções — o espelhamento explícito abaixo é a
+    //    abordagem adotada;
+    //  - a coleção users não tem campo de bloqueio além de `verified` (sistema):
+    //    "conta bloqueada" não tem representação no schema atual; identidade
+    //    existente e ≠ Mei → autorizada conforme a regra espelhada;
+    //  - o serviço lê/grava via API de servidor, que NÃO passa pelas API rules —
+    //    a checagem espelhada abaixo é o que sustenta o controle de acesso.
+    //
+    // Política: NEGAR POR PADRÃO. Anônimo (já coberto pelo middleware requireAuth,
+    // mantido aqui defensivamente), usuário Mei, identidade não-resolvida e
+    // qualquer caso indeterminado → NEGADO. Nenhum papel novo é inventado; as
+    // regras do time não restringem por registro (sem cláusula de ownership),
+    // então o controle por registro é a coerência da cadeia de relações
+    // (cadeiaCoerente) — cadeia divergente → NEGADO (tentativa entre escopos).
+
+    const OPERACOES_CONFIRMACAO = [
+      { colecao: 'cotacoes_itens', operacoes: ['view', 'update'] },
+      { colecao: 'cotacoes_fornecedor', operacoes: ['view'] },
+      { colecao: 'cotacoes_rodadas', operacoes: ['list', 'create'] },
+      { colecao: 'c2_idempotency_keys', operacoes: ['list', 'create'] },
+      { colecao: 'potenciais', operacoes: ['view'] },
+      { colecao: 'potencial_itens', operacoes: ['list', 'view', 'update'] },
+      { colecao: 'historico_precos', operacoes: ['create'] },
+      { colecao: 'itens', operacoes: ['view'] },
+      { colecao: 'fornecedores', operacoes: ['view'] },
+    ]
+
+    // Identidade: time (autenticado ≠ Mei) é o único status autorizado.
+    // Qualquer outra coisa (ausente, Mei, não-resolvida, indeterminado) → negado.
+    const resolverIdentidade = function (authUser) {
+      if (!authUser || typeof authUser.id !== 'string' || authUser.id === '') {
+        return { status: 'anonimo', id: '' }
+      }
+      if (authUser.id === MEI_INTEGRATION_USER_ID) {
+        return { status: 'mei', id: authUser.id }
+      }
+      return { status: 'time', id: authUser.id }
+    }
+
+    // Matriz espelhada: time → permitido conforme regra auditada; qualquer
+    // outro status ou coleção/oper fora do escopo → NEGADO (negar por padrão).
+    const podeAcessar = function (identidade, colecao, operacao) {
+      if (!identidade || identidade.status !== 'time') return false
+      for (let i = 0; i < OPERACOES_CONFIRMACAO.length; i++) {
+        const o = OPERACOES_CONFIRMACAO[i]
+        if (o.colecao === colecao && o.operacoes.indexOf(operacao) !== -1) return true
+      }
+      return false
+    }
+
+    // Gate por coleção/oper equivalente (view/list para leituras, create/update
+    // para escritas) — exige ACESSO EXPLÍCITO para cada coleção envolvida.
+    const exigirAcesso = function (identidade, colecao, operacao) {
+      if (podeAcessar(identidade, colecao, operacao)) return null
+      return jsonError(
+        403,
+        'acesso_negado',
+        'Acesso negado a ' + colecao + ' (' + operacao + ') nesta operação.',
+      )
+    }
+
+    // Mesma matriz, DENTRO da transação: throw → rollback total (nada gravado).
+    const exigirAcessoTx = function (identidade, colecao, operacao) {
+      if (!podeAcessar(identidade, colecao, operacao)) {
+        throw new BadRequestError(
+          'acesso_negado: autorização reavaliada e negada na gravação (' +
+            colecao +
+            '/' +
+            operacao +
+            ').',
+        )
+      }
+    }
+
+    // Cadeia de relações deve ser coerente (anti-escopo): oferta → cotação do
+    // fornecedor → potencial deve apontar para o MESMO potencial do potencial_iten
+    // (e mesmo item). Divergência → negado (tentativa entre escopos).
+    const cadeiaCoerente = function (oferta, cf, potencial, pitem) {
+      if (!oferta || !cf || !potencial) return false
+      if (cf.getString('potencial_id') !== potencial.id) return false
+      if (oferta.getString('cotacao_fornecedor_id') !== cf.id) return false
+      if (pitem) {
+        if (pitem.getString('potencial_id') !== potencial.id) return false
+        if (pitem.getString('item_id') !== oferta.getString('item_id')) return false
+      }
+      return true
+    }
+
+    // ---------- gate de autorização (negar por padrão) ----------
+    const identidade = resolverIdentidade(auth)
+    if (identidade.status !== 'time') {
+      return identidade.status === 'anonimo'
+        ? e.json(401, { error: 'nao_autenticado', message: 'Autenticação obrigatória.' })
+        : e.json(403, {
+            error: 'acesso_negado',
+            message: 'Identidade não autorizada a confirmar compras.',
+          })
+    }
+    // Cada coleção envolvida na operação, com a operação equivalente:
+    // leituras → view/list; escritas da transação → update/create.
+    const LEITURAS_CONFIRMACAO = [
+      ['cotacoes_itens', 'view'],
+      ['cotacoes_rodadas', 'list'],
+      ['cotacoes_fornecedor', 'view'],
+      ['potenciais', 'view'],
+      ['fornecedores', 'view'],
+      ['itens', 'view'],
+      ['potencial_itens', 'view'],
+      ['potencial_itens', 'list'],
+      ['c2_idempotency_keys', 'list'],
+    ]
+    for (let l = 0; l < LEITURAS_CONFIRMACAO.length; l++) {
+      const negL = exigirAcesso(identidade, LEITURAS_CONFIRMACAO[l][0], LEITURAS_CONFIRMACAO[l][1])
+      if (negL) return negL
+    }
+    const ESCRITAS_CONFIRMACAO = [
+      ['cotacoes_itens', 'update'],
+      ['potencial_itens', 'update'],
+      ['historico_precos', 'create'],
+      ['cotacoes_rodadas', 'create'],
+      ['c2_idempotency_keys', 'create'],
+    ]
+    for (let wt = 0; wt < ESCRITAS_CONFIRMACAO.length; wt++) {
+      const negW = exigirAcesso(
+        identidade,
+        ESCRITAS_CONFIRMACAO[wt][0],
+        ESCRITAS_CONFIRMACAO[wt][1],
+      )
+      if (negW) return negW
     }
 
     // ---------- leitura e validação do payload ----------
@@ -287,16 +439,6 @@ routerAdd(
       } catch (_) {
         return jsonError(404, 'potencial_item_nao_encontrado', 'Item do potencial não encontrado.')
       }
-      if (
-        pitem.getString('item_id') !== itemId ||
-        pitem.getString('potencial_id') !== potencialId
-      ) {
-        return jsonError(
-          409,
-          'relacoes_incoerentes',
-          'potencial_iten não pertence ao mesmo item/potencial da oferta.',
-        )
-      }
     } else {
       const candidatos = $app.findRecordsByFilter(
         'potencial_itens',
@@ -320,6 +462,17 @@ routerAdd(
         )
       }
       pitem = candidatos[0]
+    }
+
+    // anti-escopo: a cadeia oferta → cotação do fornecedor → potencial →
+    // potencial_iten deve apontar para o MESMO potencial e o MESMO item.
+    // Divergência em qualquer elo → negado (tentativa entre escopos).
+    if (!cadeiaCoerente(oferta, cf, potencial, pitem)) {
+      return jsonError(
+        409,
+        'relacoes_incoerentes',
+        'Cadeia de relações incoerente — potencial/item divergem da oferta (tentativa entre escopos).',
+      )
     }
 
     // ---------- margem negociada (recebida no contrato; nunca linhas.margem_padrao; nunca 7,5) ----------
@@ -419,6 +572,41 @@ routerAdd(
             'conflito_versao: a oferta mudou durante a confirmação — tente novamente.',
           )
         }
+
+        // AUTORIZAÇÃO reavaliada DENTRO da transação (não só no pré-voo):
+        // identidade + matriz (negar por padrão) — qualquer negativa → rollback total.
+        const identidadeTx = resolverIdentidade(auth)
+        exigirAcessoTx(identidadeTx, 'cotacoes_itens', 'update')
+        exigirAcessoTx(identidadeTx, 'potencial_itens', 'update')
+        exigirAcessoTx(identidadeTx, 'historico_precos', 'create')
+        exigirAcessoTx(identidadeTx, 'cotacoes_rodadas', 'create')
+        exigirAcessoTx(identidadeTx, 'c2_idempotency_keys', 'create')
+
+        // re-leitura das relações na transação + RE-checagem da cadeia (anti-escopo):
+        // os registros podem ter mudado desde o pré-voo; divergência → negado.
+        let cfTx = null
+        let potencialTx = null
+        let pitemTx = null
+        try {
+          cfTx = tx.findRecordById(
+            'cotacoes_fornecedor',
+            ofertaTx.getString('cotacao_fornecedor_id'),
+          )
+          potencialTx = tx.findRecordById('potenciais', cfTx.getString('potencial_id'))
+          pitemTx = tx.findRecordById('potencial_itens', pitem.id)
+        } catch (_) {
+          throw new BadRequestError(
+            'acesso_negado: cadeia de relações não resolvida na gravação — nada aplicado.',
+          )
+        }
+        if (!cadeiaCoerente(ofertaTx, cfTx, potencialTx, pitemTx)) {
+          throw new BadRequestError(
+            'acesso_negado: cadeia de relações divergente na gravação (tentativa entre escopos).',
+          )
+        }
+        // gravações abaixo usam os registros RE-LIDOS na transação
+        pitem = pitemTx
+        potencial = potencialTx
 
         // 1. vencedor em cotacoes_itens (desmarca outros vencedores do mesmo item)
         const outrosVencedores = tx.findRecordsByFilter(
