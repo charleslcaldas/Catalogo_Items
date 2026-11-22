@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-22T18:30:15.626Z",
+  "generatedAt": "2026-11-22T18:40:44.966Z",
   "collections": [
     {
       "name": "users",
@@ -2772,7 +2772,8 @@
             "oferta_original",
             "contraproposta_c2",
             "resposta_fabricante",
-            "oferta_confirmada"
+            "oferta_confirmada",
+            "selecao"
           ]
         },
         {
@@ -2862,9 +2863,76 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "cotacao_iten_ref",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": []
+    },
+    {
+      "name": "c2_idempotency_keys",
+      "type": "base",
+      "apiRules": {
+        "list": "((@request.auth.id != '') && @request.auth.id != \"meiqw9s6c4r2t8a\")",
+        "view": "((@request.auth.id != '') && @request.auth.id != \"meiqw9s6c4r2t8a\")",
+        "create": "((@request.auth.id != '') && @request.auth.id != \"meiqw9s6c4r2t8a\")",
+        "update": "((@request.auth.id != '') && @request.auth.id != \"meiqw9s6c4r2t8a\")",
+        "delete": "((@request.auth.id != '') && @request.auth.id != \"meiqw9s6c4r2t8a\")"
+      },
+      "fields": [
+        {
+          "name": "chave",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "escopo",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "payload_hash",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "recibo",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "criado_por",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_c2_idem_chave ON c2_idempotency_keys (chave)",
+        "CREATE INDEX idx_c2_idem_escopo ON c2_idempotency_keys (escopo, created)"
+      ]
     }
   ]
 }
