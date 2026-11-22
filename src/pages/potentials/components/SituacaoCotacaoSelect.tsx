@@ -95,7 +95,7 @@ export default function SituacaoCotacaoSelect({
       {situacao && (
         <Badge
           variant="outline"
-          className={`text-[10px] border-transparent ${CORES[situacao] || ''}`}
+          className={`text-[10px] border-transparent ${CORES_SITUACAO[situacao] || ''}`}
         >
           {saving ? 'salvando…' : ''}
         </Badge>

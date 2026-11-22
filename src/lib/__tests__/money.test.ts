@@ -1,92 +1,103 @@
-// Suite de cálculo/arredondamento (executável com: node --experimental-strip-types src/lib/__tests__/money.test.ts)
-// NÃO é importada pelo app; serve como evidência executável dos critérios 2, 3, 5, 6 e 13.
+// Suite de cálculo/arredondamento — vitest (pnpm -s vitest run)
+// Evidência executável dos critérios: fórmula venda=margem, precisão 2/3, totais, moeda única.
+
+import { describe, expect, it } from 'vitest'
 
 import {
-  parseToCents,
+  assertSingleCurrency,
   centsToNumber,
-  formatCents,
-  lineTotalCents,
-  computeVenda,
   computeMargem,
   computeTotaisFinanceiros,
+  computeVenda,
+  formatCents,
   formatMargem,
-  assertSingleCurrency,
   isValidMargin,
-} from './money'
+  lineTotalCents,
+  parseToCents,
+} from '../money'
 
-let passed = 0
-let failed = 0
-const failures: string[] = []
+describe('parsing / formatação', () => {
+  it('parse br/us/número', () => {
+    expect(parseToCents('1.234,56')).toBe(123456)
+    expect(parseToCents('1234.56')).toBe(123456)
+    expect(parseToCents(100)).toBe(10000)
+  })
 
-function eq(name: string, actual: unknown, expected: unknown) {
-  const okv = JSON.stringify(actual) === JSON.stringify(expected)
-  if (okv) passed++
-  else {
-    failed++
-    failures.push(`${name}: esperado ${JSON.stringify(expected)}, obtido ${JSON.stringify(actual)}`)
-  }
-}
+  it('parse de entradas inválidas → 0', () => {
+    expect(parseToCents(Number.NaN)).toBe(0)
+    expect(parseToCents('')).toBe(0)
+    expect(parseToCents(null)).toBe(0)
+  })
 
-function ok(name: string, cond: boolean) {
-  if (cond) passed++
-  else {
-    failed++
-    failures.push(name)
-  }
-}
+  it('precisão 2 e 3 casas', () => {
+    expect(centsToNumber(1235, 3)).toBe(1.235)
+    expect(formatCents(1235, 3)).toBe('1,235')
+    expect(centsToNumber(12345, 2)).toBe(123.45)
+  })
+})
 
-// parse
-eq('parse br', parseToCents('1.234,56'), 123456)
-eq('parse us', parseToCents('1234.56'), 123456)
-eq('parse num', parseToCents(100), 10000)
-eq('parse nan', parseToCents(Number.NaN), 0)
-eq('parse empty', parseToCents(''), 0)
+describe('fórmula obrigatória venda = compra / (1 - margem/100)', () => {
+  it('compra 100 margem 10 → 111,11 (margem, NÃO markup)', () => {
+    expect(computeVenda(100, 10)).toBeCloseTo(111.11, 2)
+  })
 
-// precisão
-eq('cents 3 casas', centsToNumber(1235, 3), 1.235)
-eq('format 3 casas', formatCents(1235, 3), '1,235')
-eq('cents 2 casas', centsToNumber(12345, 2), 123.45)
+  it('casos inválidos: margem ≥ 100, compra 0, números não finitos', () => {
+    expect(computeVenda(100, 100)).toBeUndefined()
+    expect(computeVenda(0, 10)).toBeUndefined()
+    expect(computeVenda(Number.NaN, 10)).toBeUndefined()
+    expect(computeVenda(100, Number.POSITIVE_INFINITY)).toBeUndefined()
+    expect(isValidMargin(-1)).toBe(false)
+    expect(isValidMargin(Number.NaN)).toBe(false)
+    expect(isValidMargin(99.99)).toBe(true)
+  })
+})
 
-// fórmula obrigatória
-ok('compra 100 margem 10 → 111,11', Math.abs((computeVenda(100, 10) as number) - 111.11) < 0.005)
-ok('margem 100 inválida', computeVenda(100, 100) === undefined)
-ok('compra 0 inválida', computeVenda(0, 10) === undefined)
-ok('margem negativa inválida', !isValidMargin(-1))
-ok('margem NaN inválida', !isValidMargin(Number.NaN))
+describe('edição manual de venda → margem', () => {
+  it('venda 120 compra 100 → 16,67%', () => {
+    expect(formatMargem(100, 120)).toBe('16.67%')
+    expect(computeMargem(100, 120)).toBeCloseTo(16.6667, 3)
+  })
 
-// edição manual de venda
-ok('venda 120 compra 100 → 16,67%', formatMargem(100, 120) === '16.67%')
-ok('venda zero → —', formatMargem(100, 0) === '—')
+  it('venda zero → "—"', () => {
+    expect(formatMargem(100, 0)).toBe('—')
+    expect(computeMargem(100, 0)).toBeUndefined()
+  })
+})
 
-// exemplo obrigatório 1,235 × 3
-const linha = lineTotalCents(3, parseToCents(1.235))
-ok('linha 3 casas = 3,705', centsToNumber(linha, 3) === 3.705)
-ok('geral 2 casas = 3,71', Math.round(linha) === 371 && centsToNumber(371, 2) === 3.71)
+describe('precisão 3 casas: 3 × 1,235 = 3,705 (linha) e geral 3,71', () => {
+  const precoCents = 1235 // 1,235 em milésimos
+  const linha = lineTotalCents(3, precoCents)
 
-// totais agregados (não média de margens)
-const totais = computeTotaisFinanceiros([10000, 10000], [20000, 11000])
-eq('total compra', totais.totalCompra, 20000)
-eq('total venda', totais.totalVenda, 31000)
-eq('ganho bruto', totais.ganhoBrutoEstimado, 11000)
-ok('margem efetiva ≠ média simples', Math.abs((totais.margemEfetiva as number) - 3.2258) < 0.001)
-ok('venda total zero → —', formatMargem(totais.totalCompra, 0) === '—')
+  it('total da linha = 3,705 (mesma precisão do unitário)', () => {
+    expect(centsToNumber(linha, 3)).toBe(3.705)
+    expect(formatCents(linha, 3)).toBe('3,705')
+  })
 
-// moedas
-ok('moeda única ok', assertSingleCurrency(['USD', 'USD']) === 'USD')
-ok(
-  'moedas distintas lançam',
-  (() => {
-    try {
-      assertSingleCurrency(['USD', 'BRL'])
-      return false
-    } catch {
-      return true
-    }
-  })(),
-)
+  it('total geral com 2 casas arredondado APÓS somar = 3,71', () => {
+    const geral = Math.round(linha / 10) // 370.5 → 371 (centésimos)
+    expect(geral).toBe(371)
+    expect(centsToNumber(geral, 2)).toBe(3.71)
+  })
+})
 
-console.log(`Testes de cálculo: ${passed} passaram, ${failed} falharam`)
-if (failed > 0) {
-  failures.forEach((f) => console.error('  FALHOU: ' + f))
-  process.exit(1)
-}
+describe('totais agregados (nunca média das margens)', () => {
+  const totais = computeTotaisFinanceiros([10000, 10000], [20000, 11000])
+
+  it('somas de compra/venda e ganho bruto', () => {
+    expect(totais.totalCompra).toBe(20000)
+    expect(totais.totalVenda).toBe(31000)
+    expect(totais.ganhoBrutoEstimado).toBe(11000)
+  })
+
+  it('margem efetiva = ganho/total venda, ≠ média simples (3,23% vs 25%)', () => {
+    expect(totais.margemEfetiva).toBeCloseTo(3.2258, 3)
+    expect(formatMargem(totais.totalCompra, 0)).toBe('—')
+  })
+})
+
+describe('moeda explícita', () => {
+  it('moeda única ok; moedas distintas lançam erro', () => {
+    expect(assertSingleCurrency(['USD', 'USD'])).toBe('USD')
+    expect(() => assertSingleCurrency(['USD', 'BRL'])).toThrow()
+  })
+})

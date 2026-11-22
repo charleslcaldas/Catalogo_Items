@@ -20,8 +20,8 @@ import {
   assertSingleCurrency,
 } from '@/lib/money'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { SituacaoCotacaoSelect } from './components/SituacaoCotacaoSelect'
-import { EstagioZohoReadOnly } from './components/EstagioZohoReadOnly'
+import SituacaoCotacaoSelect from './components/SituacaoCotacaoSelect'
+import EstagioZohoReadOnly from './components/EstagioZohoReadOnly'
 import {
   AlertDialog,
   AlertDialogAction,
