@@ -13,6 +13,16 @@ import { useToast } from '@/hooks/use-toast'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 import {
+  computeTotaisFinanceiros,
+  lineTotalCents,
+  parseToCents,
+  formatCents,
+  assertSingleCurrency,
+} from '@/lib/money'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { SituacaoCotacaoSelect } from './components/SituacaoCotacaoSelect'
+import { EstagioZohoReadOnly } from './components/EstagioZohoReadOnly'
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -30,6 +40,13 @@ export default function PotentialDetailsWrapper() {
   const [globalMargin, setGlobalMargin] = useState('7.5')
   const [realMargin, setRealMargin] = useState<number | null>(null)
   const [isApplying, setIsApplying] = useState(false)
+  const [totais, setTotais] = useState<{
+    totalCompra: string
+    totalVenda: string
+    ganhoBruto: string
+    margemEfetiva: string
+  }>({ totalCompra: '0,00', totalVenda: '0,00', ganhoBruto: '0,00', margemEfetiva: '—' })
+  const [moeda, setMoeda] = useState('USD')
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
   const { toast } = useToast()
   const [searchParams] = useSearchParams()
@@ -51,20 +68,31 @@ export default function PotentialDetailsWrapper() {
         expand: 'item_id',
       })
 
-      let totalPurchase = 0
-      let totalSale = 0
+      // Moeda explícita: nunca somar moedas distintas sem conversão registrada
+      const moedas = items.map((i) => i.moeda_compra)
+      try {
+        setMoeda(assertSingleCurrency(moedas))
+      } catch {
+        setMoeda('MISTAS')
+      }
+
+      const linhasCompra: number[] = []
+      const linhasVenda: number[] = []
       items.forEach((item) => {
         const q = item.quantidade || 0
-        const p = typeof item.referencia_preco === 'number' ? item.referencia_preco : 0
-        const v = item.preco_unitario || 0
-        totalPurchase += q * p
-        totalSale += q * v
+        const pCents = parseToCents(item.referencia_preco ?? 0)
+        const vCents = parseToCents(item.preco_unitario ?? 0)
+        linhasCompra.push(lineTotalCents(q, pCents))
+        linhasVenda.push(lineTotalCents(q, vCents))
       })
-      if (totalSale > 0) {
-        setRealMargin((1 - totalPurchase / totalSale) * 100)
-      } else {
-        setRealMargin(null)
-      }
+      const t = computeTotaisFinanceiros(linhasCompra, linhasVenda)
+      setRealMargin(t.margemEfetiva ?? null)
+      setTotais({
+        totalCompra: formatCents(t.totalCompra, 2),
+        totalVenda: formatCents(t.totalVenda, 2),
+        ganhoBruto: formatCents(t.ganhoBrutoEstimado, 2),
+        margemEfetiva: t.margemEfetiva !== undefined ? `${t.margemEfetiva.toFixed(2)}%` : '—',
+      })
     } catch (err) {
       console.error('Failed to load totals', err)
     }
@@ -147,9 +175,12 @@ export default function PotentialDetailsWrapper() {
         </div>
 
         {tab === 'items' && (
-          <div className="flex items-center gap-3 mb-2 bg-muted/20 p-1.5 px-3 rounded-md border shadow-sm">
+          <div className="flex items-center gap-3 mb-2 bg-muted/20 p-1.5 px-3 rounded-md border shadow-sm flex-wrap">
+            <SituacaoCotacaoSelect potencialId={potencialId} />
+            <EstagioZohoReadOnly potencialId={potencialId} />
+            <div className="w-px h-6 bg-border" />
             <Label className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
-              Inside Margin Global
+              Margem Global (%)
             </Label>
             <div className="flex items-center gap-1">
               <Input
@@ -162,7 +193,6 @@ export default function PotentialDetailsWrapper() {
                     setGlobalMargin(val)
                   }
                 }}
-                onBlur={applyGlobalMargin}
                 onKeyDown={(e) => e.key === 'Enter' && applyGlobalMargin()}
                 className="w-20 h-7 text-xs text-right font-mono bg-background"
               />
@@ -180,13 +210,49 @@ export default function PotentialDetailsWrapper() {
             <div className="w-px h-6 bg-border mx-1" />
 
             <Label className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
-              Margem Real Calculada
+              Margem Efetiva (%)
             </Label>
             <div className="flex items-center gap-1">
               <div className="h-7 px-3 flex items-center justify-end bg-background border rounded-md text-xs font-mono text-muted-foreground min-w-[4rem]">
-                {realMargin !== null ? realMargin.toFixed(3) : '0.000'}
+                {totais.margemEfetiva}
               </div>
-              <span className="text-xs text-muted-foreground font-semibold">%</span>
+            </div>
+            <div className="w-px h-6 bg-border mx-1" />
+            <div className="flex items-center gap-1">
+              <Label className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
+                Total de Compra
+              </Label>
+              <div className="h-7 px-3 flex items-center justify-end bg-background border rounded-md text-xs font-mono min-w-[6rem]">
+                {moeda === 'MISTAS'
+                  ? `${totais.totalCompra} (?)`
+                  : `${moeda} ${totais.totalCompra}`}
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <Label className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
+                Total de Venda
+              </Label>
+              <div className="h-7 px-3 flex items-center justify-end bg-background border rounded-md text-xs font-mono min-w-[6rem]">
+                {moeda === 'MISTAS' ? `${totais.totalVenda} (?)` : `${moeda} ${totais.totalVenda}`}
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Label className="text-xs font-semibold text-muted-foreground whitespace-nowrap cursor-help underline decoration-dashed underline-offset-2">
+                    Ganho Bruto Estimado
+                  </Label>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">
+                    Diferença entre o total de venda e o total de compra, sem dedução de outras
+                    despesas.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+              <div className="h-7 px-3 flex items-center justify-end bg-background border rounded-md text-xs font-mono min-w-[6rem]">
+                {moeda === 'MISTAS' ? `${totais.ganhoBruto} (?)` : `${moeda} ${totais.ganhoBruto}`}
+              </div>
             </div>
           </div>
         )}

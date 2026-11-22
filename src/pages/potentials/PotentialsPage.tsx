@@ -29,6 +29,7 @@ import { useRealtime } from '@/hooks/use-realtime'
 import type { StatusPotencial } from '@/types'
 import { getContrastColor } from '@/lib/utils'
 import { StatusManagementModal } from './components/StatusManagementModal'
+import { SITUACOES, CORES_SITUACAO } from './components/SituacaoCotacaoSelect'
 
 export default function PotentialsPage() {
   const [potentials, setPotentials] = useState<Potencial[]>([])
@@ -571,6 +572,7 @@ export default function PotentialsPage() {
                   <TableHead className="text-[11px] py-1">Nome Potencial</TableHead>
                   <TableHead className="text-[11px] py-1">Proprietário</TableHead>
                   <TableHead className="text-[11px] py-1">Estágio</TableHead>
+                  <TableHead className="text-[11px] py-1">Situação da Cotação — Compras</TableHead>
                   <TableHead className="text-[11px] py-1">Status</TableHead>
                   <TableHead className="text-[11px] py-1 text-right">Valor Total</TableHead>
                 </TableRow>
@@ -628,6 +630,32 @@ export default function PotentialsPage() {
                       </TableCell>
                       <TableCell className="py-1 text-[11px] text-muted-foreground">
                         {p.expand?.estagio_id?.nome || '-'}
+                      </TableCell>
+                      <TableCell className="py-1">
+                        <select
+                          className="h-7 rounded border border-input bg-white px-1.5 text-[11px] focus:outline-none focus:ring-2 focus:ring-ring"
+                          value={(p as any).situacao_cotacao || ''}
+                          onChange={async (e) => {
+                            const v = e.target.value
+                            setPotentials((prev) =>
+                              prev.map((x) => (x.id === p.id ? { ...x, situacao_cotacao: v } : x)),
+                            )
+                            try {
+                              await pb
+                                .collection('potenciais')
+                                .update(p.id, { situacao_cotacao: v })
+                            } catch (err) {
+                              console.error('Erro ao salvar situação da cotação', err)
+                            }
+                          }}
+                        >
+                          <option value="">—</option>
+                          {SITUACOES.map((s) => (
+                            <option key={s} value={s}>
+                              {s}
+                            </option>
+                          ))}
+                        </select>
                       </TableCell>
                       <TableCell className="py-1">{getStatusBadge(p)}</TableCell>
                       <TableCell className="py-1 text-[11px] text-right font-medium">

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-22T15:20:05.022Z",
+  "generatedAt": "2026-11-22T15:40:44.704Z",
   "collections": [
     {
       "name": "users",
@@ -719,13 +719,86 @@
           "type": "text",
           "required": false,
           "system": false
+        },
+        {
+          "name": "situacao_cotacao",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "Aguardando especificações",
+            "Aguardando cotação dos fabricantes",
+            "Cotações recebidas",
+            "Em negociação",
+            "Em formação de preço",
+            "Cotação concluída",
+            "Cancelada"
+          ]
+        },
+        {
+          "name": "compras_concluida_em",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onUpdate"]
+        },
+        {
+          "name": "compras_concluida_por",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "cotacao_versao",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "zoho_potencial_id",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "zoho_link",
+          "type": "url",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "zoho_origem",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "zoho_last_sync_at",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onUpdate"]
+        },
+        {
+          "name": "zoho_last_sync_status",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "zoho_last_sync_error",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
         "CREATE UNIQUE INDEX idx_potenciais_numero ON potenciais (numero_potencial)",
         "CREATE INDEX `idx_potenciais_nome` ON `potenciais` (nome_potencial)",
         "CREATE INDEX `idx_potenciais_proprietario` ON `potenciais` (proprietario)",
-        "CREATE INDEX `idx_potenciais_estagio_id` ON `potenciais` (estagio_id)"
+        "CREATE INDEX `idx_potenciais_estagio_id` ON `potenciais` (estagio_id)",
+        "CREATE UNIQUE INDEX `idx_potenciais_zoho_id` ON `potenciais` (`zoho_potencial_id`) WHERE `zoho_potencial_id` != ''"
       ]
     },
     {
@@ -812,6 +885,66 @@
         {
           "name": "referencia_data",
           "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "numero_linha",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "codigo_cliente",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "material_norma",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "especificacao_tecnica",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "embalagem_solicitada",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "anexos_item_url",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "aceita_alternativas",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "situacao_item",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "precisao_preco",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "moeda_compra",
+          "type": "text",
           "required": false,
           "system": false
         }
@@ -1713,6 +1846,42 @@
           "type": "text",
           "required": false,
           "system": false
+        },
+        {
+          "name": "oferta_selecionada_id",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "oferta_data",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "oferta_moeda",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "oferta_unidade",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "oferta_validade",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "oferta_condicoes",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": []
@@ -2485,6 +2654,57 @@
         "CREATE UNIQUE INDEX idx_solicitacoes_chave ON solicitacoes_itens_cliente (chave_idempotencia)",
         "CREATE INDEX idx_solicitacoes_potencial ON solicitacoes_itens_cliente (potencial_id)"
       ]
+    },
+    {
+      "name": "zoho_sync_state",
+      "type": "base",
+      "apiRules": {
+        "list": "((@request.auth.id != '') && @request.auth.id != \"meiqw9s6c4r2t8a\")",
+        "view": "((@request.auth.id != '') && @request.auth.id != \"meiqw9s6c4r2t8a\")",
+        "create": "((@request.auth.id != '') && @request.auth.id != \"meiqw9s6c4r2t8a\")",
+        "update": "((@request.auth.id != '') && @request.auth.id != \"meiqw9s6c4r2t8a\")",
+        "delete": "((@request.auth.id != '') && @request.auth.id != \"meiqw9s6c4r2t8a\")"
+      },
+      "fields": [
+        {
+          "name": "potencial_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "potenciais"
+        },
+        {
+          "name": "estado",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ultima_execucao",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "erro",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tentativas",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "proximo_retry_em",
+          "type": "date",
+          "required": false,
+          "system": false
+        }
+      ],
+      "indexes": []
     }
   ]
 }

@@ -1,7 +1,8 @@
-// Candidate number only. Check live migration ledger again before installation.
-// v3 da cotação: Situação da Cotação (Compras) separada do Estágio Zoho, campos Zoho,
-// precisão decimal por preço unitário, condições de venda, item extra e sync state.
-// Idempotente: só altera o que ainda não existe (não recalcula dados históricos).
+// v3 da cotação (aprovada por Charles): Situação da Cotação — Compras separada do
+// Estágio Zoho (somente leitura), campos Zoho (lado Skip), precisão decimal por item,
+// campos extras de item e dados da oferta selecionada por fabricante.
+// Idempotente: só adiciona o que ainda não existe. NÃO refaz a 0062 (mei_quote_nonces_v1)
+// nem recalcula dados históricos.
 
 const SITUACOES = [
   'Aguardando especificações',
@@ -20,24 +21,14 @@ migrate(
 
     if (!potenciais.fields.getByName('situacao_cotacao')) {
       potenciais.fields.add(
-        new TextField({
+        new SelectField({
           name: 'situacao_cotacao',
-          max: 100,
-          presentable: false,
+          maxSelect: 1,
+          values: SITUACOES,
         }),
       )
     }
-    // Backfill apenas de registros vazios (não converte status históricos indiscriminadamente)
-    app
-      .db()
-      .newQuery(
-        "UPDATE potenciais SET situacao_cotacao='Aguardando cotação dos fabricantes' WHERE (situacao_cotacao IS NULL OR situacao_cotacao='')",
-      )
-      .execute()
 
-    if (!potenciais.fields.getByName('situacao_cotacao_manual')) {
-      potenciais.fields.add(new BoolField({ name: 'situacao_cotacao_manual' }))
-    }
     if (!potenciais.fields.getByName('compras_concluida_em')) {
       potenciais.fields.add(
         new AutodateField({ name: 'compras_concluida_em', onCreate: false, onUpdate: true }),
@@ -56,31 +47,16 @@ migrate(
       potenciais.fields.add(new NumberField({ name: 'cotacao_versao', onlyInt: true, min: 0 }))
     }
 
-    // Integração Zoho (lado Skip; sem chamadas ativas)
-    if (!potenciais.fields.getByName('zoho_deal_id')) {
-      potenciais.fields.add(new TextField({ name: 'zoho_deal_id', max: 64 }))
+    // Integração Zoho (lado Skip; leitura — sem chamadas ativas nesta entrega)
+    if (!potenciais.fields.getByName('zoho_potencial_id')) {
+      potenciais.fields.add(new TextField({ name: 'zoho_potencial_id', max: 64 }))
     }
-    if (!potenciais.fields.getByName('zoho_stage')) {
-      potenciais.fields.add(new TextField({ name: 'zoho_stage', max: 120 }))
-    }
-    if (!potenciais.fields.getByName('zoho_url')) {
-      potenciais.fields.add(new UrlField({ name: 'zoho_url' }))
+    if (!potenciais.fields.getByName('zoho_link')) {
+      potenciais.fields.add(new URLField({ name: 'zoho_link' }))
     }
     if (!potenciais.fields.getByName('zoho_origem')) {
-      // select zoho|manual — criado como texto para idempotência e tolerância de valores
+      // "Zoho" | "manual" — texto para tolerância de valores legados
       potenciais.fields.add(new TextField({ name: 'zoho_origem', max: 16 }))
-    }
-    if (!potenciais.fields.getByName('zoho_contact_name')) {
-      potenciais.fields.add(new TextField({ name: 'zoho_contact_name', max: 200 }))
-    }
-    if (!potenciais.fields.getByName('zoho_owner_name')) {
-      potenciais.fields.add(new TextField({ name: 'zoho_owner_name', max: 200 }))
-    }
-    if (!potenciais.fields.getByName('zoho_buyer_name')) {
-      potenciais.fields.add(new TextField({ name: 'zoho_buyer_name', max: 200 }))
-    }
-    if (!potenciais.fields.getByName('zoho_closing_date')) {
-      potenciais.fields.add(new DateField({ name: 'zoho_closing_date' }))
     }
     if (!potenciais.fields.getByName('zoho_last_sync_at')) {
       potenciais.fields.add(
@@ -94,7 +70,52 @@ migrate(
       potenciais.fields.add(new TextField({ name: 'zoho_last_sync_error', max: 500 }))
     }
 
-    // ---------- potencial_itens (adiciona SE AUSENTES) ----------
+    // Índice único em zoho_potencial_id (idempotência da integração Zoho)
+    const idxZoho =
+      "CREATE UNIQUE INDEX `idx_potenciais_zoho_id` ON `potenciais` (`zoho_potencial_id`) WHERE `zoho_potencial_id` != ''"
+    const temIdxZoho = (potenciais.indexes || []).some((i) => {
+      return i.indexOf('idx_potenciais_zoho_id') >= 0
+    })
+    if (!temIdxZoho) {
+      potenciais.indexes.push(idxZoho)
+    }
+
+    // ---------- coleção de estado de sincronização Zoho (lado Skip) ----------
+    let zohoState = null
+    try {
+      zohoState = app.findCollectionByNameOrId('zoho_sync_state')
+    } catch (e) {
+      zohoState = null
+    }
+    if (!zohoState) {
+      const col = new Collection({
+        name: 'zoho_sync_state',
+        type: 'base',
+        fields: [
+          {
+            name: 'potencial_id',
+            type: 'relation',
+            required: true,
+            collectionId: potenciais.id,
+            maxSelect: 1,
+          },
+          { name: 'estado', type: 'text', max: 40 },
+          { name: 'ultima_execucao', type: 'date' },
+          { name: 'erro', type: 'text', max: 1000 },
+          { name: 'tentativas', type: 'number', onlyInt: true, min: 0 },
+          { name: 'proximo_retry_em', type: 'date' },
+        ],
+        indexes: [],
+        listRule: '((@request.auth.id != \'\') && @request.auth.id != "meiqw9s6c4r2t8a")',
+        viewRule: '((@request.auth.id != \'\') && @request.auth.id != "meiqw9s6c4r2t8a")',
+        createRule: '((@request.auth.id != \'\') && @request.auth.id != "meiqw9s6c4r2t8a")',
+        updateRule: '((@request.auth.id != \'\') && @request.auth.id != "meiqw9s6c4r2t8a")',
+        deleteRule: '((@request.auth.id != \'\') && @request.auth.id != "meiqw9s6c4r2t8a")',
+      })
+      app.save(col)
+    }
+
+    // ---------- potencial_itens: só campos que NÃO existem ----------
     const pItens = app.findCollectionByNameOrId('potencial_itens')
     const addText = (col, name, max) => {
       if (!col.fields.getByName(name)) col.fields.add(new TextField({ name, max }))
@@ -110,16 +131,11 @@ migrate(
     }
     addText(pItens, 'situacao_item', 40)
     if (!pItens.fields.getByName('precisao_preco')) {
-      const f = new NumberField({ name: 'precisao_preco', onlyInt: true, min: 0, max: 3 })
-      f.min = 0
-      f.max = 3
-      pItens.fields.add(f)
+      pItens.fields.add(new NumberField({ name: 'precisao_preco', onlyInt: true, min: 2, max: 3 }))
     }
-    if (!pItens.fields.getByName('moeda_compra')) {
-      addText(pItens, 'moeda_compra', 8)
-    }
+    addText(pItens, 'moeda_compra', 8)
 
-    // ---------- cotacoes_fornecedor: oferta selecionada, validade e condições ----------
+    // ---------- cotacoes_fornecedor: dados da oferta selecionada ----------
     const cForn = app.findCollectionByNameOrId('cotacoes_fornecedor')
     addText(cForn, 'oferta_selecionada_id', 64)
     addText(cForn, 'oferta_data', 40)
@@ -131,38 +147,47 @@ migrate(
     app.save(cForn)
     app.save(pItens)
     app.save(potenciais)
+
+    // Backfill apenas de registros vazios (após o save, quando a coluna existe;
+    // não sobrescreve situação histórica)
+    app
+      .db()
+      .newQuery(
+        "UPDATE potenciais SET situacao_cotacao='Aguardando cotação dos fabricantes' WHERE (situacao_cotacao IS NULL OR situacao_cotacao='')",
+      )
+      .execute()
   },
   (app) => {
     // Down: remove apenas campos criados aqui (nomes novos, sem risco a dados legados)
     const removeField = (colName, fieldName) => {
       try {
         const col = app.findCollectionByNameOrId(colName)
-        const f = col.fields.getByName(fieldName)
-        if (f) col.fields.removeByName(fieldName)
-        app.save(col)
+        if (col.fields.getByName(fieldName)) {
+          col.fields.removeByName(fieldName)
+          app.save(col)
+        }
       } catch (e) {
         // coleção pode não existir em bases novas
       }
     }
-    const potenciais = [
+    ;[
       'situacao_cotacao',
-      'situacao_cotacao_manual',
       'compras_concluida_em',
       'compras_concluida_por',
       'cotacao_versao',
-      'zoho_deal_id',
-      'zoho_stage',
-      'zoho_url',
+      'zoho_potencial_id',
+      'zoho_link',
       'zoho_origem',
-      'zoho_contact_name',
-      'zoho_owner_name',
-      'zoho_buyer_name',
-      'zoho_closing_date',
       'zoho_last_sync_at',
       'zoho_last_sync_status',
       'zoho_last_sync_error',
-    ]
-    potenciais.forEach((f) => removeField('potenciais', f))
+    ].forEach((f) => removeField('potenciais', f))
+    try {
+      const zs = app.findCollectionByNameOrId('zoho_sync_state')
+      app.delete(zs)
+    } catch (e) {
+      // coleção pode não existir
+    }
     ;[
       'numero_linha',
       'codigo_cliente',
@@ -183,8 +208,5 @@ migrate(
       'oferta_validade',
       'oferta_condicoes',
     ].forEach((f) => removeField('cotacoes_fornecedor', f))
-
-    app.db().newQuery('DROP TABLE IF EXISTS zoho_sync_log').execute()
-    app.db().newQuery('DROP TABLE IF EXISTS cotacao_historico_versoes').execute()
   },
 )
