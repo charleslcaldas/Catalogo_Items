@@ -1,31 +1,36 @@
-/**
- * Bloqueio de rede externa para o harness de testes isolados.
- * Estratégias (documentadas; nenhuma é segredo, nenhuma toca rede real do projeto):
- *
- * 1. Bind ONLY loopback: o PocketBase efêmero escuta em 127.0.0.1 — aborta caso
- *    contrário (harness.mjs::assertLoopbackHost).
- * 2. Cliente HTTP do executor usa baseUrl fixa http://127.0.0.1:<porta> — nunca
- *    resolve nomes externos.
- * 3. Bloqueio em container: recomendação documentada abaixo (docker --network=none,
- *    ou firewall egress a partir do processo de teste). Nesta rodada não é aplicado
- *    automaticamente — a plataforma não permite; exige isolamento equivalente no
- *    ambiente de execução.
- * 4. Nenhuma chamada de rede é feita pelo harness para preview/produção: o
- *    endereço do backend real do projeto NUNCA é lido de variáveis de ambiente
- *    aqui; o único host aceito é 127.0.0.1.
- */
+// network-blocker.mjs — pré-requisito de ambiente: bloqueio de rede externa.
+// A plataforma não garante isso: o harness VERIFICA e aborta se não houver isolamento.
+// NÃO EXECUTADO nesta rodada (a plataforma não tem binário PocketBase).
+//
+// Estratégia recomendada (documentada em ISOLAMENTO.md):
+//   docker run --network=none ...   → nenhuma rota externa
+//   ou firewall (iptables/nft) negando egress exceto loopback.
 
-export const NETWORK_BLOCKER_DOC = {
-  strategy: [
-    'bind somente loopback (127.0.0.1) — aborta se o host resolver fora do loopback',
-    'cliente HTTP do executor fixado em http://127.0.0.1:<porta>',
-    'bloqueio de egress completo é responsabilidade do ambiente de execução (container --network=none ou firewall)',
-    'nenhuma URL do backend real do projeto é referenciada no código do harness',
-  ],
-  description:
-    'Bloqueio de rede: escuta/cliente somente em loopback; egress externo depende do container/firewall do ambiente.',
+import net from 'node:net';
+
+/** Tenta alcançar um host externo de mentira (TEST-NET-1, RFC 5737) com timeout curto.
+ *  Retorna true se algo respondeu/conectou — o que indicaria rede externa aberta. */
+export function redeExternaAcessivel(timeoutMs = 1_500) {
+  return new Promise((resolve) => {
+    const socket = net.createConnection({ host: '192.0.2.1', port: 443 });
+    const decidir = (aberta) => {
+      socket.destroy();
+      resolve(aberta);
+    };
+    socket.setTimeout(timeoutMs, () => decidir(false));
+    socket.once('connect', () => decidir(true));
+    socket.once('error', () => decidir(false));
+  });
 }
 
-export function getNetworkBlockerDoc() {
-  return NETWORK_BLOCKER_DOC
+/** Aborta o harness se houver egress externo. Chamada no início do run.mjs. */
+export async function exigirRedeBloqueada() {
+  const aberta = await redeExternaAcessivel();
+  if (aberta) {
+    throw new Error(
+      '[ISOLAMENTO] Rede externa acessível (egress não bloqueado). ' +
+        'Rode o harness num ambiente sem saída externa (ex.: docker --network=none).'
+    );
+  }
+  return true;
 }

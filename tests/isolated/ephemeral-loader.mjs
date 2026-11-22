@@ -1,95 +1,86 @@
-/**
- * Carregador do código REAL do projeto para o runtime EFÊMERO do harness.
- * Copia migrations e hooks reais para um diretório temporário e aplica UMA ÚNICA
- * adaptação permitida (apenas na CÓPIA EFÊMERA, nunca no arquivo real):
- * remover as duas linhas de contenção (return 503) de confirmar_compra.js,
- * para que o código real do candidato seja exercitável no isolamento.
- *
- * PROIBIDO nesta rodada: alterar pocketbase/hooks/confirmar_compra.js real,
- * criar bypass na rota real, aplicar migrations nos backends reais.
- */
-import { readFileSync, writeFileSync, readdirSync, mkdirSync } from 'node:fs'
-import path from 'node:path'
+// ephemeral-loader.mjs — monta o dataDir EFÊMERO: copia migrations de SCHEMA (excluindo seed/dados)
+// e os hooks REAIS para uma cópia, aplica stripContainment SÓ na cópia, nunca no arquivo real.
+// NÃO EXECUTADO nesta rodada (a plataforma não tem binário PocketBase).
 
-const PB_ROOT = path.resolve(process.cwd(), 'pocketbase')
+import { readdir, readFile, writeFile, copyFile } from 'node:fs/promises';
+import path from 'node:path';
 
-const HOOKS_TO_LOAD = [
-  'confirmar_compra.js',
-  'potencial_itens_price.js',
-  'potencial_itens_reference.js',
-  'price_history_logger.js',
-  'on_cotacao_finalizada.js',
-  'update_cotacao_status_on_price.js',
-]
+/** Migrations de seed/dados EXCLUÍDAS do efêmero — o runtime sobe 100% sintético.
+ *  0002/0032/0053/0054/0058/0059/0060/0061 abortam em DB vazio (dependem de dados reais). */
+export const MIGRATIONS_EXCLUIDAS = new Set([
+  '0002', // seed usuários do time
+  '0032', // seed dados
+  '0053', // seed dados
+  '0054', // seed dados
+  '0058', // seed/dados (aborta em DB vazio)
+  '0059', // seed/dados (aborta em DB vazio)
+  '0060', // seed/dados
+  '0061', // seed/dados
+]);
 
-const MARK_BEGIN = '    // CONTENÇÃO AUTORIZADA (Charles)'
-const MARK_RETURN = "    return e.json(503, { error: 'confirmacao_em_validacao' })"
+const PREFIXO_EXCLUIDAS = [...MIGRATIONS_EXCLUIDAS];
 
-/**
- * Adapta UMA CÓPIA de confirmar_compra.js removendo a contenção (return 503 +
- * comentário imediatamente acima), preservando requireAuth no 4º argumento.
- * O arquivo REAL no projeto não é tocado.
- */
-export function stripContainment(sourceText) {
-  const lines = sourceText.split('\n')
-  const out = []
-  let removed = 0
-  let inComment = false
-  for (const line of lines) {
-    if (line.startsWith(MARK_BEGIN)) {
-      inComment = true
-      removed++
-      continue
+/** Decide se uma migration entra no efêmero: schema sim, seed/dados não. */
+export function deveCopiarMigration(nomeArquivo) {
+  if (!nomeArquivo.endsWith('.js')) return false;
+  return !PREFIXO_EXCLUIDAS.some((prefixo) => nomeArquivo.startsWith(prefixo));
+}
+
+/** Copia migrations de schema (menos as excluídas) + hooks reais para o dataDir efêmero. */
+export async function montarDataDirEfemero({ repoRoot, dataDir, migrationsDir, hooksDir }) {
+  const repoMigrations = path.join(repoRoot, 'pocketbase', 'migrations');
+  const repoHooks = path.join(repoRoot, 'pocketbase', 'hooks');
+
+  const arquivos = await readdir(repoMigrations);
+  const copiadas = [];
+  const excluidas = [];
+  for (const nome of arquivos.sort()) {
+    if (!deveCopiarMigration(nome)) {
+      if (nome.endsWith('.js')) excluidas.push(nome);
+      continue;
     }
-    if (inComment) {
-      // consome o bloco de comentário até a linha do return 503
-      if (line.startsWith(MARK_RETURN)) {
-        inComment = false
-        removed++
-        continue
-      }
-      removed++
-      continue
-    }
-    if (line.startsWith(MARK_RETURN)) {
-      removed++
-      continue
-    }
-    out.push(line)
+    await copyFile(path.join(repoMigrations, nome), path.join(migrationsDir, nome));
+    copiadas.push(nome);
   }
-  if (removed === 0) {
+
+  // Hooks reais: copiados intactos para a CÓPIA; stripContainment edita só a cópia.
+  const hooksReais = await readdir(repoHooks);
+  for (const nome of hooksReais) {
+    await copyFile(path.join(repoHooks, nome), path.join(hooksDir, nome));
+  }
+
+  // Contenção 503 removida SOMENTE na cópia efêmera do hook de confirmação.
+  const copiaHook = path.join(hooksDir, 'confirmar_compra.js');
+  const realHook = path.join(repoHooks, 'confirmar_compra.js');
+  const conteudoCopia = await readFile(copiaHook, 'utf8');
+  const { texto: semContencao, removidas } = stripContainment(conteudoCopia);
+  if (!removidas) {
     throw new Error(
-      'Esperava encontrar a contenção (return 503 + comentário) em confirmar_compra.js — nada encontrado. ' +
-        'Se a contenção real já foi removida, a rodada de testes deve ser reavaliada.',
-    )
+      '[ISOLAMENTO] stripContainment falhou: contenção 503 não encontrada na CÓPIA efêmera de confirmar_compra.js. ' +
+        'O arquivo real NÃO foi modificado — verifique o formato do return 503.'
+    );
   }
-  return out.join('\n')
+  await writeFile(copiaHook, semContencao, 'utf8');
+
+  return { copiadas, excluidas, hooksCopiados: hooksReais, containmentRemovida: true, realHook };
 }
 
-/** Copia as migrations REAIS (0001..0066) para o diretório efêmero. */
-export function loadMigrationsInto(destDir) {
-  const src = path.join(PB_ROOT, 'migrations')
-  mkdirSync(destDir, { recursive: true })
-  const files = readdirSync(src).filter((f) => f.endsWith('.js') && /^\d{4}_/.test(f))
-  for (const f of files) {
-    writeFileSync(path.join(destDir, f), readFileSync(path.join(src, f), 'utf8'))
+/** Remove a contenção 503 (return imediato) do TEXTO da cópia. Erro se não achar as linhas. */
+export function stripContainment(texto) {
+  // Formato esperado no hook real (1ª instrução do handler):
+  //   return c.json(503, { ... })  OU  return c.noContent(503) / similares com "503".
+  const linhas = texto.split('\n');
+  const indices = [];
+  for (let i = 0; i < linhas.length; i++) {
+    const linha = linhas[i].trim();
+    const eReturn503 = /^return\s+.*503/.test(linha) && /return/.test(linha);
+    // Também cobre padrão de uma linha comentada logo acima: mantenho o comentário (só removo o return).
+    if (eReturn503) indices.push(i);
   }
-  return files
-}
-
-/** Copia os hooks REAIS selecionados para o diretório efêmero (com adaptação da contenção). */
-export function loadHooksInto(destDir, { stripContainment: doStrip = true } = {}) {
-  const src = path.join(PB_ROOT, 'hooks')
-  mkdirSync(destDir, { recursive: true })
-  const loaded = []
-  for (const name of HOOKS_TO_LOAD) {
-    const raw = readFileSync(path.join(src, name), 'utf8')
-    let text = raw
-    if (name === 'confirmar_compra.js' && doStrip) {
-      text = stripContainment(raw)
-    }
-    writeFileSync(path.join(destDir, name), text)
-    loaded.push(name)
+  if (indices.length === 0) {
+    return { texto, removidas: false };
   }
-  return loaded
+  // Remove apenas o PRIMEIRO return 503 (a contenção é única e é a 1ª instrução do handler).
+  linhas.splice(indices[0], 1);
+  return { texto: linhas.join('\n'), removidas: true };
 }
