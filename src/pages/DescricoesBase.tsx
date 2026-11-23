@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { useData, DescricaoBase } from '@/contexts/data-context'
+import { useNavigate } from 'react-router-dom'
 import { Plus, Copy, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { textMatchesAll } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -44,6 +45,7 @@ export default function DescricoesBasePage() {
     null,
   )
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null)
+  const navigate = useNavigate()
 
   const filteredDesc = descricoesBase.filter((d) => {
     if (!searchTerm.trim()) return true
@@ -250,7 +252,12 @@ export default function DescricoesBasePage() {
                   </TableCell>
                   <TableCell>{linhas.find((l) => l.id === d.linha_id)?.nome_pt || '-'}</TableCell>
                   <TableCell>
-                    <Badge variant="secondary">
+                    <Badge
+                      variant="secondary"
+                      className="cursor-pointer hover:bg-secondary/80 transition-colors"
+                      onClick={() => navigate(`/itens?descricao_base_id=${d.id}`)}
+                      title={`Ver itens desta descrição base`}
+                    >
                       {itens.filter((i) => i.descricao_base_id === d.id).length} itens
                     </Badge>
                   </TableCell>

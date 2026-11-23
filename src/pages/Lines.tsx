@@ -281,8 +281,9 @@ export default function Lines() {
                     <TableCell className="text-center">
                       <Badge
                         variant="secondary"
-                        className="font-medium"
-                        title={`${itensCount} item(ns) vinculado(s) à linha ${lin.nome_pt}`}
+                        className="font-medium cursor-pointer hover:bg-secondary/80 transition-colors"
+                        onClick={() => navigate(`/itens?linha_id=${lin.id}`)}
+                        title={`Ver os ${itensCount} item(ns) da linha ${lin.nome_pt}`}
                       >
                         {itensCount} {itensCount === 1 ? 'item' : 'itens'}
                       </Badge>

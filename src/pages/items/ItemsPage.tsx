@@ -128,6 +128,7 @@ export default function ItemsPage() {
   const filterLinhaId = searchParams.get('linha_id')
   const filterNcmId = searchParams.get('ncm_id')
   const filterUnidadeId = searchParams.get('unidade_id')
+  const filterDescricaoBaseId = searchParams.get('descricao_base_id')
 
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -245,6 +246,10 @@ export default function ItemsPage() {
 
     if (filterUnidadeId) {
       filters.push(`unidade_id = "${filterUnidadeId}"`)
+    }
+
+    if (filterDescricaoBaseId) {
+      filters.push(`descricao_base_id = "${filterDescricaoBaseId}"`)
     }
 
     // Função auxiliar para construir o filtro de busca com controle de tamanho
@@ -377,6 +382,7 @@ export default function ItemsPage() {
     filterLinhaId,
     filterNcmId,
     filterUnidadeId,
+    filterDescricaoBaseId,
     perPage,
   })
 
@@ -394,6 +400,7 @@ export default function ItemsPage() {
       prev.filterLinhaId !== filterLinhaId ||
       prev.filterNcmId !== filterNcmId ||
       prev.filterUnidadeId !== filterUnidadeId ||
+      prev.filterDescricaoBaseId !== filterDescricaoBaseId ||
       prev.perPage !== perPage
 
     prevFiltersRef.current = {
@@ -403,6 +410,7 @@ export default function ItemsPage() {
       filterLinhaId,
       filterNcmId,
       filterUnidadeId,
+      filterDescricaoBaseId,
       perPage,
     }
 
@@ -419,6 +427,7 @@ export default function ItemsPage() {
     filterLinhaId,
     filterNcmId,
     filterUnidadeId,
+    filterDescricaoBaseId,
     page,
     perPage,
   ])
