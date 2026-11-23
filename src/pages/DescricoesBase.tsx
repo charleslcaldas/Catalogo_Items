@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Table,
   TableBody,
@@ -48,14 +48,65 @@ import {
   CheckCircle2,
   Circle,
 } from 'lucide-react'
-import { textMatchesAll } from '@/lib/utils'
+import { textMatchesAll, cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import pb from '@/lib/pocketbase/client'
 import { extractFieldErrors, getErrorMessage } from '@/lib/pocketbase/errors'
 
 const COLUMNS_STORAGE_KEY = 'descricoes_base:colunas_visiveis'
+const WIDTHS_STORAGE_KEY = 'descricoes_base:larguras'
+const MIN_COLUMN_WIDTH = 80
 
 type ColumnId = 'nome_en' | 'categoria' | 'linha' | 'itens' | 'impostos' | 'status' | 'conferida'
+// "Descrição (PT)" é fixa (não aparece no seletor de colunas), mas também é redimensionável.
+type ResizableColumnId = 'nome_pt' | ColumnId
+
+const ALL_WIDTH_COLUMNS: ResizableColumnId[] = [
+  'nome_pt',
+  'nome_en',
+  'categoria',
+  'linha',
+  'itens',
+  'impostos',
+  'status',
+  'conferida',
+]
+
+// Larguras padrão (px) usadas quando o usuário já redimensionou alguma coluna
+// (a tabela passa a usar layout fixo; colunas nunca ajustadas recebem o padrão).
+const DEFAULT_COLUMN_WIDTHS: Record<ResizableColumnId, number> = {
+  nome_pt: 260,
+  nome_en: 260,
+  categoria: 170,
+  linha: 170,
+  itens: 90,
+  impostos: 260,
+  status: 100,
+  conferida: 130,
+}
+
+function loadColWidths(): Partial<Record<ResizableColumnId, number>> {
+  try {
+    const raw = localStorage.getItem(WIDTHS_STORAGE_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    const out: Partial<Record<ResizableColumnId, number>> = {}
+    for (const [key, value] of Object.entries(parsed)) {
+      if (
+        ALL_WIDTH_COLUMNS.includes(key as ResizableColumnId) &&
+        typeof value === 'number' &&
+        Number.isFinite(value) &&
+        value >= MIN_COLUMN_WIDTH
+      ) {
+        out[key as ResizableColumnId] = value
+      }
+    }
+    return out
+  } catch {
+    return {}
+  }
+}
 
 // Colunas que SEMPRE ficam visíveis (mínimo útil da tela).
 const FIXED_COLUMNS: ColumnId[] = ['itens']
@@ -96,6 +147,41 @@ function loadVisibleColumns(): ColumnId[] {
   }
 }
 
+// Cabeçalho de coluna com handle de redimensionamento na borda direita.
+// O handle para o arraste fica sobre a área de padding do th; o clique nele
+// não propaga, então não dispara a ordenação da coluna.
+function ThWithResize({
+  colId,
+  widths,
+  onResizeStart,
+  children,
+  style,
+  className,
+  ...thProps
+}: React.ThHTMLAttributes<HTMLTableCellElement> & {
+  colId: ResizableColumnId
+  widths: Partial<Record<ResizableColumnId, number>>
+  onResizeStart: (colId: ResizableColumnId, e: React.MouseEvent) => void
+}) {
+  const width = widths[colId]
+  return (
+    <TableHead
+      {...thProps}
+      style={width ? { width, minWidth: width, ...style } : style}
+      className={cn('relative', className)}
+    >
+      {children}
+      <span
+        role="presentation"
+        title="Arraste para redimensionar"
+        onMouseDown={(e) => onResizeStart(colId, e)}
+        onClick={(e) => e.stopPropagation()}
+        className="absolute right-0 top-0 z-10 h-full w-2 cursor-col-resize select-none hover:bg-border/60"
+      />
+    </TableHead>
+  )
+}
+
 export default function DescricoesBasePage() {
   const { descricoesBase, categorias, linhas, ncms, itens, reloadMetadata } = useData()
   const [modalOpen, setModalOpen] = useState(false)
@@ -103,6 +189,71 @@ export default function DescricoesBasePage() {
   const [saving, setSaving] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>(loadVisibleColumns)
+  const [colWidths, setColWidths] =
+    useState<Partial<Record<ResizableColumnId, number>>>(loadColWidths)
+  const dragRef = useRef<{
+    colId: ResizableColumnId
+    startX: number
+    startWidth: number
+    moved: boolean
+  } | null>(null)
+  const suppressSortClickRef = useRef(false)
+  const hasCustomWidths = Object.keys(colWidths).length > 0
+
+  // Larguras efetivas: só entram em cena quando o usuário já redimensionou
+  // alguma coluna (layout fixo). Antes disso, a tabela usa o layout automático
+  // original — "padrão" = como nunca redimensionou.
+  const effectiveWidths = useMemo(
+    () => (hasCustomWidths ? { ...DEFAULT_COLUMN_WIDTHS, ...colWidths } : {}),
+    [hasCustomWidths, colWidths],
+  )
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(WIDTHS_STORAGE_KEY, JSON.stringify(colWidths))
+    } catch {
+      // localStorage indisponível: larguras só valem para a sessão
+    }
+  }, [colWidths])
+
+  const handleResizeStart = (colId: ResizableColumnId, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const th = (e.currentTarget as HTMLElement).closest('th')
+    const startWidth = th?.getBoundingClientRect().width || DEFAULT_COLUMN_WIDTHS[colId] || 160
+    dragRef.current = { colId, startX: e.clientX, startWidth, moved: false }
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+
+    const onMove = (ev: MouseEvent) => {
+      const drag = dragRef.current
+      if (!drag) return
+      const dx = ev.clientX - drag.startX
+      if (!drag.moved && Math.abs(dx) <= 3) return
+      drag.moved = true
+      setColWidths((prev) => ({
+        ...prev,
+        [drag.colId]: Math.max(MIN_COLUMN_WIDTH, drag.startWidth + dx),
+      }))
+    }
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      const drag = dragRef.current
+      dragRef.current = null
+      if (drag?.moved) {
+        // o clique de mouseup ainda pode cair no th e disparar a ordenação
+        suppressSortClickRef.current = true
+        setTimeout(() => {
+          suppressSortClickRef.current = false
+        }, 0)
+      }
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
   const [sortField, setSortField] = useState<
     'nome_pt' | 'nome_en' | 'categoria' | 'linha' | 'itens' | null
   >(null)
@@ -157,6 +308,7 @@ export default function DescricoesBasePage() {
   }
 
   const handleSort = (field: 'nome_pt' | 'nome_en' | 'categoria' | 'linha' | 'itens') => {
+    if (suppressSortClickRef.current) return // clique residual do fim do arraste de resize
     if (sortField === field) {
       if (sortOrder === 'asc') setSortOrder('desc')
       else if (sortOrder === 'desc') {
@@ -338,50 +490,89 @@ export default function DescricoesBasePage() {
           <CardTitle>Catálogo de Descrições Base</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
+          <Table className={cn(hasCustomWidths && 'table-fixed')}>
             <TableHeader>
               <TableRow>
-                <TableHead
+                <ThWithResize
+                  colId="nome_pt"
+                  widths={effectiveWidths}
+                  onResizeStart={handleResizeStart}
                   className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
                   onClick={() => handleSort('nome_pt')}
                 >
                   Descrição (PT) <SortIcon field="nome_pt" />
-                </TableHead>
+                </ThWithResize>
                 {visibleColumns.includes('nome_en') && (
-                  <TableHead
+                  <ThWithResize
+                    colId="nome_en"
+                    widths={effectiveWidths}
+                    onResizeStart={handleResizeStart}
                     className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
                     onClick={() => handleSort('nome_en')}
                   >
                     Descrição (EN) <SortIcon field="nome_en" />
-                  </TableHead>
+                  </ThWithResize>
                 )}
                 {visibleColumns.includes('categoria') && (
-                  <TableHead
+                  <ThWithResize
+                    colId="categoria"
+                    widths={effectiveWidths}
+                    onResizeStart={handleResizeStart}
                     className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
                     onClick={() => handleSort('categoria')}
                   >
                     Categoria <SortIcon field="categoria" />
-                  </TableHead>
+                  </ThWithResize>
                 )}
                 {visibleColumns.includes('linha') && (
-                  <TableHead
+                  <ThWithResize
+                    colId="linha"
+                    widths={effectiveWidths}
+                    onResizeStart={handleResizeStart}
                     className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
                     onClick={() => handleSort('linha')}
                   >
                     Linha <SortIcon field="linha" />
-                  </TableHead>
+                  </ThWithResize>
                 )}
                 {visibleColumns.includes('itens') && (
-                  <TableHead
+                  <ThWithResize
+                    colId="itens"
+                    widths={effectiveWidths}
+                    onResizeStart={handleResizeStart}
                     className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
                     onClick={() => handleSort('itens')}
                   >
                     Itens <SortIcon field="itens" />
-                  </TableHead>
+                  </ThWithResize>
                 )}
-                {visibleColumns.includes('impostos') && <TableHead>Impostos NCM</TableHead>}
-                {visibleColumns.includes('status') && <TableHead>Status</TableHead>}
-                {visibleColumns.includes('conferida') && <TableHead>Conferida</TableHead>}
+                {visibleColumns.includes('impostos') && (
+                  <ThWithResize
+                    colId="impostos"
+                    widths={effectiveWidths}
+                    onResizeStart={handleResizeStart}
+                  >
+                    Impostos NCM
+                  </ThWithResize>
+                )}
+                {visibleColumns.includes('status') && (
+                  <ThWithResize
+                    colId="status"
+                    widths={effectiveWidths}
+                    onResizeStart={handleResizeStart}
+                  >
+                    Status
+                  </ThWithResize>
+                )}
+                {visibleColumns.includes('conferida') && (
+                  <ThWithResize
+                    colId="conferida"
+                    widths={effectiveWidths}
+                    onResizeStart={handleResizeStart}
+                  >
+                    Conferida
+                  </ThWithResize>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
