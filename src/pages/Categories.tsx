@@ -11,20 +11,41 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useData } from '@/contexts/data-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, Pencil, Search, ArrowUpDown, ArrowUp, ArrowDown, FilterX } from 'lucide-react'
+import {
+  Plus,
+  Pencil,
+  Search,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  FilterX,
+  Trash2,
+} from 'lucide-react'
 import { CategoryModal } from '@/components/MetadataModals'
 import { getContrastColor, textMatchesAll } from '@/lib/utils'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Categoria } from '@/types'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 import { Badge } from '@/components/ui/badge'
 
 type SortField = 'nome_pt' | 'nome_en' | 'linhas' | 'created'
 
 export default function Categories() {
-  const { categorias, linhas } = useData()
+  const { categorias, linhas, deleteCategoria } = useData()
   const [modalOpen, setModalOpen] = useState(false)
   const [editData, setEditData] = useState<Categoria | null>(null)
+  const [categoriaToDelete, setCategoriaToDelete] = useState<Categoria | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [sortField, setSortField] = useState<SortField | null>('nome_pt')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
@@ -258,6 +279,18 @@ export default function Categories() {
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setCategoriaToDelete(cat)
+                          }}
+                          title="Excluir Categoria"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -276,6 +309,45 @@ export default function Categories() {
       </Card>
 
       <CategoryModal open={modalOpen} onOpenChange={setModalOpen} initialData={editData} />
+
+      <AlertDialog
+        open={!!categoriaToDelete}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) setCategoriaToDelete(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja realmente excluir a categoria <strong>{categoriaToDelete?.nome_pt}</strong>?
+              Esta ação não pode ser desfeita. Se houver linhas ou itens vinculados a ela, a
+              exclusão será recusada e o motivo será exibido.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async (e) => {
+                e.preventDefault()
+                if (!categoriaToDelete) return
+                setIsDeleting(true)
+                try {
+                  // deleteCategoria remove a linha da lista ao sucesso e mostra o erro do backend em caso de falha
+                  await deleteCategoria(categoriaToDelete.id)
+                } finally {
+                  setIsDeleting(false)
+                  setCategoriaToDelete(null)
+                }
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
