@@ -188,6 +188,10 @@ export default function DescricoesBasePage() {
   const [editingItem, setEditingItem] = useState<Partial<DescricaoBase> | null>(null)
   const [saving, setSaving] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  // Filtro de conferência: 'todos' | 'pendente' | 'conferida'
+  const [filtroConferida, setFiltroConferida] = useState<'todos' | 'pendente' | 'conferida'>(
+    'todos',
+  )
   const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>(loadVisibleColumns)
   const [colWidths, setColWidths] =
     useState<Partial<Record<ResizableColumnId, number>>>(loadColWidths)
@@ -255,7 +259,7 @@ export default function DescricoesBasePage() {
     document.addEventListener('mouseup', onUp)
   }
   const [sortField, setSortField] = useState<
-    'nome_pt' | 'nome_en' | 'categoria' | 'linha' | 'itens' | null
+    'nome_pt' | 'nome_en' | 'categoria' | 'linha' | 'itens' | 'conferida' | null
   >(null)
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null)
   const navigate = useNavigate()
@@ -287,6 +291,8 @@ export default function DescricoesBasePage() {
   }
 
   const filteredDesc = descricoesBase.filter((d) => {
+    if (filtroConferida === 'pendente' && d.conferida) return false
+    if (filtroConferida === 'conferida' && !d.conferida) return false
     if (!searchTerm.trim()) return true
     const catName = categorias.find((c) => c.id === d.categoria_id)?.nome_pt || ''
     const linhaName = linhas.find((l) => l.id === d.linha_id)?.nome_pt || ''
@@ -307,7 +313,9 @@ export default function DescricoesBasePage() {
     setModalOpen(true)
   }
 
-  const handleSort = (field: 'nome_pt' | 'nome_en' | 'categoria' | 'linha' | 'itens') => {
+  const handleSort = (
+    field: 'nome_pt' | 'nome_en' | 'categoria' | 'linha' | 'itens' | 'conferida',
+  ) => {
     if (suppressSortClickRef.current) return // clique residual do fim do arraste de resize
     if (sortField === field) {
       if (sortOrder === 'asc') setSortOrder('desc')
@@ -324,7 +332,7 @@ export default function DescricoesBasePage() {
   const SortIcon = ({
     field,
   }: {
-    field: 'nome_pt' | 'nome_en' | 'categoria' | 'linha' | 'itens'
+    field: 'nome_pt' | 'nome_en' | 'categoria' | 'linha' | 'itens' | 'conferida'
   }) => {
     if (sortField !== field) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-50 inline-block" />
     return sortOrder === 'asc' ? (
@@ -356,6 +364,15 @@ export default function DescricoesBasePage() {
         } else if (sortField === 'itens') {
           valA = String(itensCount[a.id] || 0).padStart(8, '0')
           valB = String(itensCount[b.id] || 0).padStart(8, '0')
+        } else if (sortField === 'conferida') {
+          // Ordenação por estado: agrupa pendentes (false) separadas de
+          // conferidas (true). Crescente = pendentes primeiro.
+          const confA = Number(!!a.conferida)
+          const confB = Number(!!b.conferida)
+          if (confA !== confB) {
+            return sortOrder === 'asc' ? confA - confB : confB - confA
+          }
+          return 0
         }
 
         valA = valA.toLowerCase()
@@ -449,6 +466,19 @@ export default function DescricoesBasePage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+          <Select
+            value={filtroConferida}
+            onValueChange={(v) => setFiltroConferida(v as 'todos' | 'pendente' | 'conferida')}
+          >
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Conferida" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todas</SelectItem>
+              <SelectItem value="pendente">Só pendentes</SelectItem>
+              <SelectItem value="conferida">Só conferidas</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex items-center gap-2">
           <DropdownMenu>
@@ -569,8 +599,10 @@ export default function DescricoesBasePage() {
                     colId="conferida"
                     widths={effectiveWidths}
                     onResizeStart={handleResizeStart}
+                    className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                    onClick={() => handleSort('conferida')}
                   >
-                    Conferida
+                    Conferida <SortIcon field="conferida" />
                   </ThWithResize>
                 )}
               </TableRow>
@@ -649,18 +681,21 @@ export default function DescricoesBasePage() {
                         type="button"
                         onClick={() => handleToggleConferida(d)}
                         title={d.conferida ? 'Desmarcar conferência' : 'Marcar como conferida'}
-                        className="inline-flex items-center gap-1.5 cursor-pointer text-sm hover:text-primary transition-colors"
+                        className="inline-flex cursor-pointer transition-transform hover:scale-105 focus:outline-none"
                       >
                         {d.conferida ? (
-                          <>
-                            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                            <span className="text-emerald-700">Conferida</span>
-                          </>
+                          <Badge className="gap-1.5 border border-emerald-700 bg-emerald-600 font-semibold text-white hover:bg-emerald-700">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            Conferida
+                          </Badge>
                         ) : (
-                          <>
-                            <Circle className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-muted-foreground">Pendente</span>
-                          </>
+                          <Badge
+                            variant="outline"
+                            className="gap-1.5 border-amber-300 bg-amber-100 font-semibold text-amber-800 hover:bg-amber-200"
+                          >
+                            <Circle className="h-3.5 w-3.5" />
+                            Pendente
+                          </Badge>
                         )}
                       </button>
                     </TableCell>
