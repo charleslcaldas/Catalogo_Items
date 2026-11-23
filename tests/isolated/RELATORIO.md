@@ -1,5 +1,8 @@
 # RELATORIO.md — casos do harness isolado (confirmação de compra)
 
+> **Nenhum teste ou node --check executado; pacote NÃO PRONTO PARA EXECUÇÃO:
+> imports/API, porta/dataDir e allowlist pendentes.**
+
 Status possíveis por caso: `PREPARADO` (código e payload prontos), `EXECUTADO`,
 `PASSOU`, `FALHOU`, `PENDENTE`, `NAO EXECUTADO`.
 
@@ -55,8 +58,8 @@ supressão legítima é por chave no store do servidor, nunca por flag do client
 
 - A plataforma (Skip Cloud) não expõe binário PocketBase nem runner de `.mjs`;
   `run_qa` cobre apenas oxlint/tsc/build do app React.
-- Validação feita nesta rodada: revisão sintática `node --check` em **todos**
-  os `.mjs` de `tests/isolated/`.
+- Validação feita nesta rodada: **leitura integral** dos arquivos `.mjs` de
+  `tests/isolated/` (sem execução — a plataforma não possui shell).
 - Execução real (operador local, sem tocar em preview/produção):
   `ISOLATED_PB_PATH=/caminho/pocketbase node tests/isolated/run.mjs`
   — cria dataDir temporário, aplica a allowlist de estrutura, bloqueia rede
