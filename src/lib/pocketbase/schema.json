@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-23T13:12:08.453Z",
+  "generatedAt": "2026-11-23T13:23:04.028Z",
   "collections": [
     {
       "name": "users",
@@ -1192,6 +1192,12 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "conferida",
+          "type": "bool",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [

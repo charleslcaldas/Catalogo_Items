@@ -38,6 +38,7 @@ export interface DescricaoBase {
   linha_id: string
   ncm_id: string
   ativo: boolean
+  conferida?: boolean
 }
 
 interface DataContextType {

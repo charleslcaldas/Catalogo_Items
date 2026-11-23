@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Table,
   TableBody,
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -19,6 +20,14 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   Select,
   SelectContent,
@@ -29,11 +38,63 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { useData, DescricaoBase } from '@/contexts/data-context'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Copy, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import {
+  Plus,
+  Search,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Columns3,
+  CheckCircle2,
+  Circle,
+} from 'lucide-react'
 import { textMatchesAll } from '@/lib/utils'
 import { toast } from 'sonner'
 import pb from '@/lib/pocketbase/client'
 import { extractFieldErrors, getErrorMessage } from '@/lib/pocketbase/errors'
+
+const COLUMNS_STORAGE_KEY = 'descricoes_base:colunas_visiveis'
+
+type ColumnId = 'nome_en' | 'categoria' | 'linha' | 'itens' | 'impostos' | 'status' | 'conferida'
+
+// Colunas que SEMPRE ficam visíveis (mínimo útil da tela).
+const FIXED_COLUMNS: ColumnId[] = ['itens']
+
+const COLUMN_LABELS: Record<ColumnId, string> = {
+  nome_en: 'Descrição (EN)',
+  categoria: 'Categoria',
+  linha: 'Linha',
+  itens: 'Itens',
+  impostos: 'Impostos NCM',
+  status: 'Status',
+  conferida: 'Conferida',
+}
+
+const ALL_COLUMNS: ColumnId[] = [
+  'nome_en',
+  'categoria',
+  'linha',
+  'itens',
+  'impostos',
+  'status',
+  'conferida',
+]
+
+function loadVisibleColumns(): ColumnId[] {
+  try {
+    const raw = localStorage.getItem(COLUMNS_STORAGE_KEY)
+    if (!raw) return ALL_COLUMNS
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return ALL_COLUMNS
+    const valid = parsed.filter(
+      (c: string) => ALL_COLUMNS.includes(c as ColumnId) || FIXED_COLUMNS.includes(c as ColumnId),
+    ) as ColumnId[]
+    const merged = Array.from(new Set([...FIXED_COLUMNS, ...valid]))
+    return ALL_COLUMNS.filter((c) => merged.includes(c))
+  } catch {
+    return ALL_COLUMNS
+  }
+}
 
 export default function DescricoesBasePage() {
   const { descricoesBase, categorias, linhas, ncms, itens, reloadMetadata } = useData()
@@ -41,11 +102,38 @@ export default function DescricoesBasePage() {
   const [editingItem, setEditingItem] = useState<Partial<DescricaoBase> | null>(null)
   const [saving, setSaving] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
-  const [sortField, setSortField] = useState<'nome_pt' | 'nome_en' | 'categoria' | 'linha' | null>(
-    null,
-  )
+  const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>(loadVisibleColumns)
+  const [sortField, setSortField] = useState<
+    'nome_pt' | 'nome_en' | 'categoria' | 'linha' | 'itens' | null
+  >(null)
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null)
   const navigate = useNavigate()
+
+  const itensCount = useMemo(() => {
+    const map: Record<string, number> = {}
+    for (const i of itens) {
+      if (i.descricao_base_id) map[i.descricao_base_id] = (map[i.descricao_base_id] || 0) + 1
+    }
+    return map
+  }, [itens])
+
+  const toggleColumn = (col: ColumnId) => {
+    setVisibleColumns((prev) => {
+      let next: ColumnId[]
+      if (prev.includes(col)) {
+        if (FIXED_COLUMNS.includes(col)) return prev // "Itens" nunca pode ser escondida
+        next = prev.filter((c) => c !== col)
+      } else {
+        next = ALL_COLUMNS.filter((c) => prev.includes(c) || c === col)
+      }
+      try {
+        localStorage.setItem(COLUMNS_STORAGE_KEY, JSON.stringify(next))
+      } catch {
+        // localStorage indisponível: preferência só vale para a sessão
+      }
+      return next
+    })
+  }
 
   const filteredDesc = descricoesBase.filter((d) => {
     if (!searchTerm.trim()) return true
@@ -68,12 +156,7 @@ export default function DescricoesBasePage() {
     setModalOpen(true)
   }
 
-  const handleDuplicate = (item: DescricaoBase) => {
-    setEditingItem({ ...item, id: undefined, codigo: `${item.codigo}-COPY` })
-    setModalOpen(true)
-  }
-
-  const handleSort = (field: 'nome_pt' | 'nome_en' | 'categoria' | 'linha') => {
+  const handleSort = (field: 'nome_pt' | 'nome_en' | 'categoria' | 'linha' | 'itens') => {
     if (sortField === field) {
       if (sortOrder === 'asc') setSortOrder('desc')
       else if (sortOrder === 'desc') {
@@ -86,7 +169,11 @@ export default function DescricoesBasePage() {
     }
   }
 
-  const SortIcon = ({ field }: { field: 'nome_pt' | 'nome_en' | 'categoria' | 'linha' }) => {
+  const SortIcon = ({
+    field,
+  }: {
+    field: 'nome_pt' | 'nome_en' | 'categoria' | 'linha' | 'itens'
+  }) => {
     if (sortField !== field) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-50 inline-block" />
     return sortOrder === 'asc' ? (
       <ArrowUp className="ml-2 h-4 w-4 inline-block" />
@@ -95,33 +182,50 @@ export default function DescricoesBasePage() {
     )
   }
 
-  let sortedDesc = [...filteredDesc]
-  if (sortField && sortOrder) {
-    sortedDesc.sort((a, b) => {
-      let valA = ''
-      let valB = ''
+  const sortedDesc = useMemo(() => {
+    const list = [...filteredDesc]
+    if (sortField && sortOrder) {
+      list.sort((a, b) => {
+        let valA = ''
+        let valB = ''
 
-      if (sortField === 'nome_pt') {
-        valA = a.nome_pt
-        valB = b.nome_pt
-      } else if (sortField === 'nome_en') {
-        valA = a.nome_en || ''
-        valB = b.nome_en || ''
-      } else if (sortField === 'categoria') {
-        valA = categorias.find((c) => c.id === a.categoria_id)?.nome_pt || ''
-        valB = categorias.find((c) => c.id === b.categoria_id)?.nome_pt || ''
-      } else if (sortField === 'linha') {
-        valA = linhas.find((l) => l.id === a.linha_id)?.nome_pt || ''
-        valB = linhas.find((l) => l.id === b.linha_id)?.nome_pt || ''
-      }
+        if (sortField === 'nome_pt') {
+          valA = a.nome_pt
+          valB = b.nome_pt
+        } else if (sortField === 'nome_en') {
+          valA = a.nome_en || ''
+          valB = b.nome_en || ''
+        } else if (sortField === 'categoria') {
+          valA = categorias.find((c) => c.id === a.categoria_id)?.nome_pt || ''
+          valB = categorias.find((c) => c.id === b.categoria_id)?.nome_pt || ''
+        } else if (sortField === 'linha') {
+          valA = linhas.find((l) => l.id === a.linha_id)?.nome_pt || ''
+          valB = linhas.find((l) => l.id === b.linha_id)?.nome_pt || ''
+        } else if (sortField === 'itens') {
+          valA = String(itensCount[a.id] || 0).padStart(8, '0')
+          valB = String(itensCount[b.id] || 0).padStart(8, '0')
+        }
 
-      valA = valA.toLowerCase()
-      valB = valB.toLowerCase()
+        valA = valA.toLowerCase()
+        valB = valB.toLowerCase()
 
-      if (valA < valB) return sortOrder === 'asc' ? -1 : 1
-      if (valA > valB) return sortOrder === 'asc' ? 1 : -1
-      return 0
-    })
+        if (valA < valB) return sortOrder === 'asc' ? -1 : 1
+        if (valA > valB) return sortOrder === 'asc' ? 1 : -1
+        return 0
+      })
+    }
+    return list
+  }, [filteredDesc, sortField, sortOrder, categorias, linhas, itensCount])
+
+  const handleToggleConferida = async (item: DescricaoBase) => {
+    const novoValor = !item.conferida
+    try {
+      await pb.collection('descricoes_base').update(item.id, { conferida: novoValor })
+      await reloadMetadata()
+      toast.success(novoValor ? 'Descrição marcada como conferida' : 'Marcação removida')
+    } catch (err: any) {
+      toast.error('Erro ao atualizar etiqueta: ' + getErrorMessage(err))
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -168,6 +272,10 @@ export default function DescricoesBasePage() {
     }))
   }
 
+  const colCount =
+    1 + // Descrição (PT) — fixa
+    visibleColumns.filter((c) => c !== 'itens').length
+
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -175,7 +283,8 @@ export default function DescricoesBasePage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Descrições Base</h1>
             <p className="text-muted-foreground">
-              Gerencie os templates padronizados para criação de itens.
+              {descricoesBase.length}{' '}
+              {descricoesBase.length === 1 ? 'descrição base' : 'descrições base'} no total
             </p>
           </div>
           <div className="relative w-full sm:w-64">
@@ -189,9 +298,39 @@ export default function DescricoesBasePage() {
             />
           </div>
         </div>
-        <Button onClick={handleOpenNew}>
-          <Plus className="mr-2 h-4 w-4" /> Nova Descrição Base
-        </Button>
+        <div className="flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Columns3 className="mr-2 h-4 w-4" /> Colunas
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Colunas visíveis</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {ALL_COLUMNS.map((col) => {
+                const isFixed = FIXED_COLUMNS.includes(col)
+                const checked = visibleColumns.includes(col)
+                return (
+                  <DropdownMenuCheckboxItem
+                    key={col}
+                    checked={checked}
+                    disabled={isFixed}
+                    onCheckedChange={() => toggleColumn(col)}
+                    onSelect={(e) => e.preventDefault()}
+                    className="cursor-pointer"
+                  >
+                    {COLUMN_LABELS[col]}
+                    {isFixed && <span className="ml-1 text-xs text-muted-foreground">(fixa)</span>}
+                  </DropdownMenuCheckboxItem>
+                )
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button onClick={handleOpenNew}>
+            <Plus className="mr-2 h-4 w-4" /> Nova Descrição Base
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -208,28 +347,41 @@ export default function DescricoesBasePage() {
                 >
                   Descrição (PT) <SortIcon field="nome_pt" />
                 </TableHead>
-                <TableHead
-                  className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
-                  onClick={() => handleSort('nome_en')}
-                >
-                  Descrição (EN) <SortIcon field="nome_en" />
-                </TableHead>
-                <TableHead
-                  className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
-                  onClick={() => handleSort('categoria')}
-                >
-                  Categoria <SortIcon field="categoria" />
-                </TableHead>
-                <TableHead
-                  className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
-                  onClick={() => handleSort('linha')}
-                >
-                  Linha <SortIcon field="linha" />
-                </TableHead>
-                <TableHead>Itens</TableHead>
-                <TableHead>Impostos NCM</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-[120px] text-right">Ações</TableHead>
+                {visibleColumns.includes('nome_en') && (
+                  <TableHead
+                    className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                    onClick={() => handleSort('nome_en')}
+                  >
+                    Descrição (EN) <SortIcon field="nome_en" />
+                  </TableHead>
+                )}
+                {visibleColumns.includes('categoria') && (
+                  <TableHead
+                    className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                    onClick={() => handleSort('categoria')}
+                  >
+                    Categoria <SortIcon field="categoria" />
+                  </TableHead>
+                )}
+                {visibleColumns.includes('linha') && (
+                  <TableHead
+                    className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                    onClick={() => handleSort('linha')}
+                  >
+                    Linha <SortIcon field="linha" />
+                  </TableHead>
+                )}
+                {visibleColumns.includes('itens') && (
+                  <TableHead
+                    className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
+                    onClick={() => handleSort('itens')}
+                  >
+                    Itens <SortIcon field="itens" />
+                  </TableHead>
+                )}
+                {visibleColumns.includes('impostos') && <TableHead>Impostos NCM</TableHead>}
+                {visibleColumns.includes('status') && <TableHead>Status</TableHead>}
+                {visibleColumns.includes('conferida') && <TableHead>Conferida</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -241,68 +393,92 @@ export default function DescricoesBasePage() {
                   >
                     {d.nome_pt}
                   </TableCell>
-                  <TableCell
-                    className="cursor-pointer hover:text-primary hover:underline transition-colors"
-                    onClick={() => handleEdit(d)}
-                  >
-                    {d.nome_en || '-'}
-                  </TableCell>
-                  <TableCell>
-                    {categorias.find((c) => c.id === d.categoria_id)?.nome_pt || '-'}
-                  </TableCell>
-                  <TableCell>{linhas.find((l) => l.id === d.linha_id)?.nome_pt || '-'}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="secondary"
-                      className="cursor-pointer hover:bg-secondary/80 transition-colors"
-                      onClick={() => navigate(`/itens?descricao_base_id=${d.id}`)}
-                      title={`Ver itens desta descrição base`}
+                  {visibleColumns.includes('nome_en') && (
+                    <TableCell
+                      className="cursor-pointer hover:text-primary hover:underline transition-colors"
+                      onClick={() => handleEdit(d)}
                     >
-                      {itens.filter((i) => i.descricao_base_id === d.id).length} itens
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {(() => {
-                      const n = ncms.find((x) => x.id === d.ncm_id)
-                      if (!n) return '-'
-                      return (
-                        <div className="text-xs">
-                          <span className="text-muted-foreground">
-                            II: {n.ii}% | IPI: {n.ipi}% | PIS: {n.pis}% | COF: {n.cofins}%
-                          </span>
-                        </div>
-                      )
-                    })()}
-                  </TableCell>
-                  <TableCell>
-                    {d.ativo ? (
+                      {d.nome_en || '-'}
+                    </TableCell>
+                  )}
+                  {visibleColumns.includes('categoria') && (
+                    <TableCell>
+                      {categorias.find((c) => c.id === d.categoria_id)?.nome_pt || '-'}
+                    </TableCell>
+                  )}
+                  {visibleColumns.includes('linha') && (
+                    <TableCell>{linhas.find((l) => l.id === d.linha_id)?.nome_pt || '-'}</TableCell>
+                  )}
+                  {visibleColumns.includes('itens') && (
+                    <TableCell>
                       <Badge
-                        variant="outline"
-                        className="bg-emerald-50 text-emerald-700 border-emerald-200"
+                        variant="secondary"
+                        className="cursor-pointer hover:bg-secondary/80 transition-colors"
+                        onClick={() => navigate(`/itens?descricao_base_id=${d.id}`)}
+                        title={`Ver itens desta descrição base`}
                       >
-                        Ativo
+                        {itensCount[d.id] || 0} itens
                       </Badge>
-                    ) : (
-                      <Badge variant="outline" className="bg-muted text-muted-foreground">
-                        Inativo
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDuplicate(d)}
-                      title="Duplicar"
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
+                    </TableCell>
+                  )}
+                  {visibleColumns.includes('impostos') && (
+                    <TableCell>
+                      {(() => {
+                        const n = ncms.find((x) => x.id === d.ncm_id)
+                        if (!n) return '-'
+                        return (
+                          <div className="text-xs">
+                            <span className="text-muted-foreground">
+                              II: {n.ii}% | IPI: {n.ipi}% | PIS: {n.pis}% | COF: {n.cofins}%
+                            </span>
+                          </div>
+                        )
+                      })()}
+                    </TableCell>
+                  )}
+                  {visibleColumns.includes('status') && (
+                    <TableCell>
+                      {d.ativo ? (
+                        <Badge
+                          variant="outline"
+                          className="bg-emerald-50 text-emerald-700 border-emerald-200"
+                        >
+                          Ativo
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-muted text-muted-foreground">
+                          Inativo
+                        </Badge>
+                      )}
+                    </TableCell>
+                  )}
+                  {visibleColumns.includes('conferida') && (
+                    <TableCell>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleConferida(d)}
+                        title={d.conferida ? 'Desmarcar conferência' : 'Marcar como conferida'}
+                        className="inline-flex items-center gap-1.5 cursor-pointer text-sm hover:text-primary transition-colors"
+                      >
+                        {d.conferida ? (
+                          <>
+                            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                            <span className="text-emerald-700">Conferida</span>
+                          </>
+                        ) : (
+                          <>
+                            <Circle className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-muted-foreground">Pendente</span>
+                          </>
+                        )}
+                      </button>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
               {sortedDesc.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={colCount} className="text-center py-8 text-muted-foreground">
                     Nenhuma descrição base encontrada.
                   </TableCell>
                 </TableRow>
