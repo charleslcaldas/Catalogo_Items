@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useData } from '@/contexts/data-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
 import {
   Plus,
   Trash2,
@@ -42,7 +43,7 @@ import { toast } from 'sonner'
 import { Linha } from '@/types'
 
 export default function Lines() {
-  const { linhas, categorias } = useData()
+  const { linhas, categorias, itens } = useData()
   const [modalOpen, setModalOpen] = useState(false)
   const [editData, setEditData] = useState<Linha | null>(null)
   const [attrModalOpen, setAttrModalOpen] = useState(false)
@@ -210,18 +211,20 @@ export default function Lines() {
                 >
                   Margem Padrão <SortIcon field="margem_padrao" />
                 </TableHead>
+                <TableHead className="text-center">Itens</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortedLinhas.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     Nenhuma linha encontrada.
                   </TableCell>
                 </TableRow>
               )}
               {sortedLinhas.map((lin) => {
+                const itensCount = itens.filter((i) => i.linha_id === lin.id).length
                 return (
                   <TableRow
                     key={lin.id}
@@ -274,6 +277,15 @@ export default function Lines() {
                           {lin.margem_padrao != null ? `${lin.margem_padrao}%` : '7.5% (Global)'}
                         </span>
                       </div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge
+                        variant="secondary"
+                        className="font-medium"
+                        title={`${itensCount} item(ns) vinculado(s) à linha ${lin.nome_pt}`}
+                      >
+                        {itensCount} {itensCount === 1 ? 'item' : 'itens'}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1 sm:gap-2">
