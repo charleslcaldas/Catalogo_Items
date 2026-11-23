@@ -35,7 +35,7 @@ import pb from '@/lib/pocketbase/client'
 import { extractFieldErrors, getErrorMessage } from '@/lib/pocketbase/errors'
 
 export default function DescricoesBasePage() {
-  const { descricoesBase, categorias, linhas, ncms, reloadMetadata } = useData()
+  const { descricoesBase, categorias, linhas, ncms, itens, reloadMetadata } = useData()
   const [modalOpen, setModalOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<Partial<DescricaoBase> | null>(null)
   const [saving, setSaving] = useState(false)
@@ -224,6 +224,7 @@ export default function DescricoesBasePage() {
                 >
                   Linha <SortIcon field="linha" />
                 </TableHead>
+                <TableHead>Itens</TableHead>
                 <TableHead>Impostos NCM</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="w-[120px] text-right">Ações</TableHead>
@@ -248,6 +249,11 @@ export default function DescricoesBasePage() {
                     {categorias.find((c) => c.id === d.categoria_id)?.nome_pt || '-'}
                   </TableCell>
                   <TableCell>{linhas.find((l) => l.id === d.linha_id)?.nome_pt || '-'}</TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">
+                      {itens.filter((i) => i.descricao_base_id === d.id).length} itens
+                    </Badge>
+                  </TableCell>
                   <TableCell>
                     {(() => {
                       const n = ncms.find((x) => x.id === d.ncm_id)
@@ -289,7 +295,7 @@ export default function DescricoesBasePage() {
               ))}
               {sortedDesc.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     Nenhuma descrição base encontrada.
                   </TableCell>
                 </TableRow>
