@@ -6,7 +6,6 @@ import AddItemsToPotential, { AddItemsToPotentialRef } from './AddItemsToPotenti
 import QuotationMatrix from './components/QuotationMatrix'
 import PendenciasCliente from './components/PendenciasCliente'
 import { cn } from '@/lib/utils'
-import { RuntimeCompatibilityPanel } from '@/components/RuntimeCompatibilityPanel'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -265,7 +264,6 @@ export default function PotentialDetailsWrapper() {
           )}
           <AddItemsToPotential ref={addItemsRef} onTotaisChange={handleTotaisChange} />
         </div>
-        {import.meta.env.MODE === 'development' && <RuntimeCompatibilityPanel />}
         <div
           className={cn(
             'h-full overflow-auto p-6 bg-muted/20',
