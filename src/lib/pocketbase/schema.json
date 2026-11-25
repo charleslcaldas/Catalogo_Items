@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-25T16:31:59.138Z",
+  "generatedAt": "2026-11-25T16:48:55.986Z",
   "collections": [
     {
       "name": "users",
@@ -7,8 +7,8 @@
       "apiRules": {
         "list": "((id = @request.auth.id) && @request.auth.id != \"meiqw9s6c4r2t8a\")",
         "view": "((id = @request.auth.id) && @request.auth.id != \"meiqw9s6c4r2t8a\")",
-        "create": "(((1 = 1) && @request.auth.id != \"meiqw9s6c4r2t8a\") && @request.body.id != \"meiqw9s6c4r2t8a\")",
-        "update": "((id = @request.auth.id) && @request.auth.id != \"meiqw9s6c4r2t8a\")",
+        "create": null,
+        "update": "(((id = @request.auth.id) && @request.auth.id != \"meiqw9s6c4r2t8a\")) && @request.body.pode_confirmar_compra:changed = false",
         "delete": "((id = @request.auth.id) && @request.auth.id != \"meiqw9s6c4r2t8a\")"
       },
       "fields": [
@@ -41,6 +41,12 @@
         {
           "name": "preferencias_ui",
           "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pode_confirmar_compra",
+          "type": "bool",
           "required": false,
           "system": false
         }
@@ -2893,6 +2899,30 @@
           "type": "text",
           "required": false,
           "system": false
+        },
+        {
+          "name": "validade_oferta",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "incoterm",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "condicao_pagamento",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tempo_fabricacao",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": []
@@ -2901,11 +2931,11 @@
       "name": "c2_idempotency_keys",
       "type": "base",
       "apiRules": {
-        "list": "((@request.auth.id != '') && @request.auth.id != \"meiqw9s6c4r2t8a\")",
-        "view": "((@request.auth.id != '') && @request.auth.id != \"meiqw9s6c4r2t8a\")",
-        "create": "((@request.auth.id != '') && @request.auth.id != \"meiqw9s6c4r2t8a\")",
-        "update": "((@request.auth.id != '') && @request.auth.id != \"meiqw9s6c4r2t8a\")",
-        "delete": "((@request.auth.id != '') && @request.auth.id != \"meiqw9s6c4r2t8a\")"
+        "list": null,
+        "view": null,
+        "create": null,
+        "update": null,
+        "delete": null
       },
       "fields": [
         {
