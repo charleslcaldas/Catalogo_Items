@@ -1,12 +1,3 @@
-// Testes do contrato/regras puras da confirmação de compra — vitest.
-// Espelham as validações server-side do hook (JSVM não importa módulos TS;
-// as regras são mantidas em paralelo e testadas AQUI como evidência executável).
-//
-// Execução: pnpm -s vitest run (vitest já em dependencies).
-// NÃO EXECUTADOS nesta rodada: a suíte não roda no pipeline automático — a
-// plataforma não tem etapa de testes no run_qa (apenas setup/lint/typecheck/build).
-// Rodar localmente antes do merge para evidência completa.
-
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -14,7 +5,7 @@ import {
   calcularVendaConfirmacao,
   canonicalize,
   cadeiaCoerente,
-  podeAcessar,
+  operacaoNoEscopo,
   resolverIdentidade,
   MEI_INTEGRATION_USER_ID,
   ofertaEstaVencida,
@@ -27,32 +18,34 @@ import { computeVenda, isValidMargin } from '../money'
 
 const payloadBase: ConfirmarCompraPayload = {
   cotacao_iten_id: 'abc123',
+  potencial_iten_id: 'pi123',
+  rodada_resposta_id: 'rr123',
+  versoes_esperadas: { pi123: 'v1' },
   versao: '2026-01-01 00:00:00.000Z',
   idempotency_key: 'confirmar-compra:abc123:-:v1',
-  margem_versao_esperada: 0,
+  margem_versao_esperada: 1,
 }
 
 describe('canonicalização do payload de idempotência', () => {
   it('ordem de propriedades não muda o hash (retry seguro)', () => {
     const a = payloadCanonico(payloadBase)
-    const b = payloadCanonico({
-      idempotency_key: 'confirmar-compra:abc123:-:v1',
-      versao: '2026-01-01 00:00:00.000Z',
-      cotacao_iten_id: 'abc123',
-      margem_versao_esperada: 0,
-    })
+    const b = payloadCanonico(
+      Object.fromEntries(
+        Object.entries(payloadBase).reverse(),
+      ) as unknown as ConfirmarCompraPayload,
+    )
     expect(canonicalize(a)).toBe(canonicalize(b))
   })
 
   it('payload diferente com a MESMA chave deve ser rejeitado (hash difere)', () => {
     const a = canonicalize(payloadCanonico(payloadBase))
-    const b = canonicalize(payloadCanonico({ ...payloadBase, moq: 1000 }))
+    const b = canonicalize(payloadCanonico({ ...payloadBase, ajustar_quantidade_para_moq: true }))
     expect(a).not.toBe(b)
   })
 
-  it('moq ausente vs undefined vs null → mesmo cânone (sem falsa divergência)', () => {
+  it('cópia do mesmo corpo preserva o cânone', () => {
     const a = payloadCanonico(payloadBase)
-    const b = payloadCanonico({ ...payloadBase, moq: undefined })
+    const b = payloadCanonico({ ...payloadBase })
     expect(canonicalize(a)).toBe(canonicalize(b))
   })
 })
@@ -69,66 +62,64 @@ describe('validarPayload (borda do cliente; servidor revalida)', () => {
     expect(erros.length).toBeGreaterThanOrEqual(2)
   })
 
-  it('idempotency_key > 200 caracteres rejeitada', () => {
-    const erros = validarPayload({ ...payloadBase, idempotency_key: 'k'.repeat(201) })
-    expect(erros.some((e) => e.message.includes('200'))).toBe(true)
+  it('idempotency_key > 120 caracteres rejeitada', () => {
+    const erros = validarPayload({ ...payloadBase, idempotency_key: 'k'.repeat(121) })
+    expect(erros.some((e) => e.message.includes('120'))).toBe(true)
   })
 
-  it('moq negativo ou não finito rejeitado', () => {
-    expect(validarPayload({ ...payloadBase, moq: -1 }).map((e) => e.code)).toContain('moq_invalido')
-    expect(validarPayload({ ...payloadBase, moq: Number.NaN }).map((e) => e.code)).toContain(
-      'moq_invalido',
-    )
+  it('margem não inicializada e evidência ausente são rejeitadas', () => {
+    expect(validarPayload({ ...payloadBase, margem_versao_esperada: 0 }).length).toBeGreaterThan(0)
+    expect(validarPayload({ ...payloadBase, rodada_resposta_id: '' }).length).toBeGreaterThan(0)
   })
 })
 
-describe('autorização — matriz PERMITIDO/NEGADO (espelho das API rules auditadas)', () => {
+describe('escopo preliminar do cliente — não concede autorização', () => {
   it('anônimo → NEGADO (sem auth; 401 já coberto pelo middleware requireAuth)', () => {
     expect(resolverIdentidade(null).status).toBe('anonimo')
     expect(resolverIdentidade(undefined).status).toBe('anonimo')
-    expect(podeAcessar(resolverIdentidade(null), 'cotacoes_itens', 'update')).toBe(false)
-    expect(podeAcessar(resolverIdentidade(undefined), 'potenciais', 'view')).toBe(false)
+    expect(operacaoNoEscopo(resolverIdentidade(null), 'cotacoes_itens', 'update')).toBe(false)
+    expect(operacaoNoEscopo(resolverIdentidade(undefined), 'potenciais', 'view')).toBe(false)
   })
 
   it('usuário Mei → NEGADO em qualquer coleção/operação (integração excluída do serviço)', () => {
     const mei = resolverIdentidade({ id: MEI_INTEGRATION_USER_ID })
     expect(mei.status).toBe('mei')
-    expect(podeAcessar(mei, 'cotacoes_itens', 'view')).toBe(false)
-    expect(podeAcessar(mei, 'cotacoes_itens', 'update')).toBe(false)
-    expect(podeAcessar(mei, 'potenciais', 'create')).toBe(false)
-    expect(podeAcessar(mei, 'potencial_itens', 'update')).toBe(false)
-    expect(podeAcessar(mei, 'historico_precos', 'create')).toBe(false)
-    expect(podeAcessar(mei, 'c2_idempotency_keys', 'list')).toBe(false)
+    expect(operacaoNoEscopo(mei, 'cotacoes_itens', 'view')).toBe(false)
+    expect(operacaoNoEscopo(mei, 'cotacoes_itens', 'update')).toBe(false)
+    expect(operacaoNoEscopo(mei, 'potenciais', 'create')).toBe(false)
+    expect(operacaoNoEscopo(mei, 'potencial_itens', 'update')).toBe(false)
+    expect(operacaoNoEscopo(mei, 'historico_precos', 'create')).toBe(false)
+    expect(operacaoNoEscopo(mei, 'c2_idempotency_keys', 'list')).toBe(false)
   })
 
-  it('autenticado do time → PERMITIDO conforme a regra espelhada (coleção/oper equivalentes)', () => {
+  it('escopo de operações da UI; servidor reavalia todas as permissões', () => {
     const time = resolverIdentidade({ id: 'usuario_time_1' })
     expect(time.status).toBe('time')
-    expect(podeAcessar(time, 'cotacoes_itens', 'view')).toBe(true)
-    expect(podeAcessar(time, 'cotacoes_itens', 'update')).toBe(true)
-    expect(podeAcessar(time, 'cotacoes_fornecedor', 'view')).toBe(true)
-    expect(podeAcessar(time, 'cotacoes_rodadas', 'list')).toBe(true)
-    expect(podeAcessar(time, 'cotacoes_rodadas', 'create')).toBe(true)
-    expect(podeAcessar(time, 'c2_idempotency_keys', 'list')).toBe(true)
-    expect(podeAcessar(time, 'c2_idempotency_keys', 'create')).toBe(true)
-    expect(podeAcessar(time, 'potenciais', 'view')).toBe(true)
-    expect(podeAcessar(time, 'potencial_itens', 'list')).toBe(true)
-    expect(podeAcessar(time, 'potencial_itens', 'view')).toBe(true)
-    expect(podeAcessar(time, 'potencial_itens', 'update')).toBe(true)
-    expect(podeAcessar(time, 'historico_precos', 'create')).toBe(true)
-    expect(podeAcessar(time, 'itens', 'view')).toBe(true)
-    expect(podeAcessar(time, 'fornecedores', 'view')).toBe(true)
+    expect(operacaoNoEscopo(time, 'cotacoes_itens', 'view')).toBe(true)
+    expect(operacaoNoEscopo(time, 'cotacoes_itens', 'update')).toBe(true)
+    expect(operacaoNoEscopo(time, 'cotacoes_fornecedor', 'view')).toBe(true)
+    expect(operacaoNoEscopo(time, 'cotacoes_rodadas', 'list')).toBe(true)
+    expect(operacaoNoEscopo(time, 'cotacoes_rodadas', 'create')).toBe(true)
+    expect(operacaoNoEscopo(time, 'c2_idempotency_keys', 'list')).toBe(false)
+    expect(operacaoNoEscopo(time, 'c2_idempotency_keys', 'create')).toBe(false)
+    expect(operacaoNoEscopo(time, 'potenciais', 'view')).toBe(true)
+    expect(operacaoNoEscopo(time, 'potencial_itens', 'list')).toBe(true)
+    expect(operacaoNoEscopo(time, 'potencial_itens', 'view')).toBe(true)
+    expect(operacaoNoEscopo(time, 'potencial_itens', 'update')).toBe(true)
+    expect(operacaoNoEscopo(time, 'historico_precos', 'create')).toBe(true)
+    expect(operacaoNoEscopo(time, 'itens', 'view')).toBe(true)
+    expect(operacaoNoEscopo(time, 'fornecedores', 'view')).toBe(true)
   })
 
   it('identidade não-resolvida / indeterminado → NEGADO (negar por padrão)', () => {
     const indet = resolverIdentidade({ id: 42 })
     expect(indet.status).toBe('indeterminado')
-    expect(podeAcessar(indet, 'cotacoes_itens', 'update')).toBe(false)
-    expect(podeAcessar(resolverIdentidade({ id: '' }), 'potenciais', 'view')).toBe(false)
+    expect(operacaoNoEscopo(indet, 'cotacoes_itens', 'update')).toBe(false)
+    expect(operacaoNoEscopo(resolverIdentidade({ id: '' }), 'potenciais', 'view')).toBe(false)
     // caso qualquer fora da matriz: negado por omissão
     const time = resolverIdentidade({ id: 'usuario_time_1' })
-    expect(podeAcessar(time, 'users', 'view')).toBe(false)
-    expect(podeAcessar(time, 'cotacoes_itens', 'delete')).toBe(false)
+    expect(operacaoNoEscopo(time, 'users', 'view')).toBe(false)
+    expect(operacaoNoEscopo(time, 'cotacoes_itens', 'delete')).toBe(false)
   })
 
   it('sem papel novo: "time" é exatamente autenticado ≠ Mei', () => {
@@ -190,9 +181,10 @@ describe('autorização — checagem anti-escopo (cadeia de relações coerente)
   })
 })
 
-describe('alvo (contraproposta) nunca confirma compra', () => {
+describe('alvo exige resposta do fornecedor', () => {
   it('preco == preco_contraproposta > 0 → preco_eh_alvo', () => {
     expect(validarPrecoNaoEhAlvo(4.5, 4.5)?.code).toBe('preco_eh_alvo')
+    expect(validarPrecoNaoEhAlvo(4.5, 4.5, true)).toBeNull()
     expect(validarPrecoNaoEhAlvo(4.5, 0)).toBeNull()
     expect(validarPrecoNaoEhAlvo(4.5, 5)).toBeNull()
   })
@@ -237,7 +229,7 @@ describe('margem AUTORITATIVA PERSISTIDA / precisão 2-3 (nunca 7,5 fixo)', () =
     expect(r.venda).not.toBe(calcularVendaConfirmacao(4.5, 7.5, 2, 0, 0).venda)
   })
 
-  it('margem enviada no payload do cliente é IGNORADA (não existe no contrato)', () => {
+  it('cálculo puro usa somente a margem persistida; payload adulterado é testado no servidor', () => {
     // a função não aceita margem do cliente — só a persistida + versão esperada.
     // Qualquer "margem: 50" que o cliente envie no body não muda o cálculo:
     // o servidor lê margem_negociada do registro (espelho do hook).
@@ -319,7 +311,7 @@ describe('margem_versao_esperada — validação de payload (borda do cliente)',
 
   it('entra no cânone de idempotência (retry com outra versão → hash diferente)', () => {
     const a = canonicalize(payloadCanonico(payloadBase))
-    const b = canonicalize(payloadCanonico({ ...payloadBase, margem_versao_esperada: 1 }))
+    const b = canonicalize(payloadCanonico({ ...payloadBase, margem_versao_esperada: 2 }))
     expect(a).not.toBe(b)
   })
 })
@@ -332,22 +324,5 @@ describe('validade da oferta', () => {
     expect(ofertaEstaVencida(passado)).toBe(true)
     expect(ofertaEstaVencida('data-invalida')).toBe(true)
     expect(ofertaEstaVencida(undefined)).toBe(false)
-  })
-})
-
-describe('hook — invariantes que não são executáveis aqui (NÃO EXECUTADO)', () => {
-  it('documenta o que depende de execução real do backend', () => {
-    // Estes comportamentos são do hook JSVM e só podem ser comprovados com
-    // execução real do backend (POST com auth, dados de cotação, transação):
-    //  - atomicidade (falha no meio não deixa metade aplicada) — rollback real
-    //  - idempotência durável (mesma chave → mesmo recibo; chave+payload diff → 409)
-    //  - conflito de versão (conflito_versao 409 em re-leitura divergente)
-    //  - gravação efetiva em cotacoes_rodadas/potencial_itens/historico_precos
-    //  - reavaliação da autorização DENTRO da transação (rollback em negativa)
-    //  - não-duplicação de histórico com price_history_logger/on_cotacao_finalizada
-    //  - incrementar margem_versao (+1) dentro da transação ao consumir a margem
-    //    (concorrência otimista real — confirmação dupla sob versão obsoleta
-    //    cai no conflito_margem da re-leitura, mas só com POST real)
-    expect(true).toBe(true)
   })
 })

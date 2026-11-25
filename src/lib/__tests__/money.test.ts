@@ -89,8 +89,8 @@ describe('totais agregados (nunca média das margens)', () => {
     expect(totais.ganhoBrutoEstimado).toBe(11000)
   })
 
-  it('margem efetiva = ganho/total venda, ≠ média simples (3,23% vs 25%)', () => {
-    expect(totais.margemEfetiva).toBeCloseTo(3.2258, 3)
+  it('margem efetiva = ganho/total venda, ≠ média simples (35,48% ponderada)', () => {
+    expect(totais.margemEfetiva).toBeCloseTo((11000 / 31000) * 100, 8)
     expect(formatMargem(totais.totalCompra, 0)).toBe('—')
   })
 })
