@@ -1,4 +1,3 @@
-import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { PriceInput } from '@/components/PriceInput'
 
@@ -10,7 +9,6 @@ export function PriceCell({
   draftMoq,
   isLowest,
   onDraftChange,
-  onDraftMoqChange,
   onBlur,
   onToggleWinner,
 }: any) {
@@ -69,69 +67,15 @@ export function PriceCell({
         )}
       </div>
 
-      <button
-        type="button"
-        className="text-xs text-blue-700 underline text-left"
-        onClick={(e) => {
-          e.stopPropagation()
-          onToggleWinner(cotacaoF.id, item.item_id, cotacaoI?.id, cotacaoI?.vencedor, item.id)
-        }}
-      >
-        Revisar compra {item.expand?.item_id?.sku || ''}
-      </button>
-      {currentMoq > 0 || (draftMoq !== undefined && draftMoq !== 0) ? (
-        <div className="flex items-center gap-2">
-          <span
-            className={cn(
-              'text-[9px] uppercase font-bold w-6 shrink-0',
-              cotacaoI?.vencedor ? 'text-blue-700' : 'text-muted-foreground',
-            )}
-          >
-            MOQ
-          </span>
-          <Input
-            type="text"
-            inputMode="numeric"
-            value={currentMoq || ''}
-            onChange={(e) => {
-              const val = e.target.value.replace(/[^0-9]/g, '')
-              onDraftMoqChange(cotacaoF.id, item.item_id, val ? parseInt(val, 10) : 0)
-            }}
-            onBlur={() => {
-              if (onBlur && (draftPrice !== undefined || draftMoq !== undefined)) {
-                onBlur(cotacaoF.id, item.item_id, currentPrice, currentMoq, cotacaoI?.id)
-              }
-            }}
-            onClick={(e) => e.stopPropagation()}
-            className={cn(
-              'h-6 text-[10px] text-right font-mono flex-1 min-w-0',
-              cotacaoI?.vencedor
-                ? 'bg-white text-blue-900 border-border focus-visible:ring-blue-400'
-                : isLowest
-                  ? 'bg-white/90 border-emerald-300 text-emerald-900 focus-visible:ring-emerald-400'
-                  : '',
-            )}
-            disabled={!!cotacaoI?.vencedor}
-            placeholder="MOQ"
-          />
-        </div>
-      ) : (
-        <div className="hidden group-hover:flex justify-end">
-          <button
-            className={cn(
-              'text-[9px] underline pr-1',
-              cotacaoI?.vencedor
-                ? 'text-blue-600 hover:text-blue-800'
-                : 'text-muted-foreground hover:text-foreground',
-            )}
-            onClick={(e) => {
-              e.stopPropagation()
-              onDraftMoqChange(cotacaoF.id, item.item_id, 1)
-            }}
-          >
-            + MOQ
-          </button>
-        </div>
+      {currentMoq > 0 && (
+        <p
+          className={cn(
+            'text-[10px] font-mono whitespace-nowrap',
+            cotacaoI?.vencedor ? 'text-blue-700' : 'text-muted-foreground',
+          )}
+        >
+          MLQ {currentMoq.toLocaleString('pt-BR')}
+        </p>
       )}
     </div>
   )

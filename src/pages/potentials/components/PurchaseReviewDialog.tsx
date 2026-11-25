@@ -72,7 +72,6 @@ export function PurchaseReviewDialog({
           <DialogTitle>Revisar compras selecionadas</DialogTitle>
           <DialogDescription>
             Confira a resposta do fabricante, a margem e os valores antes de confirmar cada item.
-            Duplo clique no nome do item marca como revisado e aprovado.
           </DialogDescription>
         </DialogHeader>
         {items.length > 1 && (
@@ -89,7 +88,7 @@ export function PurchaseReviewDialog({
                   title="Duplo clique marca o item como revisado e aprovado"
                   onClick={() => setIndex(i)}
                   className={cn(
-                    approved[key] && 'border-green-600 bg-green-600 text-white hover:bg-green-700',
+                    approved[key] && 'border-blue-600 bg-blue-600 text-white hover:bg-blue-700',
                     i === index && !approved[key] && 'default',
                   )}
                 >
@@ -396,28 +395,19 @@ function ReviewItem({
     </div>
   )
   const moqInfo = Number(context.resposta?.moq ?? context.oferta.quantidade_minima ?? 0)
-  const belowMoq = moqInfo > 0 && context.linha.quantidade < moqInfo
   return (
-    <div
-      className="space-y-4"
-      aria-busy={busy}
-      onDoubleClick={(e) => {
-        // Duplo clique em qualquer área livre do cartão marca revisado e aprovado.
-        const t = e.target as HTMLElement
-        if (t.closest('input, select, textarea, button, label, a')) return
-        onToggleApproved?.(true)
-      }}
-    >
+    <div className="space-y-4" aria-busy={busy}>
       <div
-        className="rounded-lg border p-3 cursor-pointer select-none"
+        className={cn(
+          'rounded-lg border p-3 cursor-pointer select-none transition-colors',
+          approved ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-400' : 'hover:bg-muted/30',
+        )}
         onDoubleClick={() => onToggleApproved?.(true)}
         title="Duplo clique marca como revisado e aprovado"
       >
         <div className="flex items-start justify-between gap-2">
           <div>
-            <p className="font-semibold">
-              {context.produto.sku} · {context.fabricante.nome}
-            </p>
+            <p className="font-semibold">{context.fabricante.nome}</p>
             <p className="text-sm text-muted-foreground">
               Quantidade solicitada: {context.linha.quantidade} {context.linha.unidade_medida}
               {context.oferta.preco_contraproposta > 0
@@ -430,28 +420,21 @@ function ReviewItem({
             <p className="font-bold text-sm">
               {context.resposta ? money(context.resposta.preco, context.resposta.moeda) : '—'}
             </p>
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wide mt-1">MOQ</p>
-            {moqInfo > 0 ? (
-              <p
-                className={cn('font-bold text-sm', belowMoq ? 'text-red-700' : 'text-emerald-700')}
-              >
-                {moqInfo} {context.linha.unidade_medida}
-                {belowMoq && ' ⚠ abaixo do pedido'}
-              </p>
-            ) : (
-              <p className="font-bold text-sm text-muted-foreground">sem MOQ</p>
+            {moqInfo > 0 && (
+              <>
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wide mt-1">
+                  MLQ
+                </p>
+                <p className="font-bold text-sm">
+                  {moqInfo} {context.linha.unidade_medida}
+                </p>
+              </>
             )}
           </div>
         </div>
         {approved && (
-          <p className="mt-2 text-xs font-semibold text-green-700" role="status">
+          <p className="mt-2 text-xs font-semibold text-blue-700" role="status">
             ✓ Revisado e aprovado
-          </p>
-        )}
-        {!approved && (
-          <p className="mt-2 text-[11px] text-muted-foreground italic">
-            Dica: duplo clique no cartão (ou no nome do item acima) para marcar como revisado e
-            aprovado.
           </p>
         )}
       </div>
