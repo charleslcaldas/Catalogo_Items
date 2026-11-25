@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -47,6 +48,10 @@ export function PurchaseReviewDialog({
 }) {
   const [index, setIndex] = useState(0)
   const [busy, setBusy] = useState(false)
+  // Estado "revisado e aprovado" por item: sobrevive à troca de item na navegação.
+  const [approved, setApproved] = useState<Record<string, boolean>>({})
+  const toggleApproved = (key: string, value: boolean) =>
+    setApproved((prev) => ({ ...prev, [key]: value }))
   return (
     <Dialog
       open={items.length > 0}
@@ -55,7 +60,7 @@ export function PurchaseReviewDialog({
       }}
     >
       <DialogContent
-        className="max-w-3xl max-h-[90vh]"
+        className="max-w-3xl max-h-[90vh] overflow-y-auto"
         onInteractOutside={(e) => {
           if (busy) e.preventDefault()
         }}
@@ -64,24 +69,35 @@ export function PurchaseReviewDialog({
         }}
       >
         <DialogHeader>
-          <DialogTitle>Revisar compra</DialogTitle>
+          <DialogTitle>Revisar compras selecionadas</DialogTitle>
           <DialogDescription>
             Confira a resposta do fabricante, a margem e os valores antes de confirmar cada item.
+            Duplo clique no nome do item marca como revisado e aprovado.
           </DialogDescription>
         </DialogHeader>
         {items.length > 1 && (
           <div className="flex flex-wrap gap-2" aria-label="Itens para revisar">
-            {items.map((x, i) => (
-              <Button
-                key={x.ofertaId + ':' + x.linhaId}
-                size="sm"
-                variant={i === index ? 'default' : 'outline'}
-                disabled={busy}
-                onClick={() => setIndex(i)}
-              >
-                {i + 1}. {x.titulo}
-              </Button>
-            ))}
+            {items.map((x, i) => {
+              const key = x.ofertaId + ':' + x.linhaId
+              return (
+                <Button
+                  key={key}
+                  size="sm"
+                  variant={i === index ? 'default' : 'outline'}
+                  disabled={busy}
+                  onDoubleClick={() => toggleApproved(key, true)}
+                  title="Duplo clique marca o item como revisado e aprovado"
+                  onClick={() => setIndex(i)}
+                  className={cn(
+                    approved[key] && 'border-green-600 bg-green-600 text-white hover:bg-green-700',
+                    i === index && !approved[key] && 'default',
+                  )}
+                >
+                  {i + 1}. {x.titulo}
+                  {approved[key] ? ' ✓' : ''}
+                </Button>
+              )
+            })}
           </div>
         )}
         {items[index] && (
@@ -90,6 +106,10 @@ export function PurchaseReviewDialog({
             item={items[index]}
             onBusy={setBusy}
             onConfirmed={onConfirmed}
+            approved={approved[items[index].ofertaId + ':' + items[index].linhaId] === true}
+            onToggleApproved={(v: boolean) =>
+              toggleApproved(items[index].ofertaId + ':' + items[index].linhaId, v)
+            }
           />
         )}
         <div className="flex justify-end">
@@ -105,10 +125,14 @@ function ReviewItem({
   item,
   onBusy,
   onConfirmed,
+  approved,
+  onToggleApproved,
 }: {
   item: RevisaoItem
   onBusy: (b: boolean) => void
   onConfirmed: () => void
+  approved?: boolean
+  onToggleApproved?: (v: boolean) => void
 }) {
   const { user } = useAuth()
   const [context, setContext] = useState<NegociacaoContexto | null>(null)
@@ -323,7 +347,7 @@ function ReviewItem({
     termsValid &&
     marginSaved &&
     (!needsMoq || adjust) &&
-    reviewed &&
+    (reviewed || approved) &&
     !context.confirmada &&
     !receipt
   const field = (key: keyof typeof response, label: string, type = 'text') => (
@@ -343,19 +367,95 @@ function ReviewItem({
       />
     </div>
   )
+  // Informações gerais da cotação (não são por item): moeda, validade, incoterm,
+  // pagamento e fabricação — exibidas uma única vez, fora do cartão do item.
+  const generalInfo = (
+    <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
+      <p className="font-medium text-foreground mb-1">Condições gerais do fornecedor</p>
+      <p>
+        Moeda: <strong>{context.resposta?.moeda || context.cotacao.oferta_moeda || '—'}</strong> ·
+        Validade:{' '}
+        <strong>
+          {context.resposta
+            ? new Date(context.resposta.validade_oferta).toLocaleDateString('pt-BR')
+            : '—'}
+        </strong>
+      </p>
+      <p>
+        Incoterm: <strong>{context.cotacao.incoterm || '—'}</strong> · Pagamento:{' '}
+        <strong>{context.cotacao.condicao_pagamento || '—'}</strong> · Fabricação:{' '}
+        <strong>{context.cotacao.tempo_fabricacao || '—'}</strong>
+      </p>
+      {context.resposta?.incoterm && (
+        <p>
+          Na resposta: Incoterm <strong>{context.resposta.incoterm}</strong> · Pagamento{' '}
+          <strong>{context.resposta.condicao_pagamento || '—'}</strong> · Fabricação{' '}
+          <strong>{context.resposta.tempo_fabricacao || '—'}</strong>
+        </p>
+      )}
+    </div>
+  )
+  const moqInfo = Number(context.resposta?.moq ?? context.oferta.quantidade_minima ?? 0)
+  const belowMoq = moqInfo > 0 && context.linha.quantidade < moqInfo
   return (
-    <div className="space-y-4" aria-busy={busy}>
-      <div>
-        <p className="font-semibold">
-          {context.produto.sku} · {context.fabricante.nome}
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Quantidade solicitada: {context.linha.quantidade} {context.linha.unidade_medida}
-          {context.oferta.preco_contraproposta > 0
-            ? ` · Alvo C2: ${money(context.oferta.preco_contraproposta)}`
-            : ''}
-        </p>
+    <div
+      className="space-y-4"
+      aria-busy={busy}
+      onDoubleClick={(e) => {
+        // Duplo clique em qualquer área livre do cartão marca revisado e aprovado.
+        const t = e.target as HTMLElement
+        if (t.closest('input, select, textarea, button, label, a')) return
+        onToggleApproved?.(true)
+      }}
+    >
+      <div
+        className="rounded-lg border p-3 cursor-pointer select-none"
+        onDoubleClick={() => onToggleApproved?.(true)}
+        title="Duplo clique marca como revisado e aprovado"
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <p className="font-semibold">
+              {context.produto.sku} · {context.fabricante.nome}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Quantidade solicitada: {context.linha.quantidade} {context.linha.unidade_medida}
+              {context.oferta.preco_contraproposta > 0
+                ? ` · Alvo C2: ${money(context.oferta.preco_contraproposta)}`
+                : ''}
+            </p>
+          </div>
+          <div className="text-right shrink-0">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Preço</p>
+            <p className="font-bold text-sm">
+              {context.resposta ? money(context.resposta.preco, context.resposta.moeda) : '—'}
+            </p>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide mt-1">MOQ</p>
+            {moqInfo > 0 ? (
+              <p
+                className={cn('font-bold text-sm', belowMoq ? 'text-red-700' : 'text-emerald-700')}
+              >
+                {moqInfo} {context.linha.unidade_medida}
+                {belowMoq && ' ⚠ abaixo do pedido'}
+              </p>
+            ) : (
+              <p className="font-bold text-sm text-muted-foreground">sem MOQ</p>
+            )}
+          </div>
+        </div>
+        {approved && (
+          <p className="mt-2 text-xs font-semibold text-green-700" role="status">
+            ✓ Revisado e aprovado
+          </p>
+        )}
+        {!approved && (
+          <p className="mt-2 text-[11px] text-muted-foreground italic">
+            Dica: duplo clique no cartão (ou no nome do item acima) para marcar como revisado e
+            aprovado.
+          </p>
+        )}
       </div>
+      {generalInfo}
       {!authorized && (
         <p role="alert" className="rounded border p-3 text-sm">
           Sua conta ainda não está habilitada para confirmar compras. Atualize sua sessão após a
@@ -502,6 +602,10 @@ function ReviewItem({
           )}
           {step === 2 && evidence && (
             <section className="space-y-3" aria-label="Conferência final">
+              <p className="text-xs text-muted-foreground">
+                Moeda, validade, incoterm, pagamento e fabricação são condições gerais do fornecedor
+                e aparecem no topo desta revisão.
+              </p>
               <dl className="grid grid-cols-2 gap-3 rounded-lg border p-4 text-sm">
                 <div>
                   <dt>Compra unitária</dt>
@@ -530,11 +634,6 @@ function ReviewItem({
                   <dd>{money(rounded * quantity, evidence.moeda)}</dd>
                 </div>
               </dl>
-              <p className="text-sm">
-                {evidence.incoterm || 'Incoterm não informado'} ·{' '}
-                {evidence.condicao_pagamento || 'Pagamento não informado'} ·{' '}
-                {evidence.tempo_fabricacao || 'Prazo não informado'}
-              </p>
               {needsMoq && (
                 <label className="flex items-start gap-2 rounded border border-amber-300 p-3 text-sm">
                   <Checkbox
@@ -558,11 +657,13 @@ function ReviewItem({
               <label className="flex items-start gap-2 text-sm">
                 <Checkbox
                   aria-label="Conferi os dados da compra"
-                  checked={reviewed}
-                  disabled={busy || uncertain || !authorized}
+                  checked={reviewed || approved}
+                  disabled={busy || uncertain || !authorized || approved}
                   onCheckedChange={(v) => setReviewed(v === true)}
                 />
-                Conferi fabricante, resposta, moeda, unidade, quantidade, margem e condições.
+                {approved
+                  ? 'Revisado e aprovado por duplo clique.'
+                  : 'Conferi fabricante, resposta, unidade, quantidade, margem e condições.'}
               </label>
               <Button disabled={busy || (!canConfirm && !pendingConfirm.current)} onClick={confirm}>
                 {busy
