@@ -54,12 +54,12 @@ export function SelectedItemsTable({
 
   // minDec/maxDec: exibição exata — o total da linha usa a mesma precisão do
   // unitário exibido/salvo, sem casas ocultas.
-  const formatCurrency = (value: number | '', minDec = 2, maxDec = 3) => {
+  const formatCurrency = (value: number | '', minDec = 2, maxDec = 3, currency = 'USD') => {
     if (value === '') return '-'
     const num = Number(value)
     return isNaN(num)
       ? '-'
-      : `$ ${num.toLocaleString('en-US', { minimumFractionDigits: minDec, maximumFractionDigits: maxDec })}`
+      : `${currency} ${num.toLocaleString('en-US', { minimumFractionDigits: minDec, maximumFractionDigits: maxDec })}`
   }
 
   // Precisão por linha (2 ou 3 casas). Reduzir para 2 arredonda o preço para
@@ -295,7 +295,7 @@ export function SelectedItemsTable({
                           <TooltipTrigger asChild>
                             <div className="flex flex-col cursor-help items-end">
                               <span className="font-bold text-amber-700">
-                                {formatCurrency(refPrice)}
+                                {formatCurrency(refPrice, 2, 3, data.moeda_compra || 'USD')}
                               </span>
                               {refSupplier ? (
                                 <span
@@ -311,7 +311,8 @@ export function SelectedItemsTable({
                           </TooltipTrigger>
                           <TooltipContent>
                             <p className="font-semibold text-xs">
-                              Preço de Compra Selecionado: {formatCurrency(refPrice)}
+                              Preço de Compra Selecionado:{' '}
+                              {formatCurrency(refPrice, 2, 3, data.moeda_compra || 'USD')}
                             </p>
                             <p className="text-xs text-muted-foreground mt-0.5">
                               Fornecedor: {refSupplier || 'Não informado'}
@@ -361,7 +362,8 @@ export function SelectedItemsTable({
                   <TableCell className="py-1 text-right">
                     <FormattedInput
                       isPrice
-                      prefixText="$"
+                      fractionDigits={precisao}
+                      prefixText={data.moeda_compra || 'USD'}
                       className="h-7 w-24 px-2 text-right text-xs bg-white font-bold ml-auto"
                       value={
                         typeof data.preco_unitario === 'number'
@@ -390,7 +392,7 @@ export function SelectedItemsTable({
                     </select>
                   </TableCell>
                   <TableCell className="py-1 text-xs font-semibold text-right whitespace-nowrap">
-                    {formatCurrency(total, 2, precisao)}
+                    {formatCurrency(total, 2, precisao, data.moeda_compra || 'USD')}
                   </TableCell>
                   <TableCell className="py-1 text-center">
                     <Button

@@ -64,6 +64,7 @@ export type SelectedItemData = {
   referencia_data?: string
   // Precisão do preço de venda desta linha (2 ou 3 casas). Ausente/vazia → 2.
   precisao_preco?: number
+  moeda_compra?: string
 }
 
 export type SelectedItemRecord = {
@@ -445,6 +446,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, AddItemsTo
               ? fornecedorCotacoes.find((f) => f.id === ofertaVencedora.cotacao_fornecedor_id)
               : undefined
             return {
+              id: si.recordId,
               item_id: si.id,
               quantidade: Number(si.data.quantidade),
               unidade_medida: si.data.unidade_medida,
@@ -574,6 +576,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, AddItemsTo
               referencia_fornecedor: pi.referencia_fornecedor,
               referencia_data: pi.referencia_data,
               precisao_preco: pi.precisao_preco,
+              moeda_compra: pi.moeda_compra,
             },
           }
         })
@@ -678,6 +681,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, AddItemsTo
                       referencia_fornecedor: it.referencia_fornecedor,
                       referencia_data: it.referencia_data,
                       precisao_preco: it.precisao_preco,
+                      moeda_compra: it.moeda_compra,
                     },
                   }
                 }
@@ -773,6 +777,12 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, AddItemsTo
 
     // Selo/badge que apenas repetia o valor do select de Situação da Cotação
     // (incl. "Completo") removido — o select já mostra o valor atual.
+
+    const moedasCotacao = Array.from(
+      new Set(selectedItems.map((si) => si.data.moeda_compra || 'USD')),
+    )
+    const moedaCotacao =
+      moedasCotacao.length === 1 ? moedasCotacao[0] : moedasCotacao.length > 1 ? 'MISTAS' : 'USD'
 
     const calculateTotals = () => {
       const totalSKUs = new Set(selectedItems.map((si) => si.id)).size
@@ -1171,7 +1181,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, AddItemsTo
                   Total de Compra
                 </span>
                 <span className="text-sm font-semibold font-mono text-amber-700">
-                  ${' '}
+                  {moedaCotacao}{' '}
                   {totalCostRef.toLocaleString('en-US', {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
@@ -1194,7 +1204,8 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, AddItemsTo
                           : 'text-foreground',
                     )}
                   >
-                    {profitValue < 0 ? '-' : ''}$
+                    {profitValue < 0 ? '-' : ''}
+                    {moedaCotacao}{' '}
                     {Math.abs(profitValue).toLocaleString('en-US', {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
@@ -1244,7 +1255,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, AddItemsTo
                   Total de Venda
                 </span>
                 <span className="text-lg font-bold text-primary">
-                  ${' '}
+                  {moedaCotacao}{' '}
                   {totalValue.toLocaleString('en-US', {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,

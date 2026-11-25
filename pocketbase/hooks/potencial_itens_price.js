@@ -1,8 +1,27 @@
 onRecordAfterUpdateSuccess((e) => {
-  // Save do serviço de confirmação (confirmar_compra.js) grava o 'venda' por conta própria.
-  if ($app.store().get('c2_suppress_venda:' + e.record.id)) {
-    return e.next()
-  }
+  // Server-signed, record-local marker survives deferred after-commit hooks.
+  // Never suppress a logger via a shared per-record flag or client-supplied boolean.
+  try {
+    const event = e.record.getString('__c2_confirmation_event')
+    const mac = e.record.getString('__c2_confirmation_mac')
+    const key = $app.store().get('c2_confirmation_signing_key')
+    const message =
+      'c2-confirm-v1\n' +
+      e.record.id +
+      '\n' +
+      e.record.getFloat('preco_unitario') +
+      '\n' +
+      e.record.getFloat('referencia_preco') +
+      '\n' +
+      event
+    if (
+      key &&
+      /^[0-9a-f]{64}$/.test(event) &&
+      /^[0-9a-f]{64}$/.test(mac) &&
+      $security.equal(mac, $security.hs256(message, key))
+    )
+      return e.next()
+  } catch (_) {}
   const preco = e.record.get('preco_unitario')
   const fornecedor = e.record.get('observacoes')
 

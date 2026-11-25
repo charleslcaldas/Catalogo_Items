@@ -22,7 +22,10 @@ export function PriceCell({
 
   return (
     <div
-      onClick={() => onToggleWinner(cotacaoF.id, item.item_id, cotacaoI?.id, cotacaoI?.vencedor)}
+      title="Revisar resposta e confirmar compra"
+      onClick={() =>
+        onToggleWinner(cotacaoF.id, item.item_id, cotacaoI?.id, cotacaoI?.vencedor, item.id)
+      }
       className={cn(
         'p-1.5 rounded-md flex flex-col gap-1.5 relative group min-h-[44px] cursor-pointer transition-all',
         cotacaoI?.vencedor
@@ -35,6 +38,7 @@ export function PriceCell({
       <div className="flex items-center gap-1">
         <div onClick={(e) => e.stopPropagation()} className="flex-1 min-w-0">
           <PriceInput
+            disabled={!!cotacaoI?.vencedor}
             value={currentPrice || undefined}
             onChange={(val) => onDraftChange(cotacaoF.id, item.item_id, val || 0)}
             onBlur={() => {
@@ -65,6 +69,16 @@ export function PriceCell({
         )}
       </div>
 
+      <button
+        type="button"
+        className="text-xs text-blue-700 underline text-left"
+        onClick={(e) => {
+          e.stopPropagation()
+          onToggleWinner(cotacaoF.id, item.item_id, cotacaoI?.id, cotacaoI?.vencedor, item.id)
+        }}
+      >
+        Revisar compra {item.expand?.item_id?.sku || ''}
+      </button>
       {currentMoq > 0 || (draftMoq !== undefined && draftMoq !== 0) ? (
         <div className="flex items-center gap-2">
           <span
@@ -97,6 +111,7 @@ export function PriceCell({
                   ? 'bg-white/90 border-emerald-300 text-emerald-900 focus-visible:ring-emerald-400'
                   : '',
             )}
+            disabled={!!cotacaoI?.vencedor}
             placeholder="MOQ"
           />
         </div>

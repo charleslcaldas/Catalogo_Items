@@ -22,7 +22,6 @@ import {
 import pb from '@/lib/pocketbase/client'
 import { Switch } from '@/components/ui/switch'
 import { useRealtime } from '@/hooks/use-realtime'
-import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import {
   Table,
@@ -53,7 +52,7 @@ import { CounterProposalModal } from './CounterProposalModal'
 import { QuotationNotes } from './QuotationNotes'
 import { PriceCell } from './PriceCell'
 import { ImportMappingModal } from './ImportMappingModal'
-import { computeVenda } from '@/lib/money'
+import { PurchaseReviewDialog, type RevisaoItem } from './PurchaseReviewDialog'
 
 interface QuotationMatrixProps {
   onAccepted?: () => void
@@ -64,7 +63,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
   const potencialId =
     searchParams.get('id') || searchParams.get('potencialId') || searchParams.get('potencial_id')
   const { toast } = useToast()
-  const { user } = useAuth()
 
   const [potencialItens, setPotencialItens] = useState<any[]>([])
   const [cotacoesF, setCotacoesF] = useState<any[]>([])
@@ -89,10 +87,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
   const [suppliersWithHistory, setSuppliersWithHistory] = useState<Set<string>>(new Set())
   const [prioritizedSuppliers, setPrioritizedSuppliers] = useState<Set<string>>(new Set())
 
-  const [moqValidation, setMoqValidation] = useState<{
-    warnings: any[]
-    action: 'accept' | 'finalize'
-  } | null>(null)
+  const [reviewItems, setReviewItems] = useState<RevisaoItem[]>([])
 
   const [importState, setImportState] = useState<{
     cfId: string
@@ -189,54 +184,50 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
   useRealtime('cotacoes_fornecedor', loadData)
   useRealtime('cotacoes_itens', loadData)
 
-  const handleSelectAllFor = async (cfId: string) => {
-    try {
-      const itemsToSelect = potencialItens.filter((pi) => {
-        const ci = cotacoesI.find(
-          (c) => c.cotacao_fornecedor_id === cfId && c.item_id === pi.item_id,
-        )
-        const draft = draftPrices[`${cfId}_${pi.item_id}`]
-        return (ci && ci.preco_ofertado > 0) || (draft && draft > 0)
+  const openReview = (offers: any[], linhaId?: string) => {
+    if (
+      Object.keys(draftPrices).length ||
+      Object.keys(draftMoqs).length ||
+      Object.keys(cfDrafts).length
+    ) {
+      toast({
+        title: 'Salve as edições primeiro',
+        description: 'Use Salvar Cotação e abra a revisão novamente.',
       })
-
-      const promises = []
-      for (const pi of itemsToSelect) {
-        const currentWinner = cotacoesI.find((c) => c.item_id === pi.item_id && c.vencedor)
-        if (currentWinner && currentWinner.cotacao_fornecedor_id !== cfId) {
-          promises.push(
-            pb.collection('cotacoes_itens').update(currentWinner.id, { vencedor: false }),
-          )
-        }
-
-        let priceToSet = draftPrices[`${cfId}_${pi.item_id}`]
-        const ci = cotacoesI.find(
-          (c) => c.cotacao_fornecedor_id === cfId && c.item_id === pi.item_id,
-        )
-
-        if (ci) {
-          if (!ci.vencedor)
-            promises.push(pb.collection('cotacoes_itens').update(ci.id, { vencedor: true }))
-        } else {
-          priceToSet = priceToSet || 0
-          promises.push(
-            pb.collection('cotacoes_itens').create({
-              cotacao_fornecedor_id: cfId,
-              item_id: pi.item_id,
-              preco_ofertado: priceToSet,
-              quantidade_minima: draftMoqs[`${cfId}_${pi.item_id}`] || 0,
-              vencedor: true,
-            }),
-          )
-        }
-      }
-      if (promises.length > 0) {
-        await Promise.all(promises)
-        toast({ title: 'Sucesso', description: `${promises.length} itens selecionados.` })
-      }
-    } catch (err: any) {
-      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
+      return
     }
+    const entries: RevisaoItem[] = []
+    for (const offer of offers) {
+      const matching = potencialItens.filter(
+        (pi) => pi.item_id === offer.item_id && (!linhaId || pi.id === linhaId),
+      )
+      if (matching.length !== 1) {
+        toast({
+          title: 'Escolha a linha do potencial',
+          description:
+            'Há mais de uma linha para este produto. Abra a revisão pela célula da linha desejada.',
+          variant: 'destructive',
+        })
+        return
+      }
+      const pi = matching[0]
+      entries.push({
+        ofertaId: offer.id,
+        linhaId: pi.id,
+        titulo: pi.expand?.item_id?.sku || 'Item',
+      })
+    }
+    if (!entries.length) {
+      toast({
+        title: 'Nenhuma oferta salva',
+        description: 'Preencha e salve a oferta do fabricante antes de revisar.',
+      })
+      return
+    }
+    setReviewItems(entries)
   }
+  const handleSelectAllFor = (cfId: string) =>
+    openReview(cotacoesI.filter((c) => c.cotacao_fornecedor_id === cfId))
 
   const handleFileSelect = (cfId: string, file: File) => {
     const reader = new FileReader()
@@ -493,347 +484,29 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
     }
   }
 
-  const handleToggleWinner = async (
-    cotacaoFId: string,
+  const handleToggleWinner = (
+    cfId: string,
     itemId: string,
-    cotacaoIId?: string,
-    isWinner?: boolean,
+    ofertaId?: string,
+    _winner?: boolean,
+    linhaId?: string,
   ) => {
-    try {
-      if (isWinner && cotacaoIId) {
-        await pb.collection('cotacoes_itens').update(cotacaoIId, { vencedor: false })
-        return
-      }
-
-      const currentWinner = cotacoesI.find((c) => c.item_id === itemId && c.vencedor)
-      const promises = []
-
-      if (currentWinner && currentWinner.id !== cotacaoIId) {
-        promises.push(pb.collection('cotacoes_itens').update(currentWinner.id, { vencedor: false }))
-      }
-
-      let priceToSet = draftPrices[`${cotacaoFId}_${itemId}`]
-
-      if (cotacaoIId) {
-        promises.push(pb.collection('cotacoes_itens').update(cotacaoIId, { vencedor: true }))
-      } else {
-        priceToSet = priceToSet || 0
-        promises.push(
-          pb.collection('cotacoes_itens').create({
-            cotacao_fornecedor_id: cotacaoFId,
-            item_id: itemId,
-            preco_ofertado: priceToSet,
-            quantidade_minima: draftMoqs[`${cotacaoFId}_${itemId}`] || 0,
-            vencedor: true,
-          }),
-        )
-      }
-
-      await Promise.all(promises)
-    } catch (err: any) {
-      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
-    }
-  }
-
-  const getWinnerPrice = (ci: any) => {
-    const draftKey = `${ci.cotacao_fornecedor_id}_${ci.item_id}`
-    const draft = draftPrices[draftKey]
-    if (draft !== undefined && draft > 0) return draft
-    return ci.preco_ofertado || 0
-  }
-
-  const handleAcceptSelected = async () => {
-    const winners = cotacoesI.filter((c) => c.vencedor && getWinnerPrice(c) > 0)
-    if (winners.length === 0) {
-      toast({ title: 'Nenhum item selecionado como vencedor' })
-      return
-    }
-
-    const warnings = []
-    for (const w of winners) {
-      const pi = potencialItens.find((p) => p.item_id === w.item_id)
-      const moqToUse = draftMoqs[`${w.cotacao_fornecedor_id}_${w.item_id}`] ?? w.quantidade_minima
-      if (pi && moqToUse > 0 && pi.quantidade < moqToUse) {
-        warnings.push({ pi, ci: { ...w, quantidade_minima: moqToUse } })
-      }
-    }
-
-    if (warnings.length > 0) {
-      setMoqValidation({ warnings, action: 'accept' })
-      return
-    }
-
-    executeAcceptSelected(false)
-  }
-
-  const executeAcceptSelected = async (adjustMoq: boolean) => {
-    try {
-      const winners = cotacoesI.filter((c) => c.vencedor && getWinnerPrice(c) > 0)
-      const promises: Promise<any>[] = []
-      let updatedCount = 0
-      const fornecedoresNomes = new Set<string>()
-
-      for (const w of winners) {
-        const pi = potencialItens.find((p) => p.item_id === w.item_id)
-        if (!pi) continue
-
-        const draftKey = `${w.cotacao_fornecedor_id}_${w.item_id}`
-        const draft = draftPrices[draftKey]
-        const priceToUse = draft !== undefined && draft > 0 ? draft : w.preco_ofertado
-
-        // Se houver draft > 0 para uma cotação aceita, persista também esse valor em cotacoes_itens
-        if (draft !== undefined && draft > 0) {
-          const draftMoq = draftMoqs[draftKey]
-          const moqVal = draftMoq !== undefined ? draftMoq : w.quantidade_minima || 0
-          promises.push(
-            pb.collection('cotacoes_itens').update(w.id, {
-              preco_ofertado: draft,
-              quantidade_minima: moqVal,
-              vencedor: true,
-            }),
-          )
-        }
-
-        const moqToUse = draftMoqs[draftKey] ?? w.quantidade_minima
-
-        promises.push(pb.collection('itens').update(w.item_id, { preco_compra: priceToUse }))
-
-        // Venda = compra / (1 - margem/100), usando a margem vigente (padrão da linha).
-        // Margem >= 100 ou venda não finita: o campo de venda permanece como está.
-        const marginToUse = pi.expand?.item_id?.expand?.linha_id?.margem_padrao ?? 7.5
-        const computedVenda = computeVenda(priceToUse, marginToUse)
-        // Precisão da linha do potencial (2 ou 3; fallback 2).
-        const precisaoLinha = pi.precisao_preco === 3 ? 3 : 2
-        const newSellingPrice =
-          computedVenda !== undefined ? Number(computedVenda.toFixed(precisaoLinha)) : undefined
-
-        let qtdeToUpdate = pi.quantidade
-        if (adjustMoq && moqToUse > 0 && pi.quantidade < moqToUse) {
-          qtdeToUpdate = moqToUse
-        }
-
-        const cf = cotacoesF.find((f) => f.id === w.cotacao_fornecedor_id)
-        const fornecedorNome = cf?.expand?.fornecedor_id?.nome || 'Desconhecido'
-        if (cf) fornecedoresNomes.add(fornecedorNome)
-
-        promises.push(
-          pb.collection('potencial_itens').update(
-            pi.id,
-            newSellingPrice !== undefined
-              ? {
-                  quantidade: qtdeToUpdate,
-                  referencia_preco: priceToUse,
-                  referencia_fornecedor: fornecedorNome,
-                  referencia_data: new Date().toISOString(),
-                  preco_unitario: newSellingPrice,
-                }
-              : {
-                  quantidade: qtdeToUpdate,
-                  referencia_preco: priceToUse,
-                  referencia_fornecedor: fornecedorNome,
-                  referencia_data: new Date().toISOString(),
-                },
-          ),
-        )
-
-        promises.push(
-          pb.collection('historico_precos').create({
-            item_id: w.item_id,
-            preco: priceToUse,
-            fornecedor: fornecedorNome,
-            data_cotacao: new Date().toISOString(),
-            tipo: 'compra',
-          }),
-        )
-
-        updatedCount++
-      }
-
-      const cfsWithWinners = new Set(winners.map((w) => w.cotacao_fornecedor_id))
-      for (const cfId of cfsWithWinners) {
-        promises.push(pb.collection('cotacoes_fornecedor').update(cfId, { status: 'finalizada' }))
-      }
-
-      if (user?.id) {
-        promises.push(
-          pb.collection('potencial_notas').create({
-            potencial_id: potencialId,
-            user_id: user.id,
-            conteudo: `Cotação aceita e finalizada. Fornecedores selecionados: ${Array.from(fornecedoresNomes).join(', ')}. Itens atualizados: ${updatedCount}.`,
-            categoria: 'Cotação',
-          }),
-        )
-      }
-
-      await Promise.all(promises)
-
-      // Limpar os drafts dos itens aceitos
-      setDraftPrices((prev) => {
-        const next = { ...prev }
-        for (const w of winners) {
-          delete next[`${w.cotacao_fornecedor_id}_${w.item_id}`]
-        }
-        return next
-      })
-      setDraftMoqs((prev) => {
-        const next = { ...prev }
-        for (const w of winners) {
-          delete next[`${w.cotacao_fornecedor_id}_${w.item_id}`]
-        }
-        return next
-      })
-
-      toast({
-        title: 'Sucesso',
-        description: `${updatedCount} preços de compra aceitos e propagados para os itens do potencial.`,
-      })
-      if (onAccepted) {
-        await onAccepted()
-      }
-      await loadData()
-    } catch (err: any) {
-      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
-    } finally {
-      setMoqValidation(null)
-    }
-  }
-
-  const handleAcceptCounterProposalForSupplier = async (cfId: string) => {
-    const cf = cotacoesF.find((f) => f.id === cfId)
-    const supplierName = cf?.expand?.fornecedor_id?.nome || 'Fabricante'
-
-    // Buscar itens deste fornecedor que possuem contraproposta > 0
-    const itemsWithCounter = cotacoesI.filter(
-      (c) => c.cotacao_fornecedor_id === cfId && c.preco_contraproposta > 0,
+    const offer = cotacoesI.find(
+      (c) => c.id === ofertaId && c.cotacao_fornecedor_id === cfId && c.item_id === itemId,
     )
-
-    if (itemsWithCounter.length === 0) {
+    if (!offer) {
       toast({
-        title: 'Sem contraproposta',
-        description: `Não há itens com contraproposta definida para ${supplierName}.`,
+        title: 'Salve a oferta primeiro',
+        description: 'Preencha o preço e use Salvar Cotação antes de revisar.',
       })
       return
     }
-
-    try {
-      const promises: Promise<any>[] = []
-      let updatedCount = 0
-
-      for (const ci of itemsWithCounter) {
-        const finalPrice = ci.preco_contraproposta
-        const pi = potencialItens.find((p) => p.item_id === ci.item_id)
-        if (!pi) continue
-
-        // Atualizar cotacoes_itens: novo preco_ofertado = preco_contraproposta, zerar preco_contraproposta e marcar como vencedor
-        promises.push(
-          pb.collection('cotacoes_itens').update(ci.id, {
-            preco_ofertado: finalPrice,
-            preco_contraproposta: 0,
-            vencedor: true,
-          }),
-        )
-
-        // Desmarcar vencedor anterior se for de outro fornecedor
-        const otherWinners = cotacoesI.filter(
-          (c) => c.item_id === ci.item_id && c.vencedor && c.id !== ci.id,
-        )
-        for (const ow of otherWinners) {
-          promises.push(pb.collection('cotacoes_itens').update(ow.id, { vencedor: false }))
-        }
-
-        // Atualiza preco_compra no cadastro de itens
-        promises.push(pb.collection('itens').update(ci.item_id, { preco_compra: finalPrice }))
-
-        // Venda = compra / (1 - margem/100), usando a margem vigente (padrão da linha).
-        // Margem >= 100 ou venda não finita: o campo de venda permanece como está.
-        const marginToUse = pi.expand?.item_id?.expand?.linha_id?.margem_padrao ?? 7.5
-        const computedVenda = computeVenda(finalPrice, marginToUse)
-        // Precisão da linha do potencial (2 ou 3; fallback 2).
-        const precisaoLinha = pi.precisao_preco === 3 ? 3 : 2
-        const newSellingPrice =
-          computedVenda !== undefined ? Number(computedVenda.toFixed(precisaoLinha)) : undefined
-
-        const moqToUse = ci.quantidade_minima || 0
-        let qtdeToUpdate = pi.quantidade
-        if (moqToUse > 0 && pi.quantidade < moqToUse) {
-          qtdeToUpdate = moqToUse
-        }
-
-        promises.push(
-          pb.collection('potencial_itens').update(
-            pi.id,
-            newSellingPrice !== undefined
-              ? {
-                  quantidade: qtdeToUpdate,
-                  referencia_preco: finalPrice,
-                  referencia_fornecedor: supplierName,
-                  referencia_data: new Date().toISOString(),
-                  preco_unitario: newSellingPrice,
-                }
-              : {
-                  quantidade: qtdeToUpdate,
-                  referencia_preco: finalPrice,
-                  referencia_fornecedor: supplierName,
-                  referencia_data: new Date().toISOString(),
-                },
-          ),
-        )
-
-        promises.push(
-          pb.collection('historico_precos').create({
-            item_id: ci.item_id,
-            preco: finalPrice,
-            fornecedor: supplierName,
-            data_cotacao: new Date().toISOString(),
-            tipo: 'compra',
-          }),
-        )
-
-        updatedCount++
-      }
-
-      // Marcar cotação deste fornecedor como finalizada
-      promises.push(pb.collection('cotacoes_fornecedor').update(cfId, { status: 'finalizada' }))
-
-      if (user?.id) {
-        promises.push(
-          pb.collection('potencial_notas').create({
-            potencial_id: potencialId,
-            user_id: user.id,
-            conteudo: `Contraproposta aceita para ${supplierName}. Itens atualizados: ${updatedCount}.`,
-            categoria: 'Cotação',
-          }),
-        )
-      }
-
-      await Promise.all(promises)
-
-      // Limpar eventuais drafts deste fornecedor
-      setDraftPrices((prev) => {
-        const next = { ...prev }
-        for (const ci of itemsWithCounter) {
-          delete next[`${ci.cotacao_fornecedor_id}_${ci.item_id}`]
-        }
-        return next
-      })
-
-      toast({
-        title: 'Contraproposta Aceita',
-        description: `${updatedCount} itens da contraproposta foram aceitos e propagados para os itens do potencial.`,
-      })
-
-      if (onAccepted) {
-        await onAccepted()
-      }
-      await loadData()
-    } catch (err: any) {
-      toast({
-        title: 'Erro ao aceitar contraproposta',
-        description: err.message,
-        variant: 'destructive',
-      })
-    }
+    openReview([offer], linhaId)
   }
+
+  const handleAcceptSelected = () => openReview(cotacoesI.filter((c) => c.vencedor))
+  const handleAcceptCounterProposalForSupplier = (cfId: string) =>
+    openReview(cotacoesI.filter((c) => c.cotacao_fornecedor_id === cfId))
 
   const handleExportExcel = () => {
     let csv = 'SKU;Description;Size;Finish;Quantity;Unit;'
@@ -1198,7 +871,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
             onClick={handleAcceptSelected}
             className="border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 hover:text-blue-800 whitespace-nowrap"
           >
-            <CheckSquare className="w-4 h-4 mr-2" /> Aceitar Selecionados
+            <CheckSquare className="w-4 h-4 mr-2" /> Revisar compras selecionadas
           </Button>
         </div>
       </div>
@@ -1402,16 +1075,18 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                       variant="outline"
                                       size="sm"
                                       className="w-full justify-start text-xs h-7 bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200 font-medium"
-                                      disabled={countWithCounter === 0}
+                                      disabled={
+                                        !cotacoesI.some((c) => c.cotacao_fornecedor_id === cf.id)
+                                      }
                                       title={
                                         countWithCounter > 0
-                                          ? `Aceita a contraproposta para ${countWithCounter} item(ns) deste fabricante`
-                                          : 'Nenhum item com contraproposta definida'
+                                          ? `Revisa as respostas e a compra dos itens deste fabricante`
+                                          : 'Revisar a resposta recebida do fabricante'
                                       }
                                       onClick={() => handleAcceptCounterProposalForSupplier(cf.id)}
                                     >
                                       <TrendingDown className="w-3 h-3 mr-2 text-amber-600" />
-                                      Aceitar Contraproposta{' '}
+                                      Revisar resposta e compra{' '}
                                       {countWithCounter > 0 && `(${countWithCounter})`}
                                     </Button>
                                   )
@@ -1438,7 +1113,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                   className="w-full justify-start text-xs h-7"
                                   onClick={() => handleSelectAllFor(cf.id)}
                                 >
-                                  <CheckSquare className="w-3 h-3 mr-2" /> Selecionar Todos
+                                  <CheckSquare className="w-3 h-3 mr-2" /> Revisar todos
                                 </Button>
                                 <div className="relative w-full">
                                   <Input
@@ -1817,6 +1492,11 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
         cotacoesI={cotacoesI}
         potencialItens={potencialItens}
         cotacoesF={cotacoesF}
+        onSaved={loadData}
+        onReviewOffer={(id: string) => {
+          setIsCounterOpen(false)
+          openReview(cotacoesI.filter((c) => c.id === id))
+        }}
       />
 
       <ImportMappingModal
@@ -1829,53 +1509,14 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
         onConfirm={handleConfirmImport}
       />
 
-      <Dialog open={!!moqValidation} onOpenChange={(val) => !val && setMoqValidation(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-amber-600 flex items-center gap-2">
-              <TrendingDown className="w-5 h-5" /> Aviso de MOQ
-            </DialogTitle>
-          </DialogHeader>
-          <div className="py-2">
-            <p className="text-sm text-muted-foreground mb-4">
-              A quantidade solicitada de alguns itens está abaixo do exigido pelo fabricante (MOQ).
-              Deseja ajustar a quantidade para o mínimo exigido ou prosseguir assim mesmo?
-            </p>
-            <div className="max-h-48 overflow-y-auto space-y-2 border rounded p-3 bg-muted/20">
-              {moqValidation?.warnings.map((w: any) => (
-                <div
-                  key={w.pi.id}
-                  className="text-xs flex items-center justify-between border-b pb-2 last:border-0 last:pb-0"
-                >
-                  <span className="font-semibold truncate pr-2 max-w-[200px]">
-                    {w.pi.expand?.item_id?.sku}
-                  </span>
-                  <div className="shrink-0 flex items-center gap-3">
-                    <span>
-                      Qtde: <span className="text-red-600 font-bold">{w.pi.quantidade}</span>
-                    </span>
-                    <span>
-                      MOQ:{' '}
-                      <span className="text-amber-600 font-bold">{w.ci.quantidade_minima}</span>
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 mt-2">
-            <Button variant="outline" onClick={() => executeAcceptSelected(false)}>
-              Prosseguir Mesmo Assim
-            </Button>
-            <Button
-              className="bg-amber-600 hover:bg-amber-700 text-white"
-              onClick={() => executeAcceptSelected(true)}
-            >
-              Ajustar para MOQ
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <PurchaseReviewDialog
+        items={reviewItems}
+        onClose={() => setReviewItems([])}
+        onConfirmed={() => {
+          void loadData()
+          onAccepted?.()
+        }}
+      />
     </div>
   )
 }

@@ -7,6 +7,7 @@ interface FormattedInputProps extends React.InputHTMLAttributes<HTMLInputElement
   onValueChange: (val: string) => void
   isPrice?: boolean
   prefixText?: string
+  fractionDigits?: 2 | 3
 }
 
 export function FormattedInput({
@@ -16,6 +17,7 @@ export function FormattedInput({
   isPrice,
   className,
   prefixText,
+  fractionDigits = 2,
   ...props
 }: FormattedInputProps) {
   const [focused, setFocused] = useState(false)
@@ -32,7 +34,7 @@ export function FormattedInput({
       : Number(value).toLocaleString(
           'en-US',
           isPrice
-            ? { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+            ? { minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits }
             : { maximumFractionDigits: 4 },
         )
 

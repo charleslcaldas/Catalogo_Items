@@ -1,4 +1,4 @@
-onRecordBeforeUpdateRequest((e) => {
+onRecordUpdateRequest((e) => {
   const record = e.record
 
   const precoCompra = record.getFloat('preco_compra')
@@ -16,7 +16,7 @@ onRecordBeforeUpdateRequest((e) => {
   e.next()
 }, 'itens')
 
-onRecordBeforeCreateRequest((e) => {
+onRecordCreateRequest((e) => {
   const record = e.record
 
   const precoCompra = record.getFloat('preco_compra')

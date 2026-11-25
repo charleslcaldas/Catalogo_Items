@@ -59,37 +59,55 @@ export const savePotencialFull = async (
   delete dataToSave.anexos
   delete (dataToSave as any).novos_anexos
 
-  if (potencialId) {
-    savedPotencial = await pb.collection('potenciais').update(potencialId, dataToSave)
-    const oldItems = await pb
-      .collection('potencial_itens')
-      .getFullList({ filter: `potencial_id = "${potencialId}"` })
-    await Promise.all(oldItems.map((i) => pb.collection('potencial_itens').delete(i.id)))
-  } else {
-    savedPotencial = await pb.collection('potenciais').create(dataToSave)
+  // Retain line identities: confirmation receipts and historical links reference these ids.
+  // Plan all retained/removed lines before writing, never delete-and-recreate a saved quote.
+  const oldItems = potencialId
+    ? await pb
+        .collection('potencial_itens')
+        .getFullList({ filter: pb.filter('potencial_id={:id}', { id: potencialId }) })
+    : []
+  const retained = new Set<string>()
+  const plan = itemsData.map((item) => {
+    let old = item.id ? oldItems.find((row) => row.id === item.id) : undefined
+    if (item.id && !old) throw new Error('Uma linha da cotação mudou. Recarregue antes de salvar.')
+    if (!item.id) {
+      const matching = oldItems.filter(
+        (row) => row.item_id === item.item_id && !retained.has(row.id),
+      )
+      if (matching.length > 1)
+        throw new Error('Há linhas repetidas para o produto. Recarregue antes de salvar.')
+      old = matching[0]
+    }
+    if (old) {
+      if (retained.has(old.id)) throw new Error('Linha duplicada no salvamento.')
+      retained.add(old.id)
+    }
+    return { item, old }
+  })
+  savedPotencial = potencialId
+    ? await pb.collection('potenciais').update(potencialId, dataToSave)
+    : await pb.collection('potenciais').create(dataToSave)
+  for (const { item, old } of plan) {
+    const payload: Record<string, any> = { ...item, potencial_id: savedPotencial.id }
+    delete payload.id
+    delete payload.expand
+    delete payload.created
+    delete payload.updated
+    // Skip unchanged fields: preserves update timestamps and avoids spurious history.
+    const changed = old
+      ? Object.fromEntries(
+          Object.entries(payload).filter(([k, v]) => v !== undefined && old[k] !== v),
+        )
+      : payload
+    if (old) {
+      if (Object.keys(changed).length)
+        await pb.collection('potencial_itens').update(old.id, changed)
+    } else await pb.collection('potencial_itens').create(payload)
   }
-
-  await Promise.all(
-    itemsData.map((item) => {
-      const payload: Record<string, any> = {
-        ...item,
-        potencial_id: savedPotencial.id,
-      }
-      if (item.unidade_medida !== undefined) payload.unidade_medida = item.unidade_medida
-      if (item.observacoes !== undefined) payload.observacoes = item.observacoes
-      if (item.referencia_preco !== undefined) payload.referencia_preco = item.referencia_preco
-      if (item.referencia_fornecedor !== undefined)
-        payload.referencia_fornecedor = item.referencia_fornecedor
-      if (item.referencia_data !== undefined) payload.referencia_data = item.referencia_data
-      // Campos de precisão (2/3 casas) e moeda criados pela migration 0063
-      if ((item as any).precisao_preco !== undefined)
-        payload.precisao_preco = (item as any).precisao_preco
-      if ((item as any).moeda_compra !== undefined)
-        payload.moeda_compra = (item as any).moeda_compra
-
-      return pb.collection('potencial_itens').create(payload)
-    }),
-  )
+  // Only explicit removals are deleted, after retained/new lines have saved successfully.
+  for (const old of oldItems) {
+    if (!retained.has(old.id)) await pb.collection('potencial_itens').delete(old.id)
+  }
 
   return savedPotencial
 }
