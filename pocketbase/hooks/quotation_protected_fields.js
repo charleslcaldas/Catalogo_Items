@@ -1,15 +1,18 @@
-// TEMPORARY LEGACY COMPATIBILITY — authorized by Charles on 2026-11-25.
-// Restore legacy winner/offer REST writes while the old production frontend remains live.
-// New margin/version fields and append-only negotiation history remain protected.
-// All three new business routes must remain unconditional authenticated 503.
+// Candidate guard for NEW margin/version fields; legacy offer and winner fields are unchanged.
 // This is a request hook: trusted application transactions still use their own explicit checks.
 onRecordUpdateRequest((e) => {
   if (e.hasSuperuserAuth()) return e.next()
   const before = e.record.original()
-  for (const name of ['preco_original', 'rodada_atual']) {
+  for (const name of ['vencedor', 'preco_original', 'rodada_atual']) {
     if (e.record.get(name) !== before.get(name))
       throw new ForbiddenError('Use a revisão e confirmação de compra.')
   }
+  if (
+    before.getBool('vencedor') &&
+    (e.record.getFloat('preco_ofertado') !== before.getFloat('preco_ofertado') ||
+      e.record.getFloat('quantidade_minima') !== before.getFloat('quantidade_minima'))
+  )
+    throw new ForbiddenError('Registre nova resposta do fabricante para renegociar esta compra.')
   for (const name of ['margem_negociada', 'margem_versao', 'precisao_negociada']) {
     if (e.record.get(name) !== before.get(name))
       throw new ForbiddenError('Use o fluxo autorizado de edição de margem.')
@@ -18,6 +21,7 @@ onRecordUpdateRequest((e) => {
 }, 'cotacoes_itens')
 onRecordCreateRequest((e) => {
   if (e.hasSuperuserAuth()) return e.next()
+  if (e.record.getBool('vencedor')) throw new ForbiddenError('Use a confirmação de compra.')
   for (const name of [
     'margem_negociada',
     'margem_versao',
