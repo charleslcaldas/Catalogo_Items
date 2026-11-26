@@ -396,7 +396,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, AddItemsTo
         if (!(Number(si.data.preco_unitario) > 0)) {
           pendencias.push(`${desc}: preço de venda deve ser maior que 0.`)
         }
-        const ofertaVencedora = cotacoesItens.find((ci) => ci.item_id === si.id && ci.vencedor)
+        const ofertaVencedora = cotacoesItens.find((ci) => ci?.item_id === si.id && ci?.vencedor)
         // Preço de Compra Selecionado: valor em memória OU gravado no banco
         // (mapa id/recordId → referencia_preco > 0, conferido antes de validar).
         const temPrecoSelecionado =
@@ -407,10 +407,13 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, AddItemsTo
         if (!ofertaVencedora && !temPrecoSelecionado) {
           pendencias.push(`${desc}: nenhuma oferta de fabricante selecionada.`)
         } else {
-          const cfOferta = fornecedorCotacoes.find(
-            (f) => f.id === ofertaVencedora.cotacao_fornecedor_id,
-          )
-          if (!(cfOferta?.oferta_moeda || '').trim()) {
+          // Oferta vencedora pode não existir (item completo só pelo Preço de
+          // Compra Selecionado) ou estar órfã (id não casado): tratar como
+          // ausente em vez de quebrar. Semântica da v0.0.297 preservada.
+          const cfOferta = ofertaVencedora
+            ? fornecedorCotacoes.find((f) => f?.id === ofertaVencedora?.cotacao_fornecedor_id)
+            : undefined
+          if (ofertaVencedora && !(cfOferta?.oferta_moeda || '').trim()) {
             pendencias.push(`${desc}: moeda da oferta não definida.`)
           }
         }
