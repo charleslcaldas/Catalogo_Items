@@ -88,6 +88,12 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
   const [prioritizedSuppliers, setPrioritizedSuppliers] = useState<Set<string>>(new Set())
 
   const [reviewItems, setReviewItems] = useState<RevisaoItem[]>([])
+  // Aceitação local por duplo clique (célula do item ou cabeçalho do fabricante).
+  // Estado de seleção de UI, no mesmo formato de chave dos rascunhos ("cfId_itemId");
+  // a confirmação real de compra segue pelo botão de revisão (diálogo).
+  const [accepted, setAccepted] = useState<Record<string, boolean>>({})
+  const isAccepted = (cfId: string, itemId: string, ci?: any) =>
+    ci?.vencedor === true || accepted[`${cfId}_${itemId}`] === true
 
   const [importState, setImportState] = useState<{
     cfId: string
@@ -226,8 +232,30 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
     }
     setReviewItems(entries)
   }
-  const handleSelectAllFor = (cfId: string) =>
-    openReview(cotacoesI.filter((c) => c.cotacao_fornecedor_id === cfId))
+  // Duplo clique no cabeçalho do fabricante: aceita todos os preços dele de uma vez,
+  // sem abrir o diálogo de revisão.
+  const handleSelectAllFor = (cfId: string) => {
+    const offers = cotacoesI.filter((c) => c.cotacao_fornecedor_id === cfId)
+    if (!offers.length) {
+      toast({
+        title: 'Nenhuma oferta salva',
+        description: 'Preencha e salve a oferta do fabricante antes de aceitar os preços.',
+      })
+      return
+    }
+    setAccepted((prev) => {
+      const next = { ...prev }
+      offers.forEach((c) => {
+        next[`${cfId}_${c.item_id}`] = true
+      })
+      return next
+    })
+    const nome = cotacoesF.find((c) => c.id === cfId)?.expand?.fornecedor_id?.nome || 'fabricante'
+    toast({
+      title: 'Preços aceitos',
+      description: `${offers.length} preço(s) de ${nome} aceito(s) para compra.`,
+    })
+  }
 
   const handleFileSelect = (cfId: string, file: File) => {
     const reader = new FileReader()
@@ -484,27 +512,32 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
     }
   }
 
+  // Duplo clique na célula do item: aceita o preço deste fabricante para o item,
+  // sem abrir o diálogo de revisão.
   const handleToggleWinner = (
     cfId: string,
     itemId: string,
-    ofertaId?: string,
+    _ofertaId?: string,
     _winner?: boolean,
-    linhaId?: string,
+    _linhaId?: string,
   ) => {
     const offer = cotacoesI.find(
-      (c) => c.id === ofertaId && c.cotacao_fornecedor_id === cfId && c.item_id === itemId,
+      (c) => c.cotacao_fornecedor_id === cfId && c.item_id === itemId,
     )
     if (!offer) {
       toast({
         title: 'Salve a oferta primeiro',
-        description: 'Preencha o preço e use Salvar Cotação antes de revisar.',
+        description: 'Preencha o preço e use Salvar Cotação antes de aceitar.',
       })
       return
     }
-    openReview([offer], linhaId)
+    if (isAccepted(cfId, itemId, offer)) return
+    setAccepted((prev) => ({ ...prev, [`${cfId}_${itemId}`]: true }))
+    toast({ title: 'Preço aceito', description: 'Item selecionado para compra.' })
   }
 
-  const handleAcceptSelected = () => openReview(cotacoesI.filter((c) => c.vencedor))
+  const handleAcceptSelected = () =>
+    openReview(cotacoesI.filter((c) => c.vencedor || accepted[`${c.cotacao_fornecedor_id}_${c.item_id}`]))
   const handleAcceptCounterProposalForSupplier = (cfId: string) =>
     openReview(cotacoesI.filter((c) => c.cotacao_fornecedor_id === cfId))
 
@@ -657,7 +690,9 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
     let custoTotal = 0
     potencialItens.forEach((pi) => {
       const qtd = pi.quantidade || 0
-      const winner = cotacoesI.find((c) => c.item_id === pi.item_id && c.vencedor)
+      const winner = cotacoesI.find(
+        (c) => c.item_id === pi.item_id && isAccepted(c.cotacao_fornecedor_id, pi.item_id, c),
+      )
       if (winner) {
         let draftP = draftPrices[`${winner.cotacao_fornecedor_id}_${pi.item_id}`]
         let p = draftP !== undefined ? draftP : (winner.preco_ofertado ?? 0)
@@ -667,7 +702,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
     return {
       custoTotal,
     }
-  }, [potencialItens, cotacoesI, draftPrices])
+  }, [potencialItens, cotacoesI, draftPrices, accepted])
 
   const formatCurrency = (val: number) =>
     val.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
@@ -1388,7 +1423,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                         )
                         const draft = draftPrices[`${cf.id}_${pi.item_id}`]
                         const currentPrice = draft !== undefined ? draft : ci?.preco_ofertado || 0
-                        const isWinnerCell = ci?.vencedor
+                        const isWinnerCell = isAccepted(cf.id, pi.item_id, ci)
 
                         return (
                           <TableCell
@@ -1462,7 +1497,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                     const ci = cotacoesI.find(
                       (c) => c.cotacao_fornecedor_id === cf.id && c.item_id === pi.item_id,
                     )
-                    if (ci?.vencedor) {
+                    if (isAccepted(cf.id, pi.item_id, ci)) {
                       const draft = draftPrices[`${cf.id}_${pi.item_id}`]
                       const price = draft !== undefined ? draft : (ci.preco_ofertado ?? 0)
                       selectedTotal += price * (pi.quantidade || 0)

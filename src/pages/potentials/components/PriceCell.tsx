@@ -18,15 +18,17 @@ export function PriceCell({
   const hasCounter = cotacaoI && cotacaoI.preco_contraproposta > 0
   const counterPrice = cotacaoI?.preco_contraproposta
 
+  const accepted = cotacaoI?.vencedor || cotacaoI?.selecionadoLocal === true
+
   return (
     <div
-      title="Revisar resposta e confirmar compra"
-      onClick={() =>
+      title="Duplo clique para aceitar o preço deste fabricante"
+      onDoubleClick={() =>
         onToggleWinner(cotacaoF.id, item.item_id, cotacaoI?.id, cotacaoI?.vencedor, item.id)
       }
       className={cn(
-        'p-1.5 rounded-md flex flex-col gap-1.5 relative group min-h-[44px] cursor-pointer transition-all',
-        cotacaoI?.vencedor
+        'p-1.5 rounded-md flex flex-col gap-1.5 relative group min-h-[44px] select-none transition-all',
+        accepted
           ? 'bg-blue-100 hover:bg-blue-100/90'
           : isLowest
             ? 'bg-emerald-100/70 ring-1.5 ring-emerald-500/80 hover:bg-emerald-100'
@@ -36,7 +38,7 @@ export function PriceCell({
       <div className="flex items-center gap-1">
         <div onClick={(e) => e.stopPropagation()} className="flex-1 min-w-0">
           <PriceInput
-            disabled={!!cotacaoI?.vencedor}
+            disabled={!!accepted}
             value={currentPrice || undefined}
             onChange={(val) => onDraftChange(cotacaoF.id, item.item_id, val || 0)}
             onBlur={() => {
@@ -46,7 +48,7 @@ export function PriceCell({
             }}
             className={cn(
               'h-7 text-xs text-right font-mono w-full font-semibold transition-colors',
-              cotacaoI?.vencedor
+              accepted
                 ? 'bg-white text-blue-900 border-border font-bold focus-visible:ring-blue-400 shadow-2xs'
                 : isLowest
                   ? 'bg-white/90 text-emerald-800 font-bold border-emerald-400 focus-visible:ring-emerald-400 shadow-2xs'
@@ -58,7 +60,7 @@ export function PriceCell({
           <span
             className={cn(
               'font-mono text-[10px] font-bold whitespace-nowrap pl-1',
-              cotacaoI?.vencedor ? 'text-amber-700' : 'text-amber-600',
+              accepted ? 'text-amber-700' : 'text-amber-600',
             )}
             title="Contraproposta"
           >
@@ -71,7 +73,7 @@ export function PriceCell({
         <p
           className={cn(
             'text-[10px] font-mono whitespace-nowrap',
-            cotacaoI?.vencedor ? 'text-blue-700' : 'text-muted-foreground',
+            accepted ? 'text-blue-700' : 'text-muted-foreground',
           )}
         >
           MLQ {currentMoq.toLocaleString('pt-BR')}
