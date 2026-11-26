@@ -23,6 +23,9 @@ interface SelectedItemsTableProps {
   handleMoveDown: (index: number) => void
   setIsSelecting: (selecting: boolean) => void
   lastOfferedPrices: Record<string, number>
+  // MOQ (quantidade mínima) da oferta aceita, por item — quando presente e
+  // maior que a quantidade informada, entra no lugar dela no total da linha.
+  moqPorItem: Record<string, number>
 }
 
 // Fórmula aprovada: venda = compra / (1 - margem/100). Sem markup invertido.
@@ -40,6 +43,7 @@ export function SelectedItemsTable({
   handleMoveDown,
   setIsSelecting,
   lastOfferedPrices,
+  moqPorItem,
 }: SelectedItemsTableProps) {
   if (selectedItems.length === 0) {
     return (
@@ -184,8 +188,13 @@ export function SelectedItemsTable({
                 typeof data.preco_unitario === 'number'
                   ? Number(data.preco_unitario.toFixed(precisao))
                   : 0
-              const total =
-                Math.round((Number(data.quantidade) || 0) * Math.round(unitario * 1000)) / 1000
+              // Quando a oferta aceita exige MOQ e a quantidade informada é menor,
+              // a MOQ entra no lugar dela na multiplicação do total da linha.
+              const quantidadeInformada = Number(data.quantidade) || 0
+              const moq = moqPorItem[id] || 0
+              const moqAplicada = moq > 0 && quantidadeInformada < moq
+              const quantidadeTotal = moqAplicada ? moq : quantidadeInformada
+              const total = Math.round(quantidadeTotal * Math.round(unitario * 1000)) / 1000
 
               const acabamento = data.item.expand?.acabamento_id
               const descricao = data.item.descricao_curta || data.item.descr_pt || '-'
@@ -268,6 +277,21 @@ export function SelectedItemsTable({
                       }}
                       onBlur={() => handleQuantityBlur(record.recordId, data.quantidade)}
                     />
+                    {moq > 0 && (
+                      <div
+                        className={cn(
+                          'text-[9px] leading-tight mt-0.5 whitespace-nowrap',
+                          moqAplicada ? 'text-amber-700 font-semibold' : 'text-muted-foreground',
+                        )}
+                        title={
+                          moqAplicada
+                            ? `Quantidade informada abaixo da MOQ — o total usa a MOQ (${moq}).`
+                            : `MOQ do fabricante: ${moq}. Quantidade já atende.`
+                        }
+                      >
+                        MOQ: {moq}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell className="py-1 text-xs text-right font-mono whitespace-nowrap text-blue-600">
                     {lastOfferedPrices[data.item.id]

@@ -99,33 +99,52 @@ export default function PotentialDetailsWrapper() {
   const fmtMargem = (m: number | null) => (m !== null ? `${m.toFixed(2)}%` : '—')
 
   const applyGlobalMargin = async () => {
-    if (!potencialId) return
     const margin = parseFloat(globalMargin)
     if (isNaN(margin) || margin >= 100 || margin < 0) {
       toast({ title: 'Margem inválida', variant: 'destructive' })
       return
     }
+    // Caminho principal: a tabela de itens (aba Itens) é a fonte da verdade —
+    // recalcula o preço de venda de TODO item em memória que tenha Preço de
+    // Compra Selecionado (referencia_preco), inclusive itens ainda não salvos,
+    // e persiste os que já têm registro. Sem reload que descarte edições.
     try {
       setIsApplying(true)
-      const items = await pb.collection('potencial_itens').getFullList({
-        filter: `potencial_id="${potencialId}"`,
-        expand: 'item_id.linha_id',
-      })
-      const promises = items.map((item) => {
-        const cost = typeof item.referencia_preco === 'number' ? item.referencia_preco : 0
-        if (cost <= 0) return Promise.resolve(null)
-        // Venda = compra / (1 - margem/100), arredondada na precisão da linha
-        // (2 ou 3 casas) — o valor salvo é exatamente o exibido.
-        const precisao = item.precisao_preco === 3 ? 3 : 2
-        const salePrice = Number((cost / (1 - margin / 100)).toFixed(precisao))
-        if (!Number.isFinite(salePrice)) return Promise.resolve(null)
-        return pb.collection('potencial_itens').update(item.id, { preco_unitario: salePrice })
-      })
-      await Promise.all(promises)
-      if (addItemsRef.current) {
-        await addItemsRef.current.reloadItemsPrices()
+      let aplicados = 0
+      if (addItemsRef.current?.applyGlobalMargin) {
+        aplicados = await addItemsRef.current.applyGlobalMargin(margin)
+      } else if (potencialId) {
+        // Fallback (tabela não montada): aplica direto no banco nos itens salvos.
+        const items = await pb.collection('potencial_itens').getFullList({
+          filter: `potencial_id="${potencialId}"`,
+        })
+        const promises = items.map((item) => {
+          const cost = typeof item.referencia_preco === 'number' ? item.referencia_preco : 0
+          if (cost <= 0) return Promise.resolve(null)
+          // Venda = compra / (1 - margem/100), arredondada na precisão da linha
+          // (2 ou 3 casas) — o valor salvo é exatamente o exibido.
+          const precisao = item.precisao_preco === 3 ? 3 : 2
+          const salePrice = Number((cost / (1 - margin / 100)).toFixed(precisao))
+          if (!Number.isFinite(salePrice)) return Promise.resolve(null)
+          return pb.collection('potencial_itens').update(item.id, { preco_unitario: salePrice })
+        })
+        const results = await Promise.allSettled(promises)
+        aplicados = results.filter((r) => r.status === 'fulfilled' && r.value !== null).length
       }
-      toast({ title: `Margem de ${margin}% aplicada a ${items.length} itens.` })
+      if (aplicados === 0) {
+        toast({
+          title: 'Nenhum item recebeu a margem',
+          description:
+            'Os itens precisam de um Preço de Compra Selecionado (oferta escolhida na Cotação de Fabricantes) para o cálculo.',
+          variant: 'destructive',
+        })
+      } else {
+        toast({
+          title: `Margem de ${margin}% aplicada a ${aplicados} ${
+            aplicados === 1 ? 'item' : 'itens'
+          }.`,
+        })
+      }
     } catch (err: any) {
       toast({ title: 'Erro ao aplicar margem', description: err.message, variant: 'destructive' })
     } finally {

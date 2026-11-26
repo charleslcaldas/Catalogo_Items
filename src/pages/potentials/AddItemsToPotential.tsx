@@ -86,6 +86,9 @@ export type AddItemsToPotentialRef = {
   reloadItemsPrices: () => Promise<void>
   reloadQuotationConditions?: () => Promise<void>
   isDirty?: () => boolean
+  // Aplica a Margem Global a TODOS os itens em memória e persiste os já salvos.
+  // Retorna quantos itens receberam a margem (têm Preço de Compra Selecionado).
+  applyGlobalMargin: (margin: number) => Promise<number>
 }
 
 type AddItemsToPotentialProps = {
@@ -118,6 +121,12 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, AddItemsTo
     })
 
     const [selectedItems, setSelectedItems] = useState<any[]>([])
+    // Espelho em ref para comandos imperativos (ex.: Margem Global) lerem os
+    // itens atuais sem depender do closure de renderização anterior.
+    const selectedItemsRef = useRef<any[]>([])
+    useEffect(() => {
+      selectedItemsRef.current = selectedItems
+    }, [selectedItems])
     const [lastOfferedPrices, setLastOfferedPrices] = useState<Record<string, number>>({})
 
     // Track initial state to detect unsaved changes
@@ -692,6 +701,45 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, AddItemsTo
             console.error('Failed to reload items prices', err)
           }
         },
+        // Margem Global: recalcula o preço de venda de CADA item em memória a
+        // partir do seu Preço de Compra Selecionado (referencia_preco), com a
+        // fórmula aprovada venda = compra / (1 - margem/100), na precisão da
+        // linha (2 ou 3 casas). Persiste apenas itens já salvos (recordId);
+        // itens novos entram no próximo Salvar Rascunho/Concluir. Retorna
+        // quantos itens receberam a margem.
+        applyGlobalMargin: async (margin: number) => {
+          if (!isFinite(margin) || margin < 0 || margin >= 100) return 0
+          let aplicados = 0
+          const updates: Promise<unknown>[] = []
+          const novos = selectedItemsRef.current.map((si) => {
+            const custo =
+              typeof si.data.referencia_preco === 'number' && !isNaN(si.data.referencia_preco)
+                ? si.data.referencia_preco
+                : 0
+            if (custo <= 0) return si
+            const precisao = si.data.precisao_preco === 3 ? 3 : 2
+            const novaVenda = Number((custo / (1 - margin / 100)).toFixed(precisao))
+            if (!Number.isFinite(novaVenda)) return si
+            aplicados += 1
+            if (si.recordId && si.recordId.length === 15) {
+              updates.push(
+                pb.collection('potencial_itens').update(si.recordId, {
+                  preco_unitario: novaVenda,
+                }),
+              )
+            }
+            return { ...si, data: { ...si.data, preco_unitario: novaVenda } }
+          })
+          setSelectedItems(novos)
+          if (updates.length > 0) {
+            const results = await Promise.allSettled(updates)
+            const falhas = results.filter((r) => r.status === 'rejected').length
+            if (falhas > 0) {
+              console.error(`Falha ao persistir margem em ${falhas} item(ns).`)
+            }
+          }
+          return aplicados
+        },
       }),
       [currentPotential?.id, searchParams],
     )
@@ -784,14 +832,51 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, AddItemsTo
     const moedaCotacao =
       moedasCotacao.length === 1 ? moedasCotacao[0] : moedasCotacao.length > 1 ? 'MISTAS' : 'USD'
 
+    // MOQ (quantidade mínima) da oferta aceita para cada item, vinda de
+    // cotacoes_itens.quantidade_minima. A oferta relevante é a vencedora vigente
+    // ou, na falta dela, a que confere com o aceite gravado em potencial_itens
+    // (referencia_fornecedor ou referencia_preco).
+    const moqPorItem = useMemo<Record<string, number>>(() => {
+      const map: Record<string, number> = {}
+      selectedItems.forEach((si) => {
+        const ofertas = cotacoesItens.filter((ci) => ci.item_id === si.id)
+        if (ofertas.length === 0) return
+        const refForn = (si.data.referencia_fornecedor || '').trim()
+        const refPreco = typeof si.data.referencia_preco === 'number' ? si.data.referencia_preco : 0
+        const cfIdsPorNome = refForn
+          ? fornecedorCotacoes
+              .filter((f) => (f.expand?.fornecedor_id?.nome || '').trim() === refForn)
+              .map((f) => f.id)
+          : []
+        const escolhida =
+          ofertas.find((ci) => ci.vencedor) ||
+          ofertas.find((ci) => cfIdsPorNome.includes(ci.cotacao_fornecedor_id)) ||
+          (refPreco > 0 ? ofertas.find((ci) => Number(ci.preco_ofertado) === refPreco) : undefined)
+        if (!escolhida) return
+        const moq = Number(escolhida.quantidade_minima) || 0
+        if (moq > 0) map[si.id] = moq
+      })
+      return map
+    }, [selectedItems, cotacoesItens, fornecedorCotacoes])
+
+    // Quantidade efetiva da linha: quando a oferta aceita exige MOQ e a
+    // quantidade informada é menor, a MOQ entra no lugar na multiplicação
+    // (preço × quantidade). Sem MOQ (ou qty >= MOQ), nada muda.
+    const qtdeEfetiva = (si: any): number => {
+      const q = Number(si.data.quantidade) || 0
+      const moq = moqPorItem[si.id] || 0
+      return moq > 0 && q < moq ? moq : q
+    }
+
     const calculateTotals = () => {
       const totalSKUs = new Set(selectedItems.map((si) => si.id)).size
       const totalQty = selectedItems.reduce((acc, si) => acc + (Number(si.data.quantidade) || 0), 0)
-      // Totais: somar as linhas (cada linha usa o unitário na sua própria precisão)
-      // e arredondar para 2 casas APÓS a soma.
+      // Totais: somar as linhas (cada linha usa o unitário na sua própria precisão
+      // e a quantidade efetiva — MOQ quando aplicável) e arredondar para 2 casas
+      // APÓS a soma.
       const totalValue = roundToCents(
         selectedItems.reduce((acc, si) => {
-          const qty = Number(si.data.quantidade) || 0
+          const qty = qtdeEfetiva(si)
           const precisaoLinha = si.data.precisao_preco === 3 ? 3 : 2
           const unitLinha = Number((Number(si.data.preco_unitario) || 0).toFixed(precisaoLinha))
           return acc + qty * unitLinha
@@ -799,7 +884,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, AddItemsTo
       )
       const totalCostRef = roundToCents(
         selectedItems.reduce((acc, si) => {
-          const qty = Number(si.data.quantidade) || 0
+          const qty = qtdeEfetiva(si)
           const refPrice =
             typeof si.data.referencia_preco === 'number' && !isNaN(si.data.referencia_preco)
               ? si.data.referencia_preco
@@ -1170,6 +1255,7 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, AddItemsTo
             handleMoveDown={handleMoveDown}
             setIsSelecting={setIsSelecting}
             lastOfferedPrices={lastOfferedPrices}
+            moqPorItem={moqPorItem}
           />
 
           {/* Totals Summary Widget */}
