@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   Plus,
-  TrendingDown,
   Download,
   Settings2,
   CheckSquare,
@@ -32,7 +31,7 @@ import {
   TableRow,
   TableFooter,
 } from '@/components/ui/table'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+
 import { Badge } from '@/components/ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Label } from '@/components/ui/label'
@@ -52,7 +51,6 @@ import { CounterProposalModal } from './CounterProposalModal'
 import { QuotationNotes } from './QuotationNotes'
 import { PriceCell } from './PriceCell'
 import { ImportMappingModal } from './ImportMappingModal'
-import { PurchaseReviewDialog, type RevisaoItem } from './PurchaseReviewDialog'
 
 interface QuotationMatrixProps {
   onAccepted?: () => void
@@ -87,10 +85,9 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
   const [suppliersWithHistory, setSuppliersWithHistory] = useState<Set<string>>(new Set())
   const [prioritizedSuppliers, setPrioritizedSuppliers] = useState<Set<string>>(new Set())
 
-  const [reviewItems, setReviewItems] = useState<RevisaoItem[]>([])
   // Aceitação local por duplo clique (célula do item ou cabeçalho do fabricante).
   // Estado de seleção de UI, no mesmo formato de chave dos rascunhos ("cfId_itemId");
-  // a confirmação real de compra segue pelo botão de revisão (diálogo).
+  // destaque azul — o verde fica reservado ao menor preço.
   const [accepted, setAccepted] = useState<Record<string, boolean>>({})
   const isAccepted = (cfId: string, itemId: string, ci?: any) =>
     ci?.vencedor === true || accepted[`${cfId}_${itemId}`] === true
@@ -190,50 +187,8 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
   useRealtime('cotacoes_fornecedor', loadData)
   useRealtime('cotacoes_itens', loadData)
 
-  const openReview = (offers: any[], linhaId?: string) => {
-    if (
-      Object.keys(draftPrices).length ||
-      Object.keys(draftMoqs).length ||
-      Object.keys(cfDrafts).length
-    ) {
-      toast({
-        title: 'Salve as edições primeiro',
-        description: 'Use Salvar Cotação e abra a revisão novamente.',
-      })
-      return
-    }
-    const entries: RevisaoItem[] = []
-    for (const offer of offers) {
-      const matching = potencialItens.filter(
-        (pi) => pi.item_id === offer.item_id && (!linhaId || pi.id === linhaId),
-      )
-      if (matching.length !== 1) {
-        toast({
-          title: 'Escolha a linha do potencial',
-          description:
-            'Há mais de uma linha para este produto. Abra a revisão pela célula da linha desejada.',
-          variant: 'destructive',
-        })
-        return
-      }
-      const pi = matching[0]
-      entries.push({
-        ofertaId: offer.id,
-        linhaId: pi.id,
-        titulo: pi.expand?.item_id?.sku || 'Item',
-      })
-    }
-    if (!entries.length) {
-      toast({
-        title: 'Nenhuma oferta salva',
-        description: 'Preencha e salve a oferta do fabricante antes de revisar.',
-      })
-      return
-    }
-    setReviewItems(entries)
-  }
   // Duplo clique no cabeçalho do fabricante: aceita todos os preços dele de uma vez,
-  // sem abrir o diálogo de revisão.
+  // sem abrir nenhuma caixa.
   const handleSelectAllFor = (cfId: string) => {
     const offers = cotacoesI.filter((c) => c.cotacao_fornecedor_id === cfId)
     if (!offers.length) {
@@ -521,9 +476,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
     _winner?: boolean,
     _linhaId?: string,
   ) => {
-    const offer = cotacoesI.find(
-      (c) => c.cotacao_fornecedor_id === cfId && c.item_id === itemId,
-    )
+    const offer = cotacoesI.find((c) => c.cotacao_fornecedor_id === cfId && c.item_id === itemId)
     if (!offer) {
       toast({
         title: 'Salve a oferta primeiro',
@@ -535,11 +488,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
     setAccepted((prev) => ({ ...prev, [`${cfId}_${itemId}`]: true }))
     toast({ title: 'Preço aceito', description: 'Item selecionado para compra.' })
   }
-
-  const handleAcceptSelected = () =>
-    openReview(cotacoesI.filter((c) => c.vencedor || accepted[`${c.cotacao_fornecedor_id}_${c.item_id}`]))
-  const handleAcceptCounterProposalForSupplier = (cfId: string) =>
-    openReview(cotacoesI.filter((c) => c.cotacao_fornecedor_id === cfId))
 
   const handleExportExcel = () => {
     let csv = 'SKU;Description;Size;Finish;Quantity;Unit;'
@@ -864,15 +812,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setIsCounterOpen(true)}
-            className="border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 hover:text-amber-800 whitespace-nowrap"
-          >
-            <TrendingDown className="w-4 h-4 mr-2" /> Contraproposta
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
             onClick={handleExportExcel}
             className="whitespace-nowrap"
           >
@@ -898,15 +837,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
               <Save className="w-4 h-4 mr-2" />
             )}
             Salvar Cotação
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleAcceptSelected}
-            className="border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 hover:text-blue-800 whitespace-nowrap"
-          >
-            <CheckSquare className="w-4 h-4 mr-2" /> Revisar compras selecionadas
           </Button>
         </div>
       </div>
@@ -1099,33 +1029,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                 )
                               })()}
                               <div className="pt-2 border-t flex flex-col gap-1.5">
-                                {(() => {
-                                  const countWithCounter = cotacoesI.filter(
-                                    (c) =>
-                                      c.cotacao_fornecedor_id === cf.id &&
-                                      c.preco_contraproposta > 0,
-                                  ).length
-                                  return (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="w-full justify-start text-xs h-7 bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200 font-medium"
-                                      disabled={
-                                        !cotacoesI.some((c) => c.cotacao_fornecedor_id === cf.id)
-                                      }
-                                      title={
-                                        countWithCounter > 0
-                                          ? `Revisa as respostas e a compra dos itens deste fabricante`
-                                          : 'Revisar a resposta recebida do fabricante'
-                                      }
-                                      onClick={() => handleAcceptCounterProposalForSupplier(cf.id)}
-                                    >
-                                      <TrendingDown className="w-3 h-3 mr-2 text-amber-600" />
-                                      Revisar resposta e compra{' '}
-                                      {countWithCounter > 0 && `(${countWithCounter})`}
-                                    </Button>
-                                  )
-                                })()}
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -1148,7 +1051,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                   className="w-full justify-start text-xs h-7"
                                   onClick={() => handleSelectAllFor(cf.id)}
                                 >
-                                  <CheckSquare className="w-3 h-3 mr-2" /> Revisar todos
+                                  <CheckSquare className="w-3 h-3 mr-2" /> Aceitar todos os preços
                                 </Button>
                                 <div className="relative w-full">
                                   <Input
@@ -1528,10 +1431,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
         potencialItens={potencialItens}
         cotacoesF={cotacoesF}
         onSaved={loadData}
-        onReviewOffer={(id: string) => {
-          setIsCounterOpen(false)
-          openReview(cotacoesI.filter((c) => c.id === id))
-        }}
       />
 
       <ImportMappingModal
@@ -1542,15 +1441,6 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
         headers={importState?.headers || []}
         summary={{ total: importState ? importState.rows.length - 1 : 0 }}
         onConfirm={handleConfirmImport}
-      />
-
-      <PurchaseReviewDialog
-        items={reviewItems}
-        onClose={() => setReviewItems([])}
-        onConfirmed={() => {
-          void loadData()
-          onAccepted?.()
-        }}
       />
     </div>
   )

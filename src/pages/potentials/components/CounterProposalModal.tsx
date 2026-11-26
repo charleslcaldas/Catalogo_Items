@@ -37,7 +37,6 @@ export function CounterProposalModal({
   potencialItens,
   cotacoesF,
   onSaved,
-  onReviewOffer,
 }: any) {
   const { user } = useAuth()
   const [rows, setRows] = useState<TargetRow[]>([])
@@ -271,16 +270,6 @@ export function CounterProposalModal({
                         )
                       }
                     />
-                  </td>
-                  <td className="p-3">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={busy || uncertain || !row.linhaId}
-                      onClick={() => onReviewOffer?.(row.id)}
-                    >
-                      Registrar / revisar
-                    </Button>
                   </td>
                 </tr>
               ))}
