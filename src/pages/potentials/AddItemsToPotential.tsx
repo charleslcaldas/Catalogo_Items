@@ -410,8 +410,9 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, AddItemsTo
           // Oferta vencedora pode não existir (item completo só pelo Preço de
           // Compra Selecionado) ou estar órfã (id não casado): tratar como
           // ausente em vez de quebrar. Semântica da v0.0.297 preservada.
-          const cfOferta = ofertaVencedora
-            ? fornecedorCotacoes.find((f) => f?.id === ofertaVencedora?.cotacao_fornecedor_id)
+          const cfIdOferta = ofertaVencedora?.cotacao_fornecedor_id
+          const cfOferta = cfIdOferta
+            ? fornecedorCotacoes.find((f) => !!f && f.id === cfIdOferta)
             : undefined
           if (ofertaVencedora && !(cfOferta?.oferta_moeda || '').trim()) {
             pendencias.push(`${desc}: moeda da oferta não definida.`)
@@ -490,9 +491,12 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, AddItemsTo
             const vendaNumero = Number(si.data.preco_unitario) || 0
             // Precisão escolhida na linha (2 ou 3), preservada ao salvar; padrão 2.
             const decimais = si.data.precisao_preco === 3 ? 3 : 2
-            const ofertaVencedora = cotacoesItens.find((ci) => ci.item_id === si.id && ci.vencedor)
-            const cfOferta = ofertaVencedora
-              ? fornecedorCotacoes.find((f) => f.id === ofertaVencedora.cotacao_fornecedor_id)
+            const ofertaVencedora = cotacoesItens.find(
+              (ci) => ci?.item_id === si.id && ci?.vencedor,
+            )
+            const cfIdOferta = ofertaVencedora?.cotacao_fornecedor_id
+            const cfOferta = cfIdOferta
+              ? fornecedorCotacoes.find((f) => !!f && f.id === cfIdOferta)
               : undefined
             return {
               id: si.recordId,
