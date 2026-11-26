@@ -196,9 +196,39 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
   useRealtime('cotacoes_fornecedor', loadData)
   useRealtime('cotacoes_itens', loadData)
 
+  // Grava o aceite como "Preço de Compra Selecionado" na aba Items do potencial
+  // (campos referencia_preco / referencia_fornecedor / referencia_data / moeda_compra
+  // de potencial_itens — os mesmos que a aba Items exibe).
+  const persistirCompraSelecionada = async (cfId: string, ofertas: any[]) => {
+    const cf = cotacoesF.find((c) => c.id === cfId)
+    const nomeFornecedor = cf?.expand?.fornecedor_id?.nome || ''
+    const moeda = cf?.oferta_moeda || 'USD'
+    const agora = new Date().toISOString()
+
+    const updates = ofertas
+      .map((c) => {
+        const pi = potencialItens.find((p) => p.item_id === c.item_id)
+        if (!pi) return null
+        const draft = draftPrices[`${cfId}_${c.item_id}`]
+        const preco = draft !== undefined ? draft : c.preco_ofertado || 0
+        if (preco <= 0) return null
+        return pb.collection('potencial_itens').update(pi.id, {
+          referencia_preco: preco,
+          referencia_fornecedor: nomeFornecedor,
+          referencia_data: agora,
+          moeda_compra: moeda,
+        })
+      })
+      .filter(Boolean) as Promise<any>[]
+
+    await Promise.all(updates)
+    if (onAccepted) await onAccepted()
+    return updates.length
+  }
+
   // Duplo clique no cabeçalho do fabricante: aceita todos os preços dele de uma vez,
-  // sem abrir nenhuma caixa.
-  const handleSelectAllFor = (cfId: string) => {
+  // sem abrir nenhuma caixa — e grava na aba Items.
+  const handleSelectAllFor = async (cfId: string) => {
     const offers = cotacoesI.filter((c) => c.cotacao_fornecedor_id === cfId)
     if (!offers.length) {
       toast({
@@ -215,10 +245,19 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
       return next
     })
     const nome = cotacoesF.find((c) => c.id === cfId)?.expand?.fornecedor_id?.nome || 'fabricante'
-    toast({
-      title: 'Preços aceitos',
-      description: `${offers.length} preço(s) de ${nome} aceito(s) para compra.`,
-    })
+    try {
+      const gravados = await persistirCompraSelecionada(cfId, offers)
+      toast({
+        title: 'Preços aceitos',
+        description: `${gravados} preço(s) de ${nome} gravado(s) como Preço de Compra Selecionado na aba Items.`,
+      })
+    } catch (err: any) {
+      toast({
+        title: 'Aceite marcado, erro ao gravar na aba Items',
+        description: err.message,
+        variant: 'destructive',
+      })
+    }
   }
 
   const handleFileSelect = (cfId: string, file: File) => {
@@ -483,7 +522,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
 
   // Duplo clique na célula do item: aceita o preço deste fabricante para o item,
   // sem abrir o diálogo de revisão.
-  const handleToggleWinner = (
+  const handleToggleWinner = async (
     cfId: string,
     itemId: string,
     _ofertaId?: string,
@@ -500,7 +539,78 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
     }
     if (isAccepted(cfId, itemId, offer)) return
     setAccepted((prev) => ({ ...prev, [`${cfId}_${itemId}`]: true }))
-    toast({ title: 'Preço aceito', description: 'Item selecionado para compra.' })
+    try {
+      await persistirCompraSelecionada(cfId, [offer])
+      toast({
+        title: 'Preço aceito',
+        description: 'Gravado como Preço de Compra Selecionado do item na aba Items.',
+      })
+    } catch (err: any) {
+      toast({
+        title: 'Aceite marcado, erro ao gravar na aba Items',
+        description: err.message,
+        variant: 'destructive',
+      })
+    }
+  }
+
+  // Edição pontual de uma oferta (cotação melhor recebida deste ou de outro
+  // fabricante): grava preço novo e MOQ no registro da oferta (cotacoes_itens).
+  const handleSaveCellEdit = async (cfId: string, itemId: string, preco: number, moq: number) => {
+    const key = `${cfId}_${itemId}`
+    try {
+      const ci = cotacoesI.find((c) => c.cotacao_fornecedor_id === cfId && c.item_id === itemId)
+      if (ci) {
+        await pb.collection('cotacoes_itens').update(ci.id, {
+          preco_ofertado: preco,
+          quantidade_minima: moq,
+        })
+      } else {
+        await pb.collection('cotacoes_itens').create({
+          cotacao_fornecedor_id: cfId,
+          item_id: itemId,
+          preco_ofertado: preco,
+          quantidade_minima: moq,
+          vencedor: false,
+        })
+      }
+      setDraftPrices((p) => {
+        const n = { ...p }
+        delete n[key]
+        return n
+      })
+      setDraftMoqs((p) => {
+        const n = { ...p }
+        delete n[key]
+        return n
+      })
+      await loadData()
+      toast({
+        title: 'Oferta atualizada',
+        description: 'Preço e MOQ da oferta salvos com sucesso.',
+      })
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao salvar oferta',
+        description: err.message,
+        variant: 'destructive',
+      })
+    }
+  }
+
+  // Cancela a edição da célula: descarta rascunhos de preço e MOQ.
+  const handleCancelCellEdit = (cfId: string, itemId: string) => {
+    const key = `${cfId}_${itemId}`
+    setDraftPrices((p) => {
+      const n = { ...p }
+      delete n[key]
+      return n
+    })
+    setDraftMoqs((p) => {
+      const n = { ...p }
+      delete n[key]
+      return n
+    })
   }
 
   const handleExportExcel = () => {
@@ -1406,6 +1516,8 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                 setDraftMoqs((p) => ({ ...p, [`${cfId}_${itemId}`]: val }))
                               }
                               onToggleWinner={handleToggleWinner}
+                              onSaveCell={handleSaveCellEdit}
+                              onCancelEdit={handleCancelCellEdit}
                             />
                           </TableCell>
                         )
