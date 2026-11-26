@@ -372,9 +372,11 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, AddItemsTo
     }
 
     // Validação para "Concluir Cotação": itens, quantidade, unidade, moeda,
-    // preço de venda e oferta selecionada por item. Pendências bloqueiam a
-    // conclusão, mas ainda permitem Salvar Rascunho.
-    const validarConcluirCotacao = (): string[] => {
+    // preço de venda e oferta selecionada OU Preço de Compra Selecionado por
+    // item (referencia_preco gravado pelo duplo clique na matriz, direto em
+    // potencial_itens). Pendências bloqueiam a conclusão, mas ainda permitem
+    // Salvar Rascunho.
+    const validarConcluirCotacao = (precosSelecionados?: Map<string, number>): string[] => {
       const pendencias: string[] = []
       if (selectedItems.length === 0) {
         pendencias.push('Nenhum item adicionado à cotação.')
@@ -395,7 +397,14 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, AddItemsTo
           pendencias.push(`${desc}: preço de venda deve ser maior que 0.`)
         }
         const ofertaVencedora = cotacoesItens.find((ci) => ci.item_id === si.id && ci.vencedor)
-        if (!ofertaVencedora) {
+        // Preço de Compra Selecionado: valor em memória OU gravado no banco
+        // (mapa id/recordId → referencia_preco > 0, conferido antes de validar).
+        const temPrecoSelecionado =
+          Number(si.data.referencia_preco) > 0 ||
+          (!!precosSelecionados &&
+            ((!!si.recordId && precosSelecionados.has(si.recordId)) ||
+              precosSelecionados.has(si.id)))
+        if (!ofertaVencedora && !temPrecoSelecionado) {
           pendencias.push(`${desc}: nenhuma oferta de fabricante selecionada.`)
         } else {
           const cfOferta = fornecedorCotacoes.find(
@@ -414,7 +423,35 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, AddItemsTo
         return toast.error('O número da cotação é obrigatório.')
       }
       if (statusOverride === 'Completo') {
-        const pendencias = validarConcluirCotacao()
+        // Fonte da verdade do aceite: referencia_preco gravado em potencial_itens
+        // pelo duplo clique na matriz. Conferido no banco antes de validar; se a
+        // leitura falhar, a validação usa só o estado em memória.
+        let precosSelecionados: Map<string, number> | undefined
+        try {
+          const targetPotencialId =
+            currentPotential?.id ||
+            searchParams.get('id') ||
+            searchParams.get('potencialId') ||
+            searchParams.get('potencial_id')
+          if (targetPotencialId) {
+            const rows = await pb.collection('potencial_itens').getFullList({
+              filter: `potencial_id="${targetPotencialId}"`,
+              fields: 'id,item_id,referencia_preco',
+            })
+            const mapa = new Map<string, number>()
+            rows.forEach((r: any) => {
+              const preco = Number(r.referencia_preco)
+              if (!isNaN(preco) && preco > 0) {
+                mapa.set(r.id, preco)
+                if (r.item_id) mapa.set(r.item_id, preco)
+              }
+            })
+            precosSelecionados = mapa
+          }
+        } catch (err) {
+          console.error('Falha ao conferir Preços de Compra Selecionados no banco', err)
+        }
+        const pendencias = validarConcluirCotacao(precosSelecionados)
         if (pendencias.length > 0) {
           setPendenciasConcluir(pendencias)
           return
