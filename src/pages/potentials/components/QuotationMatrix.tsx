@@ -16,7 +16,6 @@ import {
   Truck,
   Clock,
   CreditCard,
-  Check,
 } from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
 import { Switch } from '@/components/ui/switch'
@@ -45,6 +44,7 @@ import {
   CommandList,
 } from '@/components/ui/command'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { CalendarDays, DollarSign } from 'lucide-react'
 import { cn, textMatchesAll } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { CounterProposalModal } from './CounterProposalModal'
@@ -77,7 +77,16 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
   const [draftPrices, setDraftPrices] = useState<Record<string, number>>({})
   const [draftMoqs, setDraftMoqs] = useState<Record<string, number>>({})
   const [cfDrafts, setCfDrafts] = useState<
-    Record<string, { incoterm?: string; tempo_fabricacao?: string; condicao_pagamento?: string }>
+    Record<
+      string,
+      {
+        incoterm?: string
+        tempo_fabricacao?: string
+        condicao_pagamento?: string
+        oferta_moeda?: string
+        oferta_validade?: string
+      }
+    >
   >({})
   const [savingCfIds, setSavingCfIds] = useState<Record<string, boolean>>({})
   const [isSavingDraft, setIsSavingDraft] = useState(false)
@@ -327,6 +336,8 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
         updatePayload.tempo_fabricacao = draft.tempo_fabricacao
       if (draft.condicao_pagamento !== undefined)
         updatePayload.condicao_pagamento = draft.condicao_pagamento
+      if (draft.oferta_moeda !== undefined) updatePayload.oferta_moeda = draft.oferta_moeda
+      if (draft.oferta_validade !== undefined) updatePayload.oferta_validade = draft.oferta_validade
 
       await pb.collection('cotacoes_fornecedor').update(cfId, updatePayload)
 
@@ -435,6 +446,9 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
           updatePayload.tempo_fabricacao = drafts.tempo_fabricacao
         if (drafts.condicao_pagamento !== undefined)
           updatePayload.condicao_pagamento = drafts.condicao_pagamento
+        if (drafts.oferta_moeda !== undefined) updatePayload.oferta_moeda = drafts.oferta_moeda
+        if (drafts.oferta_validade !== undefined)
+          updatePayload.oferta_validade = drafts.oferta_validade
 
         if (Object.keys(updatePayload).length > 0) {
           promises.push(pb.collection('cotacoes_fornecedor').update(cfId, updatePayload))
@@ -865,7 +879,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                     key={cf.id}
                     className="min-w-[160px] bg-muted/30 border-r py-2 cursor-pointer select-none"
                     onDoubleClick={() => handleSelectAllFor(cf.id)}
-                    title="Duplo clique para selecionar todos os itens deste fabricante"
+                    title="Duplo clique para aceitar todos os preços deste fabricante"
                   >
                     <div className="flex flex-col items-center relative group">
                       <div className="flex items-center gap-1 w-full justify-center">
@@ -878,7 +892,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                           <TooltipContent side="top">
                             <p className="font-semibold">{cf.expand?.fornecedor_id?.nome}</p>
                             <p className="text-[10px] text-muted-foreground mt-0.5">
-                              Dê duplo clique para selecionar todos os itens
+                              Dê duplo clique para aceitar todos os preços
                             </p>
                           </TooltipContent>
                         </Tooltip>
@@ -1009,7 +1023,9 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                                   cfDrafts[cf.id] !== undefined &&
                                   (cfDrafts[cf.id]?.incoterm !== undefined ||
                                     cfDrafts[cf.id]?.tempo_fabricacao !== undefined ||
-                                    cfDrafts[cf.id]?.condicao_pagamento !== undefined)
+                                    cfDrafts[cf.id]?.condicao_pagamento !== undefined ||
+                                    cfDrafts[cf.id]?.oferta_moeda !== undefined ||
+                                    cfDrafts[cf.id]?.oferta_validade !== undefined)
                                 const isSavingThisCf = !!savingCfIds[cf.id]
 
                                 return (
@@ -1114,9 +1130,21 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                             : cf.condicao_pagamento ||
                               cf.expand?.fornecedor_id?.condicao_pagamento ||
                               ''
+                        const effectiveMoeda =
+                          cfDrafts[cf.id]?.oferta_moeda !== undefined
+                            ? cfDrafts[cf.id].oferta_moeda
+                            : cf.oferta_moeda || ''
+                        const effectiveValidade =
+                          cfDrafts[cf.id]?.oferta_validade !== undefined
+                            ? cfDrafts[cf.id].oferta_validade
+                            : cf.oferta_validade || ''
 
                         const hasAnyCondition =
-                          !!effectiveIncoterm || !!effectiveTempo || !!effectivePagamento
+                          !!effectiveIncoterm ||
+                          !!effectiveTempo ||
+                          !!effectivePagamento ||
+                          !!effectiveMoeda ||
+                          !!effectiveValidade
 
                         if (!hasAnyCondition) {
                           return (
@@ -1128,6 +1156,30 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
 
                         return (
                           <div className="w-full flex flex-col gap-0.5 mt-1 pt-1 border-t border-border/50 text-[10px] text-left">
+                            {effectiveMoeda && (
+                              <div className="flex items-center gap-1 text-muted-foreground">
+                                <DollarSign className="w-2.5 h-2.5 shrink-0 text-blue-600" />
+                                <span className="font-medium text-foreground shrink-0 text-[9px]">
+                                  Moeda:
+                                </span>
+                                <span className="truncate text-[9px] text-muted-foreground max-w-[100px]">
+                                  {effectiveMoeda}
+                                </span>
+                              </div>
+                            )}
+
+                            {effectiveValidade && (
+                              <div className="flex items-center gap-1 text-muted-foreground">
+                                <CalendarDays className="w-2.5 h-2.5 shrink-0 text-blue-600" />
+                                <span className="font-medium text-foreground shrink-0 text-[9px]">
+                                  Validade:
+                                </span>
+                                <span className="truncate text-[9px] text-muted-foreground max-w-[100px]">
+                                  {effectiveValidade}
+                                </span>
+                              </div>
+                            )}
+
                             {effectiveIncoterm && (
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -1346,6 +1398,7 @@ export default function QuotationMatrix({ onAccepted }: QuotationMatrixProps = {
                               draftPrice={draft}
                               draftMoq={draftMoqs[`${cf.id}_${pi.item_id}`]}
                               isLowest={currentPrice > 0 && currentPrice === lowestCurrentPrice}
+                              accepted={isWinnerCell}
                               onDraftChange={(cfId: string, itemId: string, val: number) =>
                                 setDraftPrices((p) => ({ ...p, [`${cfId}_${itemId}`]: val }))
                               }

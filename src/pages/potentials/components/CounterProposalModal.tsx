@@ -231,7 +231,6 @@ export function CounterProposalModal({
                 <th className="text-left p-3">SKU / fabricante</th>
                 <th className="p-3 text-right">Oferta atual</th>
                 <th className="p-3 text-right">Alvo C2</th>
-                <th className="p-3">Resposta</th>
               </tr>
             </thead>
             <tbody>

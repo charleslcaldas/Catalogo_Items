@@ -8,6 +8,7 @@ export function PriceCell({
   draftPrice,
   draftMoq,
   isLowest,
+  accepted: acceptedProp,
   onDraftChange,
   onBlur,
   onToggleWinner,
@@ -18,7 +19,10 @@ export function PriceCell({
   const hasCounter = cotacaoI && cotacaoI.preco_contraproposta > 0
   const counterPrice = cotacaoI?.preco_contraproposta
 
-  const accepted = cotacaoI?.vencedor || cotacaoI?.selecionadoLocal === true
+  // Aceite pode vir de fora (duplo clique na célula ou no header do fabricante)
+  // ou do próprio registro (vencedor salvo).
+  const accepted =
+    acceptedProp === true || cotacaoI?.vencedor === true || cotacaoI?.selecionadoLocal === true
 
   return (
     <div
@@ -77,6 +81,7 @@ export function PriceCell({
           )}
         >
           MLQ {currentMoq.toLocaleString('pt-BR')}
+          {item?.unidade_medida ? ` ${item.unidade_medida}` : ''}
         </p>
       )}
     </div>
