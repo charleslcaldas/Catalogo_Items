@@ -883,18 +883,18 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, AddItemsTo
     const moqPorItem = useMemo<Record<string, number>>(() => {
       const map: Record<string, number> = {}
       selectedItems.forEach((si) => {
-        const ofertas = cotacoesItens.filter((ci) => ci.item_id === si.id)
+        const ofertas = cotacoesItens.filter((ci) => !!ci && ci.item_id === si.id)
         if (ofertas.length === 0) return
         const refForn = (si.data.referencia_fornecedor || '').trim()
         const refPreco = typeof si.data.referencia_preco === 'number' ? si.data.referencia_preco : 0
         const cfIdsPorNome = refForn
           ? fornecedorCotacoes
-              .filter((f) => (f.expand?.fornecedor_id?.nome || '').trim() === refForn)
+              .filter((f) => !!f && (f.expand?.fornecedor_id?.nome || '').trim() === refForn)
               .map((f) => f.id)
           : []
         const escolhida =
-          ofertas.find((ci) => ci.vencedor) ||
-          ofertas.find((ci) => cfIdsPorNome.includes(ci.cotacao_fornecedor_id)) ||
+          ofertas.find((ci) => !!ci?.vencedor) ||
+          ofertas.find((ci) => cfIdsPorNome.includes(ci?.cotacao_fornecedor_id)) ||
           (refPreco > 0 ? ofertas.find((ci) => Number(ci.preco_ofertado) === refPreco) : undefined)
         if (!escolhida) return
         const moq = Number(escolhida.quantidade_minima) || 0
@@ -973,9 +973,9 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, AddItemsTo
 
       // Analisar cotacoesItens apenas dos itens vencedores vigentes da cotação atual
       cotacoesItens.forEach((ci) => {
-        if (ci.vencedor && itemQtyMap.has(ci.item_id)) {
+        if (ci?.vencedor && itemQtyMap.has(ci.item_id)) {
           const cfId = ci.cotacao_fornecedor_id
-          const cf = fornecedorCotacoes.find((f) => f.id === cfId)
+          const cf = fornecedorCotacoes.find((f) => !!f && f.id === cfId)
           if (cf) {
             const qty = itemQtyMap.get(ci.item_id) || 0
             const preco =
