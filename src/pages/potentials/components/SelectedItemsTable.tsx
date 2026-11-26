@@ -66,27 +66,6 @@ export function SelectedItemsTable({
       : `${currency} ${num.toLocaleString('en-US', { minimumFractionDigits: minDec, maximumFractionDigits: maxDec })}`
   }
 
-  // Precisão por linha (2 ou 3 casas). Reduzir para 2 arredonda o preço para
-  // que o valor exibido continue sendo exatamente o salvo.
-  const handlePrecisionChange = async (record: SelectedItemRecord, value: string) => {
-    const p = value === '3' ? 3 : 2
-    const unitRaw = Number(record.data.preco_unitario)
-    const rounded = p === 2 && Number.isFinite(unitRaw) ? Number(unitRaw.toFixed(2)) : unitRaw
-    handleUpdateItem(record.id, 'precisao_preco', String(p))
-    if (p === 2 && Number.isFinite(unitRaw)) {
-      handleUpdateItem(record.id, 'preco_unitario', String(rounded))
-    }
-    if (record.recordId && record.recordId.length === 15) {
-      const payload: Record<string, number> = { precisao_preco: p }
-      if (p === 2 && Number.isFinite(unitRaw)) payload.preco_unitario = rounded
-      try {
-        await pb.collection('potencial_itens').update(record.recordId, payload)
-      } catch (err) {
-        console.error('Auto-save precision failed', err)
-      }
-    }
-  }
-
   const handleQuantityBlur = async (recordId: string | undefined, quantidade: string | number) => {
     if (recordId && recordId.length === 15) {
       try {
@@ -160,20 +139,7 @@ export function SelectedItemsTable({
               </TableHead>
               <TableHead className="w-24 text-[11px] text-right">Margem de Venda (%)</TableHead>
               <TableHead className="w-28 text-[11px] text-right">Preço de Venda</TableHead>
-              <TableHead className="w-14 text-[11px] text-center">
-                <Tooltip>
-                  <TooltipTrigger className="cursor-help underline decoration-dashed underline-offset-2">
-                    Prec.
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="text-xs font-semibold">Precisão do preço</p>
-                    <p className="text-[10px] text-muted-foreground mt-1 max-w-[160px] leading-tight">
-                      Casas decimais (2 ou 3) usadas para exibir e salvar o preço de venda desta
-                      linha.
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TableHead>
+
               <TableHead className="w-24 text-[11px] text-right">Total</TableHead>
               <TableHead className="w-10 text-center text-[11px]">Ação</TableHead>
             </TableRow>
@@ -404,17 +370,7 @@ export function SelectedItemsTable({
                       }}
                     />
                   </TableCell>
-                  <TableCell className="py-1 text-center">
-                    <select
-                      className="h-7 w-12 rounded-md border bg-white text-xs text-center"
-                      title="Precisão do preço (casas decimais)"
-                      value={precisao}
-                      onChange={(e) => handlePrecisionChange(record, e.target.value)}
-                    >
-                      <option value={2}>2</option>
-                      <option value={3}>3</option>
-                    </select>
-                  </TableCell>
+
                   <TableCell className="py-1 text-xs font-semibold text-right whitespace-nowrap">
                     {formatCurrency(total, 2, precisao, data.moeda_compra || 'USD')}
                   </TableCell>

@@ -371,6 +371,46 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, AddItemsTo
       })
     }
 
+    // Precisão de casas decimais (2 ou 3) aplicada a TODOS os itens de uma vez.
+    // Reduzir para 2 arredonda o preço de venda, para que o valor exibido seja
+    // o salvo. Itens já salvos (recordId) gravam precisao_preco no banco.
+    const handlePrecisaoGlobal = async (value: string) => {
+      const p = value === '3' ? 3 : 2
+      const atuais = selectedItemsRef.current
+      const novos = atuais.map((si) => {
+        const unitRaw = Number(si.data.preco_unitario)
+        const arredondar = p === 2 && Number.isFinite(unitRaw)
+        const rounded = arredondar ? Number(unitRaw.toFixed(2)) : unitRaw
+        return {
+          ...si,
+          data: {
+            ...si.data,
+            precisao_preco: p,
+            ...(arredondar ? { preco_unitario: rounded } : {}),
+          },
+        }
+      })
+      setSelectedItems(novos)
+      const updates: Promise<unknown>[] = []
+      novos.forEach((si, i) => {
+        if (si.recordId && si.recordId.length === 15) {
+          const original = atuais[i]
+          const payload: Record<string, number> = { precisao_preco: p }
+          if (si.data.preco_unitario !== original.data.preco_unitario) {
+            payload.preco_unitario = Number(si.data.preco_unitario)
+          }
+          updates.push(pb.collection('potencial_itens').update(si.recordId, payload))
+        }
+      })
+      if (updates.length > 0) {
+        const results = await Promise.allSettled(updates)
+        const falhas = results.filter((r) => r.status === 'rejected').length
+        if (falhas > 0) {
+          console.error(`Falha ao salvar casas decimais em ${falhas} item(ns).`)
+        }
+      }
+    }
+
     // Validação para "Concluir Cotação": itens, quantidade, unidade, moeda,
     // preço de venda e oferta selecionada OU Preço de Compra Selecionado por
     // item (referencia_preco gravado pelo duplo clique na matriz, direto em
@@ -1281,7 +1321,26 @@ export const AddItemsToPotential = forwardRef<AddItemsToPotentialRef, AddItemsTo
         />
 
         <div className="bg-white rounded-lg border shadow-sm flex flex-col flex-1 min-h-0">
-          <div className="p-3 border-b flex items-center justify-end bg-slate-50/50 rounded-t-lg shrink-0">
+          <div className="p-3 border-b flex flex-wrap items-center justify-between gap-2 bg-slate-50/50 rounded-t-lg shrink-0">
+            <div className="flex items-center gap-2">
+              <label htmlFor="precisao-global-casas" className="text-xs font-medium">
+                Casas decimais dos preços (todos os itens)
+              </label>
+              <select
+                id="precisao-global-casas"
+                className="h-8 rounded-md border bg-white text-xs px-2"
+                value={
+                  selectedItems.length > 0 &&
+                  selectedItems.every((si) => si.data.precisao_preco === 3)
+                    ? 3
+                    : 2
+                }
+                onChange={(e) => handlePrecisaoGlobal(e.target.value)}
+              >
+                <option value={2}>2</option>
+                <option value={3}>3</option>
+              </select>
+            </div>
             <Button
               size="sm"
               className="rounded-full h-8 px-4 text-xs font-medium shadow-sm"
